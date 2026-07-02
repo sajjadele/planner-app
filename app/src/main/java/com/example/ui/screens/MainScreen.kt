@@ -6,9 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Extension
@@ -32,6 +30,8 @@ import com.example.core.plugin.ModuleSettingsViewModel
 import com.example.core.plugin.PluginRegistry
 import com.example.core.search.SearchDialog
 import com.example.plugins.planner.PlannerViewModel
+import com.example.ui.screens.components.MainBottomBar
+import com.example.ui.screens.components.MainTopBar
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -76,144 +76,18 @@ fun MainScreen(
             .fillMaxSize()
             .background(Color(0xFFFDFBFF)),
         topBar = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "Vision Planner",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1C1B1F),
-                            letterSpacing = (-0.5).sp
-                        )
-                        Text(
-                            text = getPersianTodayDate(),
-                            fontSize = 12.sp,
-                            color = Color(0xFF49454F),
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Advanced Search Button
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .background(Color(0xFFEADDFF).copy(alpha = 0.5f), CircleShape)
-                                .clip(CircleShape)
-                                .clickable { showSearchDialog = true }
-                                .testTag("search_button"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "جستجو",
-                                tint = Color(0xFF21005D),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        // Settings/About Button
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .background(Color(0xFFEADDFF), CircleShape)
-                                .clip(CircleShape)
-                                .clickable { showSettingsInfo = true }
-                                .testTag("settings_button"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "About",
-                                tint = Color(0xFF21005D),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                }
-            }
+            MainTopBar(
+                currentDate = getPersianTodayDate(),
+                onSearchClick = { showSearchDialog = true },
+                onSettingsClick = { showSettingsInfo = true }
+            )
         },
         bottomBar = {
-            // Elegant navigation bar conforming to Material 3 standard in the mockup
-            NavigationBar(
-                containerColor = Color(0xFFF3EDF7),
-                tonalElevation = 0.dp,
-                modifier = Modifier
-                    .navigationBarsPadding()
-                    .height(80.dp)
-                    .testTag("bottom_nav_bar")
-            ) {
-                // Render tabs for all active plugins
-                activePlugins.forEach { plugin ->
-                    val isSelected = selectedTabId == plugin.id
-                    NavigationBarItem(
-                        selected = isSelected,
-                        onClick = { selectedTabId = plugin.id },
-                        icon = {
-                            Icon(
-                                imageVector = plugin.icon,
-                                contentDescription = plugin.name
-                            )
-                        },
-                        label = {
-                            Text(
-                                text = plugin.name.take(12),
-                                fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            )
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color(0xFF1D192B),
-                            unselectedIconColor = Color(0xFF49454F),
-                            selectedTextColor = Color(0xFF1D192B),
-                            unselectedTextColor = Color(0xFF49454F),
-                            indicatorColor = Color(0xFFE8DEF8)
-                        ),
-                        modifier = Modifier.testTag("nav_tab_${plugin.id}")
-                    )
-                }
-
-                // Standard Modules Management Tab
-                val isModulesSelected = selectedTabId == "modules"
-                NavigationBarItem(
-                    selected = isModulesSelected,
-                    onClick = { selectedTabId = "modules" },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.Extension,
-                            contentDescription = "Modules"
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = "ماژول‌ها",
-                            fontSize = 11.sp,
-                            fontWeight = if (isModulesSelected) FontWeight.Bold else FontWeight.Medium
-                        )
-                    },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color(0xFF1D192B),
-                        unselectedIconColor = Color(0xFF49454F),
-                        selectedTextColor = Color(0xFF1D192B),
-                        unselectedTextColor = Color(0xFF49454F),
-                        indicatorColor = Color(0xFFE8DEF8)
-                    ),
-                    modifier = Modifier.testTag("nav_tab_modules")
-                )
-            }
+            MainBottomBar(
+                activePlugins = activePlugins,
+                selectedTabId = selectedTabId,
+                onTabSelected = { selectedTabId = it }
+            )
         }
     ) { innerPadding ->
         AnimatedContent(
