@@ -1,0 +1,6 @@
+{
+  "name": "Vision Planner",
+  "description": "An offline, modular personal productivity planner with a plugin-based architecture, task scheduler, local reminders, and a clean minimalist design.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
