@@ -229,13 +229,16 @@ fun SearchTaskItem(
     task: SearchResult.TaskResult,
     onClick: () -> Unit
 ) {
-    val priorityColor = when (task.priority.uppercase()) {
+    // Handle nullable priority safely - default to LOW for display
+    val priorityValue = task.priority ?: "LOW"
+    
+    val priorityColor = when (priorityValue.uppercase()) {
         "HIGH" -> Color(0xFFB3261E)
         "MEDIUM" -> Color(0xFF6750A4)
         else -> Color(0xFF49454F)
     }
     
-    val priorityLabel = when (task.priority.uppercase()) {
+    val priorityLabel = when (priorityValue.uppercase()) {
         "HIGH" -> "فوری"
         "MEDIUM" -> "متوسط"
         else -> "عادی"

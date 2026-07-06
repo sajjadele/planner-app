@@ -56,29 +56,8 @@ fun MainBottomBar(
             )
         }
 
-        NavigationBarItem(
-            selected = selectedTabId == "modules",
-            onClick = { onTabSelected("modules") },
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.Extension,
-                    contentDescription = "Modules"
-                )
-            },
-            label = {
-                Text(
-                    text = "ماژول‌ها",
-                    fontSize = 11.sp,
-                    fontWeight = if (selectedTabId == "modules") {
-                        FontWeight.Bold
-                    } else {
-                        FontWeight.Medium
-                    }
-                )
-            },
-            colors = navigationBarColors(),
-            modifier = Modifier.testTag("nav_tab_modules")
-        )
+        // Module management intentionally hidden from primary MVP navigation.
+        // Plugin infrastructure still exists but should not dominate the UX.
     }
 }
 

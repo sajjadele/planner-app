@@ -82,7 +82,9 @@ fun TaskCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(top = 4.dp)
             ) {
-                PriorityChip(priority = task.priority)
+                if (task.priority != null) {
+                    PriorityChip(priority = task.priority)
+                }
 
                 if (task.reminderHour != null && task.reminderMinute != null) {
                     Spacer(modifier = Modifier.width(12.dp))
@@ -123,7 +125,7 @@ fun TaskCard(
 }
 
 @Composable
-private fun PriorityChip(priority: String) {
+private fun PriorityChip(priority: String?) {
     val priorityLabel = when (priority) {
         "HIGH" -> "اولویت بالا"
         "MEDIUM" -> "اولویت متوسط"

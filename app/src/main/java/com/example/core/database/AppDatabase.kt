@@ -8,20 +8,24 @@ import com.example.plugins.notes.NoteDao
 import com.example.plugins.notes.NoteEntity
 import com.example.plugins.planner.TaskDao
 import com.example.plugins.planner.TaskEntity
+import com.example.plugins.planner.TaskEventDao
+import com.example.plugins.planner.TaskEventEntity
 
 @Database(
     entities = [
         ModuleSettingsEntity::class,
         TaskEntity::class,
+        TaskEventEntity::class,
         NoteEntity::class
     ],
-    version = 1,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun moduleSettingsDao(): ModuleSettingsDao
     abstract fun taskDao(): TaskDao
     abstract fun noteDao(): NoteDao
+    abstract fun taskEventDao(): TaskEventDao
 
     companion object {
         @Volatile

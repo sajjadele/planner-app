@@ -47,7 +47,7 @@ fun MainScreen(
     // Determine which registered plugins are currently enabled
     val activePlugins = remember(enabledModulesMap) {
         PluginRegistry.allPlugins.filter { plugin ->
-            enabledModulesMap[plugin.id] != false
+            enabledModulesMap[plugin.id] != false && plugin.id != "notes"
         }
     }
 
@@ -56,7 +56,9 @@ fun MainScreen(
     // 1 -> Second active plugin (if any)
     // ...
     // Last -> "Modules" Manager Tab (Always present)
-    var selectedTabId by remember { mutableStateOf("modules") }
+    // MVP-first UX: planner is the primary experience.
+    // Background systems remain available but are no longer the default focus.
+    var selectedTabId by remember { mutableStateOf("planner") }
 
     // Fallback logic: if selected tab is disabled, switch to the modules tab
     LaunchedEffect(activePlugins) {
@@ -152,7 +154,7 @@ fun MainScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "درباره Vision Planner",
+                        text = "Vision Planner",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF1C1B1F)

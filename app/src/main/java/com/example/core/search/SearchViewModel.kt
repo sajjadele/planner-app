@@ -15,7 +15,7 @@ sealed class SearchResult {
     data class TaskResult(
         val id: Int,
         val title: String,
-        val priority: String,
+        val priority: String?,
         val isCompleted: Boolean,
         val dayIndex: Int,
         val dayName: String

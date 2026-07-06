@@ -8,8 +8,8 @@ import com.example.core.plugin.AppPlugin
 
 class PlannerPlugin : AppPlugin {
     override val id: String = "planner"
-    override val name: String = "برنامه‌ریزی روزانه"
-    override val description: String = "مدیریت زمان، اولویت‌بندی کارها و تنظیم یادآور محلی آفلاین."
+    override val name: String = "وظایف"
+    override val description: String = "ثبت سریع و مدیریت وظایف به صورت کاملاً آفلاین با سازمان‌دهی اختیاری."
     override val icon = Icons.Default.EventNote
 
     @Composable

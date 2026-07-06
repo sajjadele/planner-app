@@ -17,13 +17,18 @@ import java.util.Calendar
 
 class PlannerViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: TaskRepository
+    private val taskEventDao: TaskEventDao
+
+    private val _lastCompletedTask = MutableStateFlow<TaskEntity?>(null)
+    val lastCompletedTask: StateFlow<TaskEntity?> = _lastCompletedTask
 
     init {
         val database = AppDatabase.getDatabase(application)
         repository = TaskRepository(database.taskDao())
+        taskEventDao = database.taskEventDao()
     }
 
-    // Default to today's index (0 = Monday, 6 = Sunday)
+    // Default to today's index (0 = Saturday/شنبه, 6 = Friday/جمعه)
     private val _selectedDayIndex = MutableStateFlow(getTodayIndex())
     val selectedDayIndex: StateFlow<Int> = _selectedDayIndex
 
@@ -40,17 +45,26 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         _selectedDayIndex.value = index
     }
 
-    fun addTask(title: String, priority: String, hour: Int?, minute: Int?) {
+    fun addTask(title: String, priority: String?, hour: Int?, minute: Int?, goalName: String?, valueTag: String?) {
         viewModelScope.launch {
             val task = TaskEntity(
                 title = title,
                 priority = priority,
                 dayIndex = _selectedDayIndex.value,
                 reminderHour = hour,
-                reminderMinute = minute
+                reminderMinute = minute,
+                goalName = goalName,
+                valueTag = valueTag
             )
             val generatedId = repository.insertTask(task)
-            
+
+            taskEventDao.insertEvent(
+                TaskEventEntity(
+                    taskId = generatedId.toInt(),
+                    eventType = "created"
+                )
+            )
+
             // If reminder scheduled, schedule with updated ID
             if (hour != null && minute != null) {
                 val finalTask = task.copy(id = generatedId.toInt())
@@ -63,18 +77,44 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             val updatedTask = task.copy(isCompleted = !task.isCompleted)
             repository.updateTask(updatedTask)
-            
-            // Cancel alarm if task is completed
+
             if (updatedTask.isCompleted) {
+                taskEventDao.insertEvent(
+                    TaskEventEntity(taskId = updatedTask.id, eventType = "completed")
+                )
                 ReminderScheduler.cancel(getApplication(), updatedTask)
-            } else if (updatedTask.reminderHour != null && updatedTask.reminderMinute != null) {
-                ReminderScheduler.schedule(getApplication(), updatedTask)
+                _lastCompletedTask.value = updatedTask
+            } else {
+                taskEventDao.insertEvent(
+                    TaskEventEntity(taskId = updatedTask.id, eventType = "reopened")
+                )
+                if (updatedTask.reminderHour != null && updatedTask.reminderMinute != null) {
+                    ReminderScheduler.schedule(getApplication(), updatedTask)
+                }
+            }
+        }
+    }
+
+    fun undoLastComplete() {
+        val completed = _lastCompletedTask.value ?: return
+        _lastCompletedTask.value = null
+        viewModelScope.launch {
+            val reopened = completed.copy(isCompleted = false)
+            repository.updateTask(reopened)
+            taskEventDao.insertEvent(
+                TaskEventEntity(taskId = reopened.id, eventType = "reopened")
+            )
+            if (reopened.reminderHour != null && reopened.reminderMinute != null) {
+                ReminderScheduler.schedule(getApplication(), reopened)
             }
         }
     }
 
     fun deleteTask(task: TaskEntity) {
         viewModelScope.launch {
+            taskEventDao.insertEvent(
+                TaskEventEntity(taskId = task.id, eventType = "deleted")
+            )
             repository.deleteTask(task)
             ReminderScheduler.cancel(getApplication(), task)
         }
@@ -88,14 +128,15 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
 
     private fun getTodayIndex(): Int {
         val calendar = Calendar.getInstance()
+        // Persian week: Saturday=0, Sunday=1, Monday=2, Tuesday=3, Wednesday=4, Thursday=5, Friday=6
         return when (calendar.get(Calendar.DAY_OF_WEEK)) {
-            Calendar.MONDAY -> 0
-            Calendar.TUESDAY -> 1
-            Calendar.WEDNESDAY -> 2
-            Calendar.THURSDAY -> 3
-            Calendar.FRIDAY -> 4
-            Calendar.SATURDAY -> 5
-            Calendar.SUNDAY -> 6
+            Calendar.SATURDAY -> 0
+            Calendar.SUNDAY -> 1
+            Calendar.MONDAY -> 2
+            Calendar.TUESDAY -> 3
+            Calendar.WEDNESDAY -> 4
+            Calendar.THURSDAY -> 5
+            Calendar.FRIDAY -> 6
             else -> 0
         }
     }
