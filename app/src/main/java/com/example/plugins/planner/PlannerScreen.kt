@@ -10,7 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.animation.AnimatedVisibility
+
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -30,7 +30,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.TextDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
@@ -83,53 +82,57 @@ fun PlannerScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Calendar Selection Row
+            // Calendar Selection Row — fixed height ensures circles align on same level
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(IntrinsicSize.Min)
+                    .height(64.dp)
                     .padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 daysOfWeek.forEachIndexed { index, (fullName, shortName) ->
                     val isSelected = index == selectedDayIndex
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                    Box(
+                        contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(12.dp))
                             .clickable { viewModel.selectDay(index) }
-                            .padding(vertical = 4.dp)
                     ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .background(
-                                    if (isSelected) Color(0xFF6750A4) else Color.Transparent,
-                                    shape = CircleShape
-                                )
-                                .border(
-                                    width = 1.dp,
-                                    color = if (isSelected) Color.Transparent else Color(0xFFCAC4D0),
-                                    shape = CircleShape
-                                )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(
+                                        if (isSelected) Color(0xFF6750A4) else Color.Transparent,
+                                        shape = CircleShape
+                                    )
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isSelected) Color.Transparent else Color(0xFFCAC4D0),
+                                        shape = CircleShape
+                                    )
+                            ) {
+                                Text(
+                                    text = shortName,
+                                    color = if (isSelected) Color.White else Color(0xFF49454F),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
                             Text(
-                                text = shortName,
-                                color = if (isSelected) Color.White else Color(0xFF49454F),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
+                                text = fullName.take(3),
+                                color = if (isSelected) Color(0xFF6750A4) else Color(0xFF938F99),
+                                fontSize = 10.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = fullName.take(3), // display compact name
-                            color = if (isSelected) Color(0xFF6750A4) else Color(0xFF938F99),
-                            fontSize = 10.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                        )
                     }
                 }
             }
@@ -252,35 +255,36 @@ fun PlannerScreen(
                                     color = if (task.isCompleted) Color(0xFF938F99) else Color(0xFF1C1B1F),
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Medium,
-                                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                                    textDirection = TextDirection.ContentOrStyle
+                                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
                                 )
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(top = 4.dp)
                                 ) {
-                                    val priorityLabel = when (task.priority) {
-                                        "HIGH" -> "اولویت بالا"
-                                        "MEDIUM" -> "اولویت متوسط"
-                                        else -> "اولویت پایین"
-                                    }
-                                    val priorityColor = when (task.priority) {
-                                        "HIGH" -> Color(0xFFB3261E)
-                                        "MEDIUM" -> Color(0xFF6750A4)
-                                        else -> Color(0xFF49454F)
-                                    }
+                                    if (task.priority != null) {
+                                        val priorityLabel = when (task.priority) {
+                                            "HIGH" -> "اولویت بالا"
+                                            "MEDIUM" -> "اولویت متوسط"
+                                            else -> "اولویت پایین"
+                                        }
+                                        val priorityColor = when (task.priority) {
+                                            "HIGH" -> Color(0xFFB3261E)
+                                            "MEDIUM" -> Color(0xFF6750A4)
+                                            else -> Color(0xFF49454F)
+                                        }
 
-                                    Box(
-                                        modifier = Modifier
-                                            .background(priorityColor.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = priorityLabel,
-                                            color = priorityColor,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .background(priorityColor.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = priorityLabel,
+                                                color = priorityColor,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
                                     }
 
                                     if (task.reminderHour != null && task.reminderMinute != null) {
@@ -295,8 +299,9 @@ fun PlannerScreen(
                                         val formattedTime = String.format("%02d:%02d", task.reminderHour, task.reminderMinute)
                                         Text(
                                             text = formattedTime,
-                                            color = Color(0xFF49454F),
-                                            fontSize = 10.sp
+                                            color = Color(0xFF1C1B1F),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
                                         )
                                     }
                                 }
@@ -392,11 +397,16 @@ fun PlannerScreen(
                         OutlinedTextField(
                             value = title,
                             onValueChange = { title = it },
-                            label = { Text("عنوان برنامه") },
-                            placeholder = { Text("مثال: بررسی معماری ماژولار") },
+                            label = { Text("عنوان برنامه", color = Color(0xFF49454F)) },
+                            placeholder = { Text("مثال: بررسی معماری ماژولار", color = Color(0xFF938F99)) },
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = Color(0xFF6750A4),
-                                focusedLabelColor = Color(0xFF6750A4)
+                                unfocusedBorderColor = Color(0xFF49454F),
+                                focusedLabelColor = Color(0xFF6750A4),
+                                unfocusedLabelColor = Color(0xFF49454F),
+                                cursorColor = Color(0xFF6750A4),
+                                focusedTextColor = Color(0xFF1C1B1F),
+                                unfocusedTextColor = Color(0xFF1C1B1F)
                             ),
                             shape = RoundedCornerShape(12.dp),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -445,7 +455,7 @@ fun PlannerScreen(
                                                     )
                                                 }
 
-                                                AnimatedVisibility(visible = showOptionalFields) {
+                                                if (showOptionalFields) {
                                                     Column(
                                                         modifier = Modifier
                                                             .fillMaxWidth()
@@ -558,14 +568,18 @@ fun PlannerScreen(
                                                             OutlinedTextField(
                                                                 value = goalName,
                                                                 onValueChange = { goalName = it },
-                                                                label = { Text("نام هدف، مثل: ورزیدن، یادگیری", fontSize = 12.sp) },
+                                                                label = { Text("نام هدف، مثل: ورزیدن، یادگیری", fontSize = 12.sp, color = Color(0xFF49454F)) },
                                                                 placeholder = { Text("بدون هدف", fontSize = 12.sp, color = Color(0xFF938F99)) },
                                                                 modifier = Modifier.fillMaxWidth(),
                                                                 singleLine = true,
                                                                 colors = OutlinedTextFieldDefaults.colors(
                                                                     focusedBorderColor = Color(0xFF6750A4),
-                                                                    unfocusedBorderColor = Color(0xFFCAC4D0),
-                                                                    cursorColor = Color(0xFF6750A4)
+                                                                    unfocusedBorderColor = Color(0xFF49454F),
+                                                                    focusedLabelColor = Color(0xFF6750A4),
+                                                                    unfocusedLabelColor = Color(0xFF49454F),
+                                                                    cursorColor = Color(0xFF6750A4),
+                                                                    focusedTextColor = Color(0xFF1C1B1F),
+                                                                    unfocusedTextColor = Color(0xFF1C1B1F)
                                                                 ),
                                                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                                                                 keyboardActions = KeyboardActions(onNext = { focusRequesterReminder.requestFocus() })

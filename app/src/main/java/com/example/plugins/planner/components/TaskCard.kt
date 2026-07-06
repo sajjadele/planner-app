@@ -103,8 +103,9 @@ fun TaskCard(
                     )
                     Text(
                         text = formattedTime,
-                        color = Color(0xFF49454F),
-                        fontSize = 10.sp
+                        color = Color(0xFF1C1B1F),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
