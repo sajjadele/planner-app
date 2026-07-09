@@ -26,9 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.example.core.util.formatPersianTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -226,19 +224,6 @@ fun NotesScreen(
                     }
                 }
             }
-        }
-    }
-}
-
-private fun formatPersianTime(timestamp: Long): String {
-    val diff = System.currentTimeMillis() - timestamp
-    return when {
-        diff < 60000 -> "همین الان"
-        diff < 3600000 -> "${diff / 60000} دقیقه پیش"
-        diff < 86400000 -> "${diff / 3600000} ساعت پیش"
-        else -> {
-            val sdf = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.US)
-            sdf.format(Date(timestamp))
         }
     }
 }

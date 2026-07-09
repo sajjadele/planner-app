@@ -19,3 +19,23 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# ---- Room Database ----
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+-dontwarn androidx.room.paging.**
+
+# ---- Room Entities ----
+-keep class com.example.plugins.planner.TaskEntity { *; }
+-keep class com.example.plugins.planner.TaskEventEntity { *; }
+-keep class com.example.plugins.notes.NoteEntity { *; }
+-keep class com.example.core.database.ModuleSettingsEntity { *; }
+
+# ---- Room DAOs ----
+-keep class com.example.plugins.planner.TaskDao { *; }
+-keep class com.example.plugins.planner.TaskEventDao { *; }
+-keep class com.example.plugins.notes.NoteDao { *; }
+-keep class com.example.core.database.ModuleSettingsDao { *; }
+
+# ---- KSP-generated Room implementations ----
+-keep class **_Impl { *; }

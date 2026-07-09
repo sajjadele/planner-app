@@ -7,9 +7,9 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Search
@@ -25,12 +25,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.core.plugin.AppPlugin
 import com.example.core.plugin.ModuleSettingsViewModel
 import com.example.core.plugin.PluginRegistry
 import com.example.core.search.SearchDialog
 import com.example.plugins.planner.PlannerViewModel
-import com.example.ui.screens.components.MainBottomBar
 import com.example.ui.screens.components.MainTopBar
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -44,7 +42,7 @@ fun MainScreen(
 ) {
     val enabledModulesMap by moduleViewModel.enabledModulesState.collectAsState()
     
-    // Determine which registered plugins are currently enabled
+    // Determine which registered plugins are currently enabled (excluding Notes — demoted to top bar)
     val activePlugins = remember(enabledModulesMap) {
         PluginRegistry.allPlugins.filter { plugin ->
             enabledModulesMap[plugin.id] != false && plugin.id != "notes"
@@ -64,8 +62,6 @@ fun MainScreen(
     LaunchedEffect(activePlugins) {
         if (selectedTabId != "modules" && activePlugins.none { it.id == selectedTabId }) {
             selectedTabId = "modules"
-        } else if (selectedTabId == "modules" && activePlugins.isNotEmpty() && selectedTabId != "modules") {
-            selectedTabId = activePlugins.first().id
         }
     }
 
@@ -76,19 +72,20 @@ fun MainScreen(
     Scaffold(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFFDFBFF)),
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        androidx.compose.ui.graphics.Color(0xFFD0BCFF),
+                        androidx.compose.ui.graphics.Color(0xFFFDFBFF)
+                    )
+                )
+            ),
         topBar = {
             MainTopBar(
                 currentDate = getPersianTodayDate(),
                 onSearchClick = { showSearchDialog = true },
+                onNotesClick = { selectedTabId = "notes" },
                 onSettingsClick = { showSettingsInfo = true }
-            )
-        },
-        bottomBar = {
-            MainBottomBar(
-                activePlugins = activePlugins,
-                selectedTabId = selectedTabId,
-                onTabSelected = { selectedTabId = it }
             )
         }
     ) { innerPadding ->
@@ -108,7 +105,8 @@ fun MainScreen(
                     enabledMap = enabledModulesMap
                 )
             } else {
-                val currentPlugin = activePlugins.find { it.id == tabId }
+                // Notes is demoted from bottom bar but still accessible via top bar
+                val currentPlugin = PluginRegistry.allPlugins.find { it.id == tabId }
                 if (currentPlugin != null) {
                     currentPlugin.Content(
                         modifier = Modifier.fillMaxSize(),

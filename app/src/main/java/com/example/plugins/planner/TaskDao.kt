@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TaskDao {
+    // TODO: needed for Phase 2.2 — Goal/LifeArea queries will need full task list
     @Query("SELECT * FROM tasks ORDER BY isCompleted ASC, id DESC")
     fun getAllTasks(): Flow<List<TaskEntity>>
 
@@ -21,9 +22,6 @@ interface TaskDao {
 
     @Update
     suspend fun updateTask(task: TaskEntity)
-
-    @Query("DELETE FROM tasks WHERE id = :id")
-    suspend fun deleteTaskById(id: Int)
 
     @Delete
     suspend fun deleteTask(task: TaskEntity)

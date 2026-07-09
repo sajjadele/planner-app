@@ -3,7 +3,6 @@ package com.example.plugins.planner
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.core.constants.DateConstants
 import com.example.core.database.AppDatabase
 import com.example.core.receiver.ReminderScheduler
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -117,12 +116,6 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
             )
             repository.deleteTask(task)
             ReminderScheduler.cancel(getApplication(), task)
-        }
-    }
-
-    fun getSelectedDayName(): String {
-        return DateConstants.persianDayNames.getOrElse(_selectedDayIndex.value) {
-            DateConstants.persianDayNames.first()
         }
     }
 

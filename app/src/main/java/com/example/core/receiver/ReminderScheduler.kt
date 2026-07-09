@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import com.example.plugins.planner.TaskEntity
 import java.util.Calendar
 
@@ -33,14 +34,14 @@ object ReminderScheduler {
             set(Calendar.MILLISECOND, 0)
 
             val targetDayOfWeek = when (task.dayIndex) {
-                0 -> Calendar.MONDAY
-                1 -> Calendar.TUESDAY
-                2 -> Calendar.WEDNESDAY
-                3 -> Calendar.THURSDAY
-                4 -> Calendar.FRIDAY
-                5 -> Calendar.SATURDAY
-                6 -> Calendar.SUNDAY
-                else -> Calendar.MONDAY
+                0 -> Calendar.SATURDAY    // شنبه
+                1 -> Calendar.SUNDAY      // یکشنبه
+                2 -> Calendar.MONDAY      // دوشنبه
+                3 -> Calendar.TUESDAY     // سه‌شنبه
+                4 -> Calendar.WEDNESDAY   // چهارشنبه
+                5 -> Calendar.THURSDAY    // پنج‌شنبه
+                6 -> Calendar.FRIDAY      // جمعه
+                else -> Calendar.SATURDAY
             }
 
             val currentDayOfWeek = get(Calendar.DAY_OF_WEEK)
@@ -52,15 +53,23 @@ object ReminderScheduler {
         }
 
         try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    pendingIntent
+                )
+            }
+        } catch (e: SecurityException) {
+            // Fallback for restricted permission environments
             alarmManager.set(
                 AlarmManager.RTC_WAKEUP,
-                calendar.timeInMillis,
-                pendingIntent
-            )
-        } catch (e: SecurityException) {
-            // Safe fallback if permission is restricted
-            alarmManager.set(
-                AlarmManager.RTC,
                 calendar.timeInMillis,
                 pendingIntent
             )

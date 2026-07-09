@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.core.util.formatPersianTime
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -101,7 +102,12 @@ fun SearchDialog(
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { viewModel.updateQuery(it) },
-                        placeholder = { Text("جستجو در برنامه‌ها و یادداشت‌ها...") },
+                        placeholder = {
+                            Text(
+                                "جستجو در برنامه‌ها و یادداشت‌ها...",
+                                color = Color(0xFF938F99)
+                            )
+                        },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Search,
@@ -124,7 +130,10 @@ fun SearchDialog(
                             focusedBorderColor = Color(0xFF6750A4),
                             unfocusedBorderColor = Color(0xFFCAC4D0),
                             focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White
+                            unfocusedContainerColor = Color.White,
+                            focusedTextColor = Color(0xFF1C1B1F),
+                            unfocusedTextColor = Color(0xFF1C1B1F),
+                            cursorColor = Color(0xFF6750A4)
                         ),
                         shape = RoundedCornerShape(16.dp),
                         singleLine = true,
@@ -404,7 +413,7 @@ fun SearchNoteItem(
                 }
 
                 Text(
-                    text = formatPersianTime(note.timestamp),
+                    text = formatPersianTime(note.timestamp, fallbackFormat = "yyyy/MM/dd"),
                     fontSize = 9.sp,
                     color = Color(0xFF6750A4),
                     fontWeight = FontWeight.SemiBold
@@ -421,19 +430,6 @@ fun SearchNoteItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-        }
-    }
-}
-
-private fun formatPersianTime(timestamp: Long): String {
-    val diff = System.currentTimeMillis() - timestamp
-    return when {
-        diff < 60000 -> "همین الان"
-        diff < 3600000 -> "${diff / 60000} دقیقه پیش"
-        diff < 86400000 -> "${diff / 3600000} ساعت پیش"
-        else -> {
-            val sdf = SimpleDateFormat("yyyy/MM/dd", Locale.US)
-            sdf.format(Date(timestamp))
         }
     }
 }

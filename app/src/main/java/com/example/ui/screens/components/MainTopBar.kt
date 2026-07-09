@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.sp
 fun MainTopBar(
     currentDate: String,
     onSearchClick: () -> Unit,
+    onNotesClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
     Column(
@@ -73,6 +75,20 @@ fun MainTopBar(
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = "جستجو",
+                        tint = Color(0xFF21005D),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                ActionCircleButton(
+                    onClick = onNotesClick,
+                    backgroundColor = Color(0xFFEADDFF).copy(alpha = 0.5f),
+                    iconTint = Color(0xFF21005D),
+                    testTag = "notes_button"
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.EditNote,
+                        contentDescription = "یادداشت",
                         tint = Color(0xFF21005D),
                         modifier = Modifier.size(20.dp)
                     )
