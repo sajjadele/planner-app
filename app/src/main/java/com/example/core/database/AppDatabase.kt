@@ -4,28 +4,34 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.example.plugins.notes.NoteDao
-import com.example.plugins.notes.NoteEntity
-import com.example.plugins.planner.TaskDao
-import com.example.plugins.planner.TaskEntity
-import com.example.plugins.planner.TaskEventDao
-import com.example.plugins.planner.TaskEventEntity
+import com.example.core.goal.GoalDao
+import com.example.core.goal.GoalEntity
+import com.example.plugins.notes.data.NoteDao
+import com.example.plugins.notes.data.NoteEntity
+import com.example.plugins.planner.data.InsightDao
+import com.example.plugins.planner.data.TaskDao
+import com.example.plugins.planner.data.TaskEntity
+import com.example.plugins.planner.data.TaskEventDao
+import com.example.plugins.planner.data.TaskEventEntity
 
 @Database(
     entities = [
         ModuleSettingsEntity::class,
+        GoalEntity::class,
         TaskEntity::class,
         TaskEventEntity::class,
         NoteEntity::class
     ],
-    version = 3,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun moduleSettingsDao(): ModuleSettingsDao
+    abstract fun goalDao(): GoalDao
     abstract fun taskDao(): TaskDao
-    abstract fun noteDao(): NoteDao
     abstract fun taskEventDao(): TaskEventDao
+    abstract fun insightDao(): InsightDao
+    abstract fun noteDao(): NoteDao
 
     companion object {
         @Volatile

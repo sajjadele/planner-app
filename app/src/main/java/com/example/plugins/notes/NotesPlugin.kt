@@ -5,6 +5,7 @@ import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.example.core.plugin.AppPlugin
+import com.example.plugins.notes.ui.NotesScreen
 
 class NotesPlugin : AppPlugin {
     override val id: String = "notes"
@@ -15,8 +16,9 @@ class NotesPlugin : AppPlugin {
     @Composable
     override fun Content(
         modifier: Modifier,
-        onNavigateToSettings: () -> Unit
+        onNavigateToSettings: () -> Unit,
+        onBack: () -> Unit
     ) {
-        NotesScreen(modifier = modifier)
+        NotesScreen(modifier = modifier, onBack = onBack)
     }
 }

@@ -5,6 +5,7 @@ import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.example.core.plugin.AppPlugin
+import com.example.plugins.planner.ui.PlannerScreen
 
 class PlannerPlugin : AppPlugin {
     override val id: String = "planner"
@@ -15,7 +16,8 @@ class PlannerPlugin : AppPlugin {
     @Composable
     override fun Content(
         modifier: Modifier,
-        onNavigateToSettings: () -> Unit
+        onNavigateToSettings: () -> Unit,
+        onBack: () -> Unit
     ) {
         PlannerScreen(modifier = modifier)
     }

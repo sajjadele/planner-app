@@ -111,7 +111,7 @@ fun SearchDialog(
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Search,
-                                contentDescription = "Search icon",
+                                contentDescription = "آیکون جستجو",
                                 tint = Color(0xFF6750A4)
                             )
                         },
@@ -120,7 +120,7 @@ fun SearchDialog(
                                 IconButton(onClick = { viewModel.updateQuery("") }) {
                                     Icon(
                                         imageVector = Icons.Default.Close,
-                                        contentDescription = "Clear",
+                                        contentDescription = "پاک کردن",
                                         tint = Color(0xFF49454F)
                                     )
                                 }

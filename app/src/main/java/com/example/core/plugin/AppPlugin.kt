@@ -17,6 +17,7 @@ interface AppPlugin {
     @Composable
     fun Content(
         modifier: Modifier,
-        onNavigateToSettings: () -> Unit
+        onNavigateToSettings: () -> Unit,
+        onBack: () -> Unit = {}
     )
 }

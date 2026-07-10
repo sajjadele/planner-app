@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -50,14 +51,14 @@ fun MainTopBar(
                     text = "Vision Planner",
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1C1B1F),
+                    color = MaterialTheme.colorScheme.onBackground,
                     letterSpacing = (-0.5).sp
                 )
 
                 Text(
                     text = currentDate,
                     fontSize = 12.sp,
-                    color = Color(0xFF49454F),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -68,42 +69,36 @@ fun MainTopBar(
             ) {
                 ActionCircleButton(
                     onClick = onSearchClick,
-                    backgroundColor = Color(0xFFEADDFF).copy(alpha = 0.5f),
-                    iconTint = Color(0xFF21005D),
                     testTag = "search_button"
                 ) {
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = "جستجو",
-                        tint = Color(0xFF21005D),
+                        tint = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.size(20.dp)
                     )
                 }
 
                 ActionCircleButton(
                     onClick = onNotesClick,
-                    backgroundColor = Color(0xFFEADDFF).copy(alpha = 0.5f),
-                    iconTint = Color(0xFF21005D),
                     testTag = "notes_button"
                 ) {
                     Icon(
                         imageVector = Icons.Default.EditNote,
                         contentDescription = "یادداشت",
-                        tint = Color(0xFF21005D),
+                        tint = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.size(20.dp)
                     )
                 }
 
                 ActionCircleButton(
                     onClick = onSettingsClick,
-                    backgroundColor = Color(0xFFEADDFF),
-                    iconTint = Color(0xFF21005D),
                     testTag = "settings_button"
                 ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "تنظیمات",
-                        tint = Color(0xFF21005D),
+                        tint = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -115,15 +110,13 @@ fun MainTopBar(
 @Composable
 private fun ActionCircleButton(
     onClick: () -> Unit,
-    backgroundColor: Color,
-    iconTint: Color,
     testTag: String,
     content: @Composable () -> Unit
 ) {
     Box(
         modifier = Modifier
             .size(40.dp)
-            .background(backgroundColor, CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
             .clip(CircleShape)
             .clickable(onClick = onClick)
             .testTag(testTag),
