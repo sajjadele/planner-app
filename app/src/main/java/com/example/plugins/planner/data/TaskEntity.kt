@@ -24,13 +24,15 @@ data class TaskEntity(
     // Optional metadata — tasks must remain ultra-fast to create.
     val priority: String? = null, // "HIGH", "MEDIUM", "LOW"
     val isCompleted: Boolean = false,
-    val dayIndex: Int, // 0 to 6 representing Saturday (0) to Friday (6)
+    /** Midnight epoch ms of the scheduled day (local timezone). Replaces dayIndex. */
+    val dateEpochMs: Long,
+    /** Creation timestamp for ordering / insights fallback. */
+    val timestamp: Long = System.currentTimeMillis(),
     val reminderHour: Int? = null,
     val reminderMinute: Int? = null,
     // Goal linkage — nullable foreign key to GoalEntity.
     val goalId: Int? = null,
     val lifeAreaId: Int? = null,
     val goalName: String? = null, // Denormalized cache for backward compatibility
-    val valueTag: String? = null,
-    val timestamp: Long = System.currentTimeMillis()
+    val valueTag: String? = null
 )

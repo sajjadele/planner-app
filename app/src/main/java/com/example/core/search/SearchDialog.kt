@@ -38,7 +38,7 @@ import java.util.Locale
 @Composable
 fun SearchDialog(
     onDismissRequest: () -> Unit,
-    onNavigateToTask: (dayIndex: Int) -> Unit,
+    onNavigateToTask: (dateEpochMs: Long) -> Unit,
     onNavigateToNotes: () -> Unit,
     viewModel: SearchViewModel = viewModel()
 ) {
@@ -209,7 +209,7 @@ fun SearchDialog(
                                         SearchTaskItem(
                                             task = result,
                                             onClick = {
-                                                onNavigateToTask(result.dayIndex)
+                                                onNavigateToTask(result.dateEpochMs)
                                                 onDismissRequest()
                                             }
                                         )

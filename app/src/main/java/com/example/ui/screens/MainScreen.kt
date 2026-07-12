@@ -24,9 +24,6 @@ import com.example.ui.screens.components.MainBottomBar
 import com.example.ui.screens.components.MainTopBar
 import com.example.ui.screens.components.ThemeSettingsDialog
 import com.example.ui.theme.*
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,7 +69,6 @@ fun MainScreen(
             .background(MaterialTheme.colorScheme.background),
         topBar = {
             MainTopBar(
-                currentDate = getPersianTodayDate(),
                 onSearchClick = { showSearchDialog = true },
                 onNotesClick = { selectedTabId = "notes" },
                 onSettingsClick = { showThemeSettings = true }
@@ -132,8 +128,8 @@ fun MainScreen(
     if (showSearchDialog) {
         SearchDialog(
             onDismissRequest = { showSearchDialog = false },
-            onNavigateToTask = { dayIndex ->
-                plannerViewModel.selectDay(dayIndex)
+            onNavigateToTask = { dateEpochMs ->
+                plannerViewModel.selectDate(dateEpochMs)
                 selectedTabId = "planner"
             },
             onNavigateToNotes = {
@@ -143,7 +139,3 @@ fun MainScreen(
     }
 }
 
-private fun getPersianTodayDate(): String {
-    val sdf = SimpleDateFormat("EEEE, d MMMM", Locale("fa", "IR"))
-    return sdf.format(Date())
-}

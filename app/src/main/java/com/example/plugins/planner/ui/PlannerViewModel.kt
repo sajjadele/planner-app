@@ -41,21 +41,22 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         taskEventDao = database.taskEventDao()
     }
 
-    // Default to today's index (0 = Saturday/شنبه, 6 = Friday/جمعه)
-    private val _selectedDayIndex = MutableStateFlow(getTodayIndex())
-    val selectedDayIndex: StateFlow<Int> = _selectedDayIndex
+    /** Midnight epoch ms of the currently-selected day (local timezone). */
+    private val _selectedDateEpochMs = MutableStateFlow(getTodayDateEpochMs())
+    val selectedDateEpochMs: StateFlow<Long> = _selectedDateEpochMs
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val tasks: StateFlow<List<TaskEntity>> = _selectedDayIndex
-        .flatMapLatest { day -> repository.getTasksForDay(day) }
+    val tasks: StateFlow<List<TaskEntity>> = _selectedDateEpochMs
+        .flatMapLatest { date -> repository.getTasksForDay(date) }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
 
-    fun selectDay(index: Int) {
-        _selectedDayIndex.value = index
+    /** @param dateEpochMs midnight epoch ms of the day to select */
+    fun selectDate(dateEpochMs: Long) {
+        _selectedDateEpochMs.value = dateEpochMs
     }
 
     fun addTask(title: String, priority: String?, hour: Int?, minute: Int?, goalId: Int?, goalName: String?, valueTag: String?, lifeAreaId: Int? = null) {
@@ -63,7 +64,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
             val task = TaskEntity(
                 title = title,
                 priority = priority,
-                dayIndex = _selectedDayIndex.value,
+                dateEpochMs = _selectedDateEpochMs.value,
                 reminderHour = hour,
                 reminderMinute = minute,
                 goalId = goalId,
@@ -135,9 +136,10 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun rescheduleTask(task: TaskEntity, newDayIndex: Int) {
+    /** @param newDateEpochMs midnight epoch ms of the new scheduled day */
+    fun rescheduleTask(task: TaskEntity, newDateEpochMs: Long) {
         viewModelScope.launch {
-            val updated = task.copy(dayIndex = newDayIndex)
+            val updated = task.copy(dateEpochMs = newDateEpochMs)
             repository.updateTask(updated)
             taskEventDao.insertEvent(
                 TaskEventEntity(
@@ -145,7 +147,6 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
                     eventType = "rescheduled"
                 )
             )
-            // Re-schedule reminder if one exists
             ReminderScheduler.cancel(getApplication(), task)
             if (updated.reminderHour != null && updated.reminderMinute != null && !updated.isCompleted) {
                 ReminderScheduler.schedule(getApplication(), updated)
@@ -166,18 +167,13 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private fun getTodayIndex(): Int {
+    /** Midnight epoch ms of today (local timezone, 00:00:00.000). */
+    private fun getTodayDateEpochMs(): Long {
         val calendar = Calendar.getInstance()
-        // Persian week: Saturday=0, Sunday=1, Monday=2, Tuesday=3, Wednesday=4, Thursday=5, Friday=6
-        return when (calendar.get(Calendar.DAY_OF_WEEK)) {
-            Calendar.SATURDAY -> 0
-            Calendar.SUNDAY -> 1
-            Calendar.MONDAY -> 2
-            Calendar.TUESDAY -> 3
-            Calendar.WEDNESDAY -> 4
-            Calendar.THURSDAY -> 5
-            Calendar.FRIDAY -> 6
-            else -> 0
-        }
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        return calendar.timeInMillis
     }
 }

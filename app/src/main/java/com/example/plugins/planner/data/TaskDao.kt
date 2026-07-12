@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TaskDao {
-    // TODO: needed for Phase 2.2 — Goal/LifeArea queries will need full task list
     @Query("SELECT * FROM tasks ORDER BY isCompleted ASC, id DESC")
     fun getAllTasks(): Flow<List<TaskEntity>>
 
@@ -18,8 +17,11 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE reminderHour IS NOT NULL AND reminderMinute IS NOT NULL AND isCompleted = 0")
     suspend fun getActiveReminders(): List<TaskEntity>
 
-    @Query("SELECT * FROM tasks WHERE dayIndex = :dayIndex ORDER BY isCompleted ASC, id DESC")
-    fun getTasksForDay(dayIndex: Int): Flow<List<TaskEntity>>
+    @Query("SELECT * FROM tasks WHERE dateEpochMs = :dateEpochMs ORDER BY isCompleted ASC, id DESC")
+    fun getTasksForDay(dateEpochMs: Long): Flow<List<TaskEntity>>
+
+    @Query("SELECT * FROM tasks WHERE dateEpochMs BETWEEN :start AND :end ORDER BY isCompleted ASC, id DESC")
+    fun getTasksBetween(start: Long, end: Long): Flow<List<TaskEntity>>
 
     @Query("SELECT * FROM tasks WHERE id = :taskId")
     suspend fun getTaskById(taskId: Int): TaskEntity?

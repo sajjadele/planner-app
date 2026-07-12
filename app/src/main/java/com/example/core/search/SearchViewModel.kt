@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.constants.DateConstants
 import com.example.core.database.AppDatabase
+import com.example.plugins.planner.ui.components.persianDayIndex
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,7 +18,7 @@ sealed class SearchResult {
         val title: String,
         val priority: String?,
         val isCompleted: Boolean,
-        val dayIndex: Int,
+        val dateEpochMs: Long,
         val dayName: String
     ) : SearchResult()
 
@@ -50,7 +51,8 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
             val filteredTasks = tasks.filter { 
                 it.title.lowercase().contains(normalizedQuery)
             }.map { task ->
-                val dayName = DateConstants.persianDayNames.getOrElse(task.dayIndex) {
+                val dayIdx = persianDayIndex(task.dateEpochMs)
+                val dayName = DateConstants.persianDayNames.getOrElse(dayIdx) {
                     DateConstants.persianDayNames.first()
                 }
                 SearchResult.TaskResult(
@@ -58,7 +60,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                     title = task.title,
                     priority = task.priority,
                     isCompleted = task.isCompleted,
-                    dayIndex = task.dayIndex,
+                    dateEpochMs = task.dateEpochMs,
                     dayName = dayName
                 )
             }

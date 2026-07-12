@@ -13,10 +13,9 @@ import kotlinx.coroutines.flow.Flow
  *
  * All queries here are reactive Flows that re-emit when underlying data changes.
  *
- * Phase 3 additions:
- * - Procrastination detection (reschedule count per task)
- * - Goal completion rates via FK join
- * - Weekly velocity comparison (current vs previous week)
+ * All BETWEEN filters use dateEpochMs (the task's scheduled day) rather than
+ * timestamp (creation moment). This correctly assigns a task to the week it
+ * was planned for, not the week it was created in.
  */
 @Dao
 interface InsightDao {
@@ -26,18 +25,20 @@ interface InsightDao {
 
     @Query("""
         SELECT COUNT(*) FROM tasks
-        WHERE isCompleted = 1 AND timestamp BETWEEN :start AND :end
+        WHERE isCompleted = 1 AND dateEpochMs BETWEEN :start AND :end
     """)
     fun observeCompletedCount(start: Long, end: Long): Flow<Int>
 
     @Query("""
         SELECT COUNT(*) FROM tasks
-        WHERE timestamp BETWEEN :start AND :end
+        WHERE dateEpochMs BETWEEN :start AND :end
     """)
     fun observeCreatedCount(start: Long, end: Long): Flow<Int>
 
     // ──────────────────────────────────────────────
     // Streak: raw timestamps of 'completed' events
+    // Uses task_events.timestamp (actual completion time), NOT dateEpochMs.
+    // A streak is about user action on a calendar day, not scheduled dates.
     // ──────────────────────────────────────────────
 
     @Query("""
@@ -53,7 +54,7 @@ interface InsightDao {
     @Query("""
         SELECT t.lifeAreaId as lifeAreaId, COUNT(*) as count
         FROM tasks t
-        WHERE t.isCompleted = 1 AND t.timestamp BETWEEN :start AND :end
+        WHERE t.isCompleted = 1 AND t.dateEpochMs BETWEEN :start AND :end
         AND t.lifeAreaId IS NOT NULL
         GROUP BY t.lifeAreaId
         ORDER BY count DESC
@@ -66,19 +67,22 @@ interface InsightDao {
 
     @Query("""
         SELECT COUNT(*) FROM tasks
-        WHERE timestamp BETWEEN :start AND :end
+        WHERE dateEpochMs BETWEEN :start AND :end
         AND lifeAreaId IS NULL AND goalId IS NULL AND goalName IS NULL
     """)
     fun observeUnorganizedCount(start: Long, end: Long): Flow<Int>
 
     // ──────────────────────────────────────────────
     // Best day of week
+    // Derives Persian day index (0=Saturday … 6=Friday) from dateEpochMs.
+    // 1970-01-01 (epoch day 0) was a Thursday = Persian index 5.
+    // Formula: (dateEpochMs / 86400000 + 5) % 7
     // ──────────────────────────────────────────────
 
     @Query("""
-        SELECT dayIndex as dayIndex, COUNT(*) as count
+        SELECT CAST((dateEpochMs / 86400000 + 5) AS INTEGER) % 7 as dayIndex, COUNT(*) as count
         FROM tasks
-        WHERE isCompleted = 1 AND timestamp BETWEEN :start AND :end
+        WHERE isCompleted = 1 AND dateEpochMs BETWEEN :start AND :end
         GROUP BY dayIndex
         ORDER BY count DESC
     """)
@@ -91,7 +95,7 @@ interface InsightDao {
     @Query("""
         SELECT goalName as goalName, COUNT(*) as count
         FROM tasks
-        WHERE isCompleted = 1 AND timestamp BETWEEN :start AND :end
+        WHERE isCompleted = 1 AND dateEpochMs BETWEEN :start AND :end
         AND goalName IS NOT NULL AND goalName != ''
         GROUP BY goalName
         ORDER BY count DESC
@@ -104,10 +108,6 @@ interface InsightDao {
     // Tasks with ≥ 3 reschedules signal procrastination patterns.
     // ──────────────────────────────────────────────
 
-    /**
-     * Count rescheduled events per task. ViewModel filters for ≥ 3 to
-     * build procrastination alerts. Reactive: re-emits when task_events changes.
-     */
     @Query("""
         SELECT taskId, COUNT(*) as rescheduleCount
         FROM task_events
@@ -122,11 +122,6 @@ interface InsightDao {
     // to calculate completed/total per goal.
     // ──────────────────────────────────────────────
 
-    /**
-     * Goal completion rate: completed tasks / total tasks per goal.
-     * Only includes goals that have at least one task (left-out semantics).
-     * Sorted by rate ASC so the most neglected goal is first.
-     */
     @Query("""
         SELECT
             g.id as goalId,
@@ -146,9 +141,6 @@ interface InsightDao {
     """)
     fun observeGoalCompletionRates(): Flow<List<GoalRateResult>>
 
-    /**
-     * Single goal completion rate: completed tasks / total tasks for one goal.
-     */
     @Query("""
         SELECT
             g.id as goalId,
@@ -167,49 +159,34 @@ interface InsightDao {
     """)
     fun observeGoalCompletionRate(goalId: Int): Flow<GoalRateResult?>
 
-    /**
-     * Total tasks completed this week that belong to any goal.
-     * Used with previous-week query to compute weekly velocity.
-     */
     @Query("""
         SELECT COUNT(*) FROM tasks t
         WHERE t.isCompleted = 1
         AND t.goalId IS NOT NULL
-        AND t.timestamp BETWEEN :start AND :end
+        AND t.dateEpochMs BETWEEN :start AND :end
     """)
     fun observeGoalTaskCompletedCount(start: Long, end: Long): Flow<Int>
 
-    /**
-     * Total tasks created this week that belong to any goal.
-     */
     @Query("""
         SELECT COUNT(*) FROM tasks t
         WHERE t.goalId IS NOT NULL
-        AND t.timestamp BETWEEN :start AND :end
+        AND t.dateEpochMs BETWEEN :start AND :end
     """)
     fun observeGoalTaskCreatedCount(start: Long, end: Long): Flow<Int>
 
     // ──────────────────────────────────────────────
     // Phase 3: Weekly Velocity
-    // Compare current week completion count against previous week.
     // ──────────────────────────────────────────────
 
-    /**
-     * Completed tasks in the previous week. Used alongside current-week
-     * count to calculate velocity (improving / stable / declining).
-     */
     @Query("""
         SELECT COUNT(*) FROM tasks
-        WHERE isCompleted = 1 AND timestamp BETWEEN :start AND :end
+        WHERE isCompleted = 1 AND dateEpochMs BETWEEN :start AND :end
     """)
     fun observePreviousWeekCompletedCount(start: Long, end: Long): Flow<Int>
 
-    /**
-     * Total tasks created in the previous week.
-     */
     @Query("""
         SELECT COUNT(*) FROM tasks
-        WHERE timestamp BETWEEN :start AND :end
+        WHERE dateEpochMs BETWEEN :start AND :end
     """)
     fun observePreviousWeekCreatedCount(start: Long, end: Long): Flow<Int>
 }

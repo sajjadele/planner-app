@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun MainTopBar(
-    currentDate: String,
     onSearchClick: () -> Unit,
     onNotesClick: () -> Unit,
     onSettingsClick: () -> Unit
@@ -46,22 +45,13 @@ fun MainTopBar(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    text = "Vision Planner",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    letterSpacing = (-0.5).sp
-                )
-
-                Text(
-                    text = currentDate,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                    fontWeight = FontWeight.Medium
-                )
-            }
+            Text(
+                text = "Vision Planner",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                letterSpacing = (-0.5).sp
+            )
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,

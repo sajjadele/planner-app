@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.util.Calendar
 
 class WeeklyInsightViewModel(application: Application) : AndroidViewModel(application) {
@@ -43,8 +44,9 @@ class WeeklyInsightViewModel(application: Application) : AndroidViewModel(applic
      * or goals changes, Room re-runs the queries and the combine block emits
      * a fresh WeeklyInsightState — no manual refresh needed.
      *
-     * Phase 3: now also computes procrastination alerts, goal neglect,
-     * and weekly velocity comparison.
+     * All insight queries now filter by dateEpochMs (scheduled day) rather than
+     * timestamp (creation moment), so future-planned tasks don't distort the
+     * current week's metrics.
      */
     private fun observeInsight() {
         val (curStart, curEnd) = currentWeek
@@ -52,7 +54,6 @@ class WeeklyInsightViewModel(application: Application) : AndroidViewModel(applic
 
         viewModelScope.launch {
             combine(
-                // Core metrics
                 insightDao.observeCompletedCount(curStart, curEnd),
                 insightDao.observeCreatedCount(curStart, curEnd),
                 insightDao.observeCompletionByLifeArea(curStart, curEnd),
@@ -60,10 +61,8 @@ class WeeklyInsightViewModel(application: Application) : AndroidViewModel(applic
                 insightDao.observeCompletedTimestamps(),
                 insightDao.observeCompletionByDay(curStart, curEnd),
                 insightDao.observeCompletionByGoal(curStart, curEnd),
-                // Phase 3: Behavioral
                 insightDao.observeRescheduleCounts(),
                 insightDao.observeGoalCompletionRates(),
-                // Phase 3: Weekly velocity
                 insightDao.observePreviousWeekCompletedCount(prevStart, prevEnd),
                 insightDao.observePreviousWeekCreatedCount(prevStart, prevEnd)
             ) { results: Array<*> ->
@@ -92,14 +91,16 @@ class WeeklyInsightViewModel(application: Application) : AndroidViewModel(applic
                 // --- Completion rate ---
                 val rate = if (created > 0) (completed.toFloat() / created.toFloat()) * 100f else 0f
 
-                // --- Procrastination alerts (rescheduled ≥ 3 times) ---
+                // --- Procrastination alerts (rescheduled >= 3 times) ---
                 val alerts = rescheduleCounts
                     .filter { it.rescheduleCount >= 3 }
                     .sortedByDescending { it.rescheduleCount }
 
                 // Resolve task titles for procrastination alerts
                 val alertsWithTitles = alerts.map { alert ->
-                    val task = taskDao.getTaskById(alert.taskId)
+                    val task = runBlocking {
+                        taskDao.getTaskById(alert.taskId)
+                    }
                     ProcrastinationAlert(
                         taskTitle = task?.title ?: "تسک #${alert.taskId}",
                         rescheduleCount = alert.rescheduleCount
