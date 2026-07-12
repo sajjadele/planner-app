@@ -23,13 +23,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.constants.DateConstants
 import com.example.core.constants.LifeAreas
-import com.example.core.util.toPersianDigits
+import com.example.core.util.RTL
+import com.example.core.util.isolated
 import com.example.plugins.planner.ui.Velocity
 import com.example.plugins.planner.ui.WeeklyInsightState
 import com.example.ui.theme.*
-
-/** RTL mark — forces paragraph direction to RTL, preventing BiDi reordering of numbers in Persian text. */
-private const val RTL = "‏"
 
 @Composable
 fun WeeklyInsightCard(
@@ -70,7 +68,7 @@ fun WeeklyInsightCard(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "${state.completionRate.toInt().toPersianDigits()}٪",
+                                text = "${state.completionRate.toInt().isolated()}٪",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.primary
@@ -83,7 +81,7 @@ fun WeeklyInsightCard(
                     // Stats column
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "${RTL}${state.completedCount.toPersianDigits()} از ${state.createdCount.toPersianDigits()} تسک تکمیل شد",
+                            text = "${RTL}${state.completedCount.isolated()} از ${state.createdCount.isolated()} تسک تکمیل شد",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -92,7 +90,7 @@ fun WeeklyInsightCard(
                         if (state.streakDays > 0) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "${RTL}🔥 ${state.streakDays.toPersianDigits()} روز پیاپی",
+                                text = "${RTL}🔥 ${state.streakDays.isolated()} روز پیاپی",
                                 fontSize = 12.sp,
                                 color = AccentFire
                             )
@@ -102,7 +100,7 @@ fun WeeklyInsightCard(
                             Spacer(modifier = Modifier.height(2.dp))
                             val dayName = DateConstants.persianDayNames.getOrElse(dayIdx) { "—" }
                             Text(
-                                text = "${RTL}📅 بهترین روز: $dayName (${state.bestDayCount.toPersianDigits()} تسک)",
+                                text = "${RTL}📅 بهترین روز: $dayName (${state.bestDayCount.isolated()} تسک)",
                                 fontSize = 11.sp,
                                 color = AccentBlue
                             )
@@ -182,11 +180,11 @@ fun InsightDetailsSheetContent(
         // ── Weekly Velocity ──
         val velocityLabel = when (state.weeklyVelocity) {
             Velocity.IMPROVING -> {
-                val pct = state.weeklyVelocityPercent.toInt().toPersianDigits()
+                val pct = state.weeklyVelocityPercent.toInt().isolated()
                 "${RTL}عملکرد شما نسبت به هفته گذشته ${pct}٪ بهبود یافته 🚀"
             }
             Velocity.DECLINING -> {
-                val pct = state.weeklyVelocityPercent.toInt().toPersianDigits()
+                val pct = state.weeklyVelocityPercent.toInt().isolated()
                 "${RTL}عملکرد شما نسبت به هفته گذشته ${pct}٪ کاهش یافته"
             }
             Velocity.STABLE -> "عملکرد شما نسبت به هفته گذشته ثابت است"
@@ -216,7 +214,7 @@ fun InsightDetailsSheetContent(
             state.procrastinationAlerts.forEach { alert ->
                 DetailStatRow(
                     icon = "⚠️",
-                    text = "${RTL}\"${alert.taskTitle}\" ${alert.rescheduleCount.toPersianDigits()} بار به تعویق افتاده",
+                    text = "${RTL}\"${alert.taskTitle}\" ${alert.rescheduleCount.isolated()} بار به تعویق افتاده",
                     iconTint = Color(0xFFF97316)
                 )
             }
@@ -229,7 +227,7 @@ fun InsightDetailsSheetContent(
                 color = MaterialTheme.colorScheme.outlineVariant
             )
             DetailSectionTitle(text = "هدف مغفول")
-            val rateText = state.neglectedGoalRate.toInt().toPersianDigits()
+            val rateText = state.neglectedGoalRate.toInt().isolated()
             DetailStatRow(
                 icon = "📌",
                 text = "${RTL}هدف \"$goalTitle\" کمترین نرخ تکمیل را دارد ($rateText٪)",
@@ -246,7 +244,7 @@ fun InsightDetailsSheetContent(
             DetailSectionTitle(text = "بدون دسته‌بندی")
             DetailStatRow(
                 icon = "ℹ️",
-                text = "${RTL}${state.unorganizedCount.toPersianDigits()} تسک بدون دسته‌بندی",
+                text = "${RTL}${state.unorganizedCount.isolated()} تسک بدون دسته‌بندی",
                 iconTint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -262,7 +260,7 @@ fun InsightDetailsSheetContent(
                 breakdown.forEach { item ->
                     DetailStatRow(
                         icon = LifeAreas.getIcon(item.lifeAreaId),
-                        text = "${RTL}${LifeAreas.getName(item.lifeAreaId)}: ${item.count.toPersianDigits()} تسک",
+                        text = "${RTL}${LifeAreas.getName(item.lifeAreaId)}: ${item.count.isolated()} تسک",
                         iconTint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -279,7 +277,7 @@ fun InsightDetailsSheetContent(
             if (state.streakDays > 0) {
                 DetailStatRow(
                     icon = "🔥",
-                    text = "${RTL}${state.streakDays.toPersianDigits()} روز پیش‌سرهم تسک کامل شده",
+                    text = "${RTL}${state.streakDays.isolated()} روز پیش‌سرهم تسک کامل شده",
                     iconTint = AccentFire
                 )
             }
@@ -287,7 +285,7 @@ fun InsightDetailsSheetContent(
                 val dayName = DateConstants.persianDayNames.getOrElse(dayIdx) { "—" }
                 DetailStatRow(
                     icon = "📅",
-                    text = "${RTL}بهترین روز: $dayName (${state.bestDayCount.toPersianDigits()} تسک)",
+                    text = "${RTL}بهترین روز: $dayName (${state.bestDayCount.isolated()} تسک)",
                     iconTint = AccentBlue
                 )
             }

@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,15 +14,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.core.util.toPersianDigits
-import com.example.plugins.planner.ui.components.AddTaskDialog
+import com.example.core.util.isolated
 import com.example.plugins.planner.ui.components.CalendarPopup
 import com.example.plugins.planner.ui.components.InfiniteWeekRow
 import com.example.plugins.planner.ui.components.InsightDetailsSheetContent
@@ -48,7 +45,6 @@ fun PlannerScreen(
     val scope = rememberCoroutineScope()
     var showInsightSheet by remember { mutableStateOf(false) }
 
-    var showAddTaskDialog by remember { mutableStateOf(false) }
     var selectedTaskId by remember { mutableStateOf<Int?>(null) }
     var showCalendarPopup by remember { mutableStateOf(false) }
 
@@ -181,7 +177,7 @@ fun PlannerScreen(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = "برنامه‌های $headerDayName، ${selectedJalali.day} ${JalaliDate.MONTH_NAMES[selectedJalali.month - 1]}",
+                            text = "برنامه‌های $headerDayName، ${selectedJalali.day.isolated()} ${JalaliDate.MONTH_NAMES[selectedJalali.month - 1]}",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -236,24 +232,6 @@ fun PlannerScreen(
             }
         }
 
-        // FAB
-        FloatingActionButton(
-            onClick = { showAddTaskDialog = true },
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 8.dp)
-                .testTag("add_task_fab")
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = "افزودن تسک",
-                modifier = Modifier.size(24.dp)
-            )
-        }
-
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier
@@ -261,24 +239,5 @@ fun PlannerScreen(
                 .padding(bottom = 80.dp)
         )
 
-        if (showAddTaskDialog) {
-            AddTaskDialog(
-                onDismiss = { showAddTaskDialog = false },
-                activeGoals = viewModel.activeGoals,
-                onAddTask = { title, priority, hour, minute, goalId, goalName, valueTag, lifeAreaId ->
-                    viewModel.addTask(
-                        title = title,
-                        priority = priority,
-                        hour = hour,
-                        minute = minute,
-                        goalId = goalId,
-                        goalName = goalName,
-                        valueTag = valueTag,
-                        lifeAreaId = lifeAreaId
-                    )
-                    showAddTaskDialog = false
-                }
-            )
-        }
     }
 }

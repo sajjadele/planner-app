@@ -32,14 +32,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.core.util.formatPersianTime
-import com.example.core.util.toPersianDigits
+import com.example.core.util.isolated
+import com.example.core.util.RTL
 import com.example.plugins.notes.data.NoteEntity
 import com.example.plugins.planner.data.TaskEntity
 import com.example.plugins.planner.ui.components.NeumorphicSurface
 import com.example.ui.theme.*
-
-/** RTL mark — forces paragraph direction to RTL */
-private const val RTL = "‏"
 
 @Composable
 fun TaskDetailScreen(
@@ -278,7 +276,7 @@ fun TaskDetailScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = if (task?.reminderHour != null && task?.reminderMinute != null)
-                                    "${RTL}${String.format("%02d:%02d", task!!.reminderHour, task!!.reminderMinute)}"
+                                    "${RTL}${String.format("%02d:%02d", task!!.reminderHour, task!!.reminderMinute).isolated()}"
                                 else
                                     "${RTL}تنظیم زمان یادآوری",
                                 fontSize = 13.sp,

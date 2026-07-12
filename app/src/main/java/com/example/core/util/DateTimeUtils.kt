@@ -14,8 +14,8 @@ fun formatPersianTime(timestamp: Long, fallbackFormat: String = "yyyy/MM/dd HH:m
     val diff = System.currentTimeMillis() - timestamp
     return when {
         diff < 60_000 -> "همین الان"
-        diff < 3_600_000 -> "${(diff / 60_000).toPersianDigits()} دقیقه پیش"
-        diff < 86_400_000 -> "${(diff / 3_600_000).toPersianDigits()} ساعت پیش"
+        diff < 3_600_000 -> "${(diff / 60_000).isolated()} دقیقه پیش"
+        diff < 86_400_000 -> "${(diff / 3_600_000).isolated()} ساعت پیش"
         else -> {
             val sdf = SimpleDateFormat(fallbackFormat, Locale.US)
             sdf.format(Date(timestamp))

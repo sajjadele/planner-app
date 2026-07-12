@@ -1,6 +1,7 @@
 package com.example.core.domain
 
 import com.example.core.util.JalaliDate
+import com.example.core.util.isolated
 import java.util.Calendar
 
 /**
@@ -82,7 +83,7 @@ data class CalendarDate(
     }
 
     /** Full Jalali date string for display, e.g. "شنبه 20 تیر 1405". */
-    fun toJalaliDisplay(): String = "$dayName $jalaliDay $monthName $jalaliYear"
+    fun toJalaliDisplay(): String = "$dayName ${jalaliDay.isolated()} $monthName ${jalaliYear.isolated()}"
 
     /** Gregorian date string for display, e.g. "11 July 2026". */
     fun toGregorianDisplay(): String = "$gregorianDay ${gMonthNames[gregorianMonth - 1]} $gregorianYear"

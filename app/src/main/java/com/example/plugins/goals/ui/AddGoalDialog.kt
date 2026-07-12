@@ -36,12 +36,12 @@ fun AddGoalDialog(
         }
 
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(24.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
-                .border(1.dp, Color(0xFFCAC4D0), RoundedCornerShape(24.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(24.dp))
         ) {
             Column(
                 modifier = Modifier
@@ -54,7 +54,7 @@ fun AddGoalDialog(
                     text = "هدف جدید",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1C1B1F)
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -62,7 +62,7 @@ fun AddGoalDialog(
                 Text(
                     text = "یک هدف بلندمدت تعریف کنید",
                     fontSize = 12.sp,
-                    color = Color(0xFF938F99)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -71,17 +71,17 @@ fun AddGoalDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    placeholder = { Text("مثال: یادگیری AI Engineering", color = Color(0xFF938F99)) },
+                    placeholder = { Text("مثال: یادگیری AI Engineering", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(focusRequester),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF6750A4),
-                        unfocusedBorderColor = Color(0xFFCAC4D0),
-                        cursorColor = Color(0xFF6750A4),
-                        focusedTextColor = Color(0xFF1C1B1F),
-                        unfocusedTextColor = Color(0xFF1C1B1F)
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                     ),
                     shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -98,7 +98,7 @@ fun AddGoalDialog(
                     Text(
                         text = if (showDescription) "بدون توضیح" else "افزودن توضیح",
                         fontSize = 12.sp,
-                        color = Color(0xFF6750A4)
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
 
@@ -107,16 +107,16 @@ fun AddGoalDialog(
                     OutlinedTextField(
                         value = description,
                         onValueChange = { description = it },
-                        placeholder = { Text("توضیحات اختیاری...", fontSize = 12.sp, color = Color(0xFF938F99)) },
+                        placeholder = { Text("توضیحات اختیاری...", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 2,
                         maxLines = 4,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF6750A4),
-                            unfocusedBorderColor = Color(0xFFCAC4D0),
-                            cursorColor = Color(0xFF6750A4),
-                            focusedTextColor = Color(0xFF1C1B1F),
-                            unfocusedTextColor = Color(0xFF1C1B1F)
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            cursorColor = MaterialTheme.colorScheme.primary,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                         ),
                         shape = RoundedCornerShape(12.dp),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -139,7 +139,7 @@ fun AddGoalDialog(
                 ) {
                     TextButton(
                         onClick = onDismiss,
-                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF938F99))
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
                     ) {
                         Text("انصراف", fontSize = 13.sp)
                     }
@@ -153,12 +153,12 @@ fun AddGoalDialog(
                                 onDismiss()
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6750A4)),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(12.dp),
                         enabled = title.isNotBlank(),
                         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 10.dp)
                     ) {
-                        Text("ذخیره", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("ذخیره", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             }

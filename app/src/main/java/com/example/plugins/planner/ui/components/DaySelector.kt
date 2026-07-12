@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,6 +15,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,10 +28,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.example.core.data.HolidayRepository
 import com.example.core.domain.CalendarDate
 import com.example.core.domain.DayContext
 import com.example.core.util.JalaliDate
+import com.example.core.util.isolated
+import com.example.ui.theme.HolidayRed
 import java.util.Calendar
 import java.util.Locale
 
@@ -60,6 +66,11 @@ private fun saturdayAtWeekOffset(offsetWeeks: Int): Long {
 }
 
 private const val WEEK_WINDOW = 1000 // ±19 years — more than enough
+
+private val GREGORIAN_MONTHS = arrayOf(
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+)
 
 // ────────────────────────────────────────────────────────────
 // Infinite Horizontal Week Row
@@ -251,6 +262,10 @@ private fun CalendarGrid(
     }
     val (jYear, jMonth) = targetMonth
 
+    val gregorianMonthRange = remember(jYear, jMonth) {
+        JalaliDate.getGregorianMonthRange(jYear, jMonth)
+    }
+
     val daysInJalaliMonth = remember(jYear, jMonth) { JalaliDate.monthLength(jYear, jMonth) }
 
     // First day of month → day-of-week (0=Sat)
@@ -258,6 +273,19 @@ private fun CalendarGrid(
         JalaliDate.toEpochMs(JalaliDate(jYear, jMonth, 1))
     }
     val startDow = remember(firstDayEpochMs) { JalaliDate.dayOfWeekIndex(firstDayEpochMs) }
+
+    // Precompute which day numbers in this month are holidays
+    val holidayDays = remember(jYear, jMonth, holidayRepo) {
+        if (holidayRepo == null) emptySet()
+        else {
+            (1..daysInJalaliMonth).mapNotNull { d ->
+                val date = CalendarDate.fromEpochMs(
+                    JalaliDate.toEpochMs(JalaliDate(jYear, jMonth, d))
+                )
+                if (holidayRepo.isHoliday(date)) d else null
+            }.toSet()
+        }
+    }
 
     // Is the selected date in this month?
     val isSelectedMonth = jYear == selectedJalali.year && jMonth == selectedJalali.month
@@ -270,6 +298,8 @@ private fun CalendarGrid(
             .padding(bottom = 32.dp)
     ) {
         // ── Month / Year header ──
+        var monthPickerVisible by remember { mutableStateOf(false) }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -278,9 +308,128 @@ private fun CalendarGrid(
             TextButton(onClick = { monthOffset-- }) {
                 Text("‹", fontSize = 22.sp, color = MaterialTheme.colorScheme.primary)
             }
-            // Month/year text intentionally omitted — clean minimal header
+
+            Box(contentAlignment = Alignment.Center) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.clickable { monthPickerVisible = true }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "${JalaliDate.MONTH_NAMES[jMonth - 1]} ${jYear.isolated()}",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Text(
+                        text = gregorianMonthRange,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
             TextButton(onClick = { monthOffset++ }) {
                 Text("›", fontSize = 22.sp, color = MaterialTheme.colorScheme.primary)
+            }
+        }
+
+        if (monthPickerVisible) {
+            Dialog(onDismissRequest = { monthPickerVisible = false }) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(24.dp))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "انتخاب ماه",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+
+                        val months = (0..11).chunked(3)
+                        months.forEach { row ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                row.forEach { idx ->
+                                    val monthNum = idx + 1
+                                    val isActive = monthNum == jMonth
+                                    val gReg = remember(jYear, monthNum) {
+                                        JalaliDate.getGregorianMonthRange(jYear, monthNum)
+                                            .split(" ").first()
+                                    }
+                                    Card(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(1.3f)
+                                            .clickable {
+                                                monthOffset += (monthNum - selectedJalali.month)
+                                                monthPickerVisible = false
+                                            },
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (isActive)
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                            else
+                                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                        ),
+                                        border = if (isActive) BorderStroke(
+                                            1.5.dp, MaterialTheme.colorScheme.primary
+                                        ) else null
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.fillMaxSize(),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Text(
+                                                text = JalaliDate.MONTH_NAMES[idx],
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isActive)
+                                                    MaterialTheme.colorScheme.primary
+                                                else
+                                                    MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = gReg,
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+                }
             }
         }
 
@@ -330,8 +479,10 @@ private fun CalendarGrid(
                             }
                             val isDaySelected = isSelectedMonth && cellDate.jalaliDay == selectedJalali.day
                             val isDayToday = isTodayMonth && cellDate.isToday
+                            val isHoliday = hasDay && thisDay in holidayDays
 
-                            Box(
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier
                                     .aspectRatio(1f)
                                     .padding(4.dp)
@@ -346,8 +497,7 @@ private fun CalendarGrid(
                                     )
                                     .clickable {
                                         localSelectedEpochMs.value = cellDate.epochMs
-                                    },
-                                contentAlignment = Alignment.Center
+                                    }
                             ) {
                                 Text(
                                     text = cellDate.jalaliDay.toString(),
@@ -356,9 +506,19 @@ private fun CalendarGrid(
                                     fontWeight = if (isDaySelected || isDayToday) FontWeight.Bold else FontWeight.Medium,
                                     color = when {
                                         isDaySelected -> MaterialTheme.colorScheme.onPrimary
+                                        isHoliday -> HolidayRed
                                         else -> MaterialTheme.colorScheme.onSurface
                                     }
                                 )
+                                if (isHoliday && !isDaySelected) {
+                                    Spacer(modifier = Modifier.height(1.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .size(4.dp)
+                                            .clip(CircleShape)
+                                            .background(HolidayRed)
+                                    )
+                                }
                             }
                         }
                     }

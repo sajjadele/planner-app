@@ -20,13 +20,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.core.util.toPersianDigits
+import com.example.core.util.RTL
+import com.example.core.util.isolated
 import com.example.plugins.planner.data.TaskEntity
 import com.example.plugins.planner.ui.components.NeumorphicSurface
 import com.example.ui.theme.*
-
-/** RTL mark — forces paragraph direction to RTL */
-private const val RTL = "‏"
 
 @Composable
 fun GoalDetailScreen(
@@ -34,6 +32,7 @@ fun GoalDetailScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: GoalDetailViewModel = viewModel(
+        key = "goal_detail_$goalId",
         factory = GoalDetailViewModel.factory(
             androidx.compose.ui.platform.LocalContext.current.applicationContext as android.app.Application,
             goalId
@@ -172,12 +171,12 @@ fun GoalDetailScreen(
                     ) {
                         StatItem(
                             label = "نرخ تکمیل",
-                            value = "${rate.toInt().toPersianDigits()}٪",
+                            value = "${rate.toInt().isolated()}٪",
                             color = MaterialTheme.colorScheme.primary
                         )
                         StatItem(
                             label = "انجام شده",
-                            value = "${RTL}${completedCount.toPersianDigits()} از ${totalCount.toPersianDigits()}",
+                            value = "${RTL}${completedCount.isolated()} از ${totalCount.isolated()}",
                             color = AccentGreen
                         )
                     }

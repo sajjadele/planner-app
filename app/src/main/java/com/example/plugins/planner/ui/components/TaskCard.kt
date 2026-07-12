@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.core.util.isolated
 import com.example.plugins.planner.data.TaskEntity
 import com.example.ui.theme.*
 
@@ -122,7 +123,7 @@ fun TaskCard(
                             "%02d:%02d", task.reminderHour, task.reminderMinute
                         )
                         Text(
-                            text = formattedTime,
+                            text = formattedTime.isolated(),
                             color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold

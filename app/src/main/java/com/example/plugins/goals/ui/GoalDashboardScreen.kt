@@ -6,8 +6,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.core.goal.GoalEntity
-import com.example.core.util.toPersianDigits
+import com.example.core.util.isolated
 import com.example.ui.theme.*
 
 @Composable
@@ -29,7 +27,6 @@ fun GoalDashboardScreen(
     val activeGoals by viewModel.activeGoals.collectAsState()
     val allGoals by viewModel.allGoals.collectAsState()
 
-    var showAddGoalDialog by remember { mutableStateOf(false) }
     var selectedGoal by remember { mutableStateOf<GoalEntity?>(null) }
     var showGoalMenu by remember { mutableStateOf(false) }
     var selectedGoalId by remember { mutableStateOf<Int?>(null) }
@@ -73,7 +70,7 @@ fun GoalDashboardScreen(
 
                 val activeCount = activeGoals.count { it.status == "active" }
                 Text(
-                    text = "${activeCount.toPersianDigits()} هدف فعال",
+                    text = "${activeCount.isolated()} هدف فعال",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary
@@ -129,35 +126,6 @@ fun GoalDashboardScreen(
                     }
                 }
             }
-        }
-
-        // FAB
-        FloatingActionButton(
-            onClick = { showAddGoalDialog = true },
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 8.dp)
-                .testTag("add_goal_fab")
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = "افزودن هدف",
-                modifier = Modifier.size(24.dp)
-            )
-        }
-
-        // Add Goal Dialog
-        if (showAddGoalDialog) {
-            AddGoalDialog(
-                onDismiss = { showAddGoalDialog = false },
-                onAddGoal = { title, description ->
-                    viewModel.addGoal(title, description)
-                    showAddGoalDialog = false
-                }
-            )
         }
 
         // Long-press context menu

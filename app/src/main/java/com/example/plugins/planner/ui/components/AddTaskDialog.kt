@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.core.constants.LifeAreas
 import com.example.core.goal.GoalEntity
+import com.example.core.util.isolated
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import java.util.Calendar
@@ -182,7 +183,7 @@ fun AddTaskDialog(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "یادآوری: ${String.format("%02d:%02d", selectedHour, selectedMinute)}",
+                                    text = "یادآوری: ${String.format("%02d:%02d", selectedHour, selectedMinute).isolated()}",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.primary
@@ -385,7 +386,7 @@ fun AddTaskDialog(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = if (selectedHour != null && selectedMinute != null)
-                                            "امروز، ساعت ${String.format("%02d:%02d", selectedHour, selectedMinute)}"
+                                            "امروز، ساعت ${String.format("%02d:%02d", selectedHour, selectedMinute).isolated()}"
                                         else
                                             "تنظیم زمان یادآوری",
                                         fontSize = 13.sp,

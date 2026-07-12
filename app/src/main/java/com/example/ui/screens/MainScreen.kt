@@ -19,8 +19,11 @@ import com.example.core.plugin.ModuleSettingsViewModel
 import com.example.core.plugin.PluginRegistry
 import com.example.core.preferences.ThemeMode
 import com.example.core.search.SearchDialog
+import com.example.plugins.goals.ui.AddGoalDialog
+import com.example.plugins.goals.ui.GoalViewModel
 import com.example.plugins.planner.ui.PlannerViewModel
-import com.example.ui.screens.components.MainBottomBar
+import com.example.plugins.planner.ui.components.AddTaskDialog
+import com.example.ui.screens.components.VisionBottomBar
 import com.example.ui.screens.components.MainTopBar
 import com.example.ui.screens.components.ThemeSettingsDialog
 import com.example.ui.theme.*
@@ -62,6 +65,11 @@ fun MainScreen(
     var showThemeSettings by remember { mutableStateOf(false) }
     var showSearchDialog by remember { mutableStateOf(false) }
     val plannerViewModel: PlannerViewModel = viewModel()
+    val goalViewModel: GoalViewModel = viewModel()
+
+    // FAB dialog states
+    var showAddTaskDialog by remember { mutableStateOf(false) }
+    var showAddGoalDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier
@@ -75,10 +83,16 @@ fun MainScreen(
             )
         },
         bottomBar = {
-            MainBottomBar(
+            VisionBottomBar(
                 activePlugins = bottomBarPlugins,
                 selectedTabId = selectedTabId,
-                onTabSelected = { selectedTabId = it }
+                onTabSelected = { selectedTabId = it },
+                onActionClick = {
+                    when (selectedTabId) {
+                        "planner" -> showAddTaskDialog = true
+                        "goals" -> showAddGoalDialog = true
+                    }
+                }
             )
         }
     ) { innerPadding ->
@@ -114,6 +128,38 @@ fun MainScreen(
         }
     }
 
+    // ── Dialogs ──
+
+    if (showAddTaskDialog) {
+        AddTaskDialog(
+            onDismiss = { showAddTaskDialog = false },
+            activeGoals = plannerViewModel.activeGoals,
+            onAddTask = { title, priority, hour, minute, goalId, goalName, valueTag, lifeAreaId ->
+                plannerViewModel.addTask(
+                    title = title,
+                    priority = priority,
+                    hour = hour,
+                    minute = minute,
+                    goalId = goalId,
+                    goalName = goalName,
+                    valueTag = valueTag,
+                    lifeAreaId = lifeAreaId
+                )
+                showAddTaskDialog = false
+            }
+        )
+    }
+
+    if (showAddGoalDialog) {
+        AddGoalDialog(
+            onDismiss = { showAddGoalDialog = false },
+            onAddGoal = { title, description ->
+                goalViewModel.addGoal(title, description)
+                showAddGoalDialog = false
+            }
+        )
+    }
+
     // Theme Settings Dialog
     if (showThemeSettings) {
         ThemeSettingsDialog(
@@ -138,4 +184,3 @@ fun MainScreen(
         )
     }
 }
-
