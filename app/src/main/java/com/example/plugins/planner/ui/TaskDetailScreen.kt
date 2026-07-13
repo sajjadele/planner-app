@@ -56,6 +56,7 @@ fun TaskDetailScreen(
 
     val task by viewModel.task.collectAsState()
     val activeGoals by viewModel.activeGoals.collectAsState()
+    val allGoals by viewModel.allGoals.collectAsState()
     val taskLogs by viewModel.taskLogs.collectAsState()
 
     // Editable title state — initialized from task, synced back on save
@@ -65,10 +66,9 @@ fun TaskDetailScreen(
 
     val focusManager = LocalFocusManager.current
 
-    // Current goal name for display
-    val currentGoalName = remember(task, activeGoals) {
-        task?.goalId?.let { gid -> activeGoals.firstOrNull { it.id == gid }?.title }
-            ?: task?.goalName
+    // Current goal name for display — resolved via goalId (FK) from allGoals
+    val currentGoalName = remember(task, allGoals) {
+        task?.goalId?.let { gid -> allGoals.firstOrNull { it.id == gid }?.title }
     }
 
     Box(
@@ -189,7 +189,7 @@ fun TaskDetailScreen(
                                     Text("بدون هدف", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 },
                                 onClick = {
-                                    viewModel.updateTaskGoal(goalId = null, goalName = null)
+                                    viewModel.updateTaskGoal(goalId = null)
                                     showGoalDropdown = false
                                 }
                             )
@@ -199,7 +199,7 @@ fun TaskDetailScreen(
                                         Text(goal.title, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
                                     },
                                     onClick = {
-                                        viewModel.updateTaskGoal(goalId = goal.id, goalName = goal.title)
+                                        viewModel.updateTaskGoal(goalId = goal.id)
                                         showGoalDropdown = false
                                     }
                                 )

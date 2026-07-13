@@ -1,6 +1,7 @@
 package com.example.plugins.goals.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,6 +25,7 @@ import com.example.core.util.RTL
 import com.example.core.util.isolated
 import com.example.plugins.planner.data.TaskEntity
 import com.example.plugins.planner.ui.components.NeumorphicSurface
+import com.example.ui.onboarding.pressScale
 import com.example.ui.theme.*
 
 @Composable
@@ -31,6 +33,7 @@ fun GoalDetailScreen(
     goalId: Int,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    isOnboarding: Boolean = false,
     viewModel: GoalDetailViewModel = viewModel(
         key = "goal_detail_$goalId",
         factory = GoalDetailViewModel.factory(
@@ -45,6 +48,7 @@ fun GoalDetailScreen(
 
     var selectedTaskId by remember { mutableStateOf<Int?>(null) }
     var showEditGoalDialog by remember { mutableStateOf(false) }
+    var showHomeHint by remember { mutableStateOf(isOnboarding) }
 
     // Navigate to task detail if selected
     selectedTaskId?.let { taskId ->
@@ -85,6 +89,40 @@ fun GoalDetailScreen(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
         ) {
+            // ── Onboarding home hint (dismissible) ──
+            if (showHomeHint) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${RTL}بازگشت به خانه",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(Modifier.weight(1f))
+                        val homeHintInteraction = remember { MutableInteractionSource() }
+                        TextButton(
+                            onClick = { showHomeHint = false; onBack() },
+                            interactionSource = homeHintInteraction,
+                            modifier = Modifier.pressScale(homeHintInteraction)
+                        ) {
+                            Text("بازگشت", color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            }
+
             // ── Top bar ──
             Row(
                 modifier = Modifier

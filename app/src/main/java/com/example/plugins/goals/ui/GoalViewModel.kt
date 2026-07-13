@@ -5,7 +5,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.database.AppDatabase
 import com.example.core.goal.GoalEntity
+import com.example.core.goal.GoalEventEntity
 import com.example.core.goal.GoalRepository
+import com.example.core.goal.RoomGoalRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -17,7 +19,7 @@ class GoalViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         val database = AppDatabase.getDatabase(application)
-        repository = GoalRepository(database.goalDao())
+        repository = RoomGoalRepository(database.goalDao(), database.goalEventDao())
     }
 
     /** All active goals — drives the GoalDashboardScreen list */
@@ -38,12 +40,15 @@ class GoalViewModel(application: Application) : AndroidViewModel(application) {
 
     fun addGoal(title: String, description: String?) {
         viewModelScope.launch {
-            repository.insertGoal(
+            val id = repository.insertGoal(
                 GoalEntity(
                     title = title,
                     description = description,
                     status = "active"
                 )
+            )
+            repository.insertGoalEvent(
+                GoalEventEntity(goalId = id.toInt(), eventType = "created")
             )
         }
     }
@@ -57,6 +62,9 @@ class GoalViewModel(application: Application) : AndroidViewModel(application) {
                     completedAt = System.currentTimeMillis()
                 )
             )
+            repository.insertGoalEvent(
+                GoalEventEntity(goalId = goalId, eventType = "completed")
+            )
         }
     }
 
@@ -64,6 +72,9 @@ class GoalViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val goal = repository.getGoalById(goalId) ?: return@launch
             repository.updateGoal(goal.copy(status = "paused"))
+            repository.insertGoalEvent(
+                GoalEventEntity(goalId = goalId, eventType = "paused")
+            )
         }
     }
 
@@ -71,6 +82,9 @@ class GoalViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val goal = repository.getGoalById(goalId) ?: return@launch
             repository.updateGoal(goal.copy(status = "active", completedAt = null))
+            repository.insertGoalEvent(
+                GoalEventEntity(goalId = goalId, eventType = "resumed")
+            )
         }
     }
 
@@ -78,6 +92,9 @@ class GoalViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val goal = repository.getGoalById(goalId) ?: return@launch
             repository.updateGoal(goal.copy(status = "abandoned"))
+            repository.insertGoalEvent(
+                GoalEventEntity(goalId = goalId, eventType = "abandoned")
+            )
         }
     }
 

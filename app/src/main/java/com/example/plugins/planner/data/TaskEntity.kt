@@ -33,6 +33,6 @@ data class TaskEntity(
     // Goal linkage — nullable foreign key to GoalEntity.
     val goalId: Int? = null,
     val lifeAreaId: Int? = null,
-    val goalName: String? = null, // Denormalized cache for backward compatibility
+    // goalName removed: goal linkage is resolved exclusively via goalId (FK)
     val valueTag: String? = null
 )

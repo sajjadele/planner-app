@@ -7,6 +7,8 @@ class TaskRepository(private val taskDao: TaskDao) {
 
     fun getTasksBetween(start: Long, end: Long): Flow<List<TaskEntity>> = taskDao.getTasksBetween(start, end)
 
+    fun getTasksByGoalId(goalId: Int): Flow<List<TaskEntity>> = taskDao.getTasksByGoalId(goalId)
+
     suspend fun insertTask(task: TaskEntity): Long = taskDao.insertTask(task)
 
     suspend fun updateTask(task: TaskEntity) = taskDao.updateTask(task)

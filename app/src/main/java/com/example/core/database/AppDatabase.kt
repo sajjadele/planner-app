@@ -8,6 +8,11 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.core.goal.GoalDao
 import com.example.core.goal.GoalEntity
+import com.example.core.goal.GoalEventDao
+import com.example.core.goal.GoalEventEntity
+import com.example.core.snapshot.BehaviorSnapshotEntity
+import com.example.core.snapshot.GoalProgressSnapshotEntity
+import com.example.core.snapshot.SnapshotDao
 import com.example.plugins.notes.data.NoteDao
 import com.example.plugins.notes.data.NoteEntity
 import com.example.plugins.planner.data.InsightDao
@@ -20,16 +25,21 @@ import com.example.plugins.planner.data.TaskEventEntity
     entities = [
         ModuleSettingsEntity::class,
         GoalEntity::class,
+        GoalEventEntity::class,
+        GoalProgressSnapshotEntity::class,
+        BehaviorSnapshotEntity::class,
         TaskEntity::class,
         TaskEventEntity::class,
         NoteEntity::class
     ],
-    version = 6,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun moduleSettingsDao(): ModuleSettingsDao
     abstract fun goalDao(): GoalDao
+    abstract fun goalEventDao(): GoalEventDao
+    abstract fun snapshotDao(): SnapshotDao
     abstract fun taskDao(): TaskDao
     abstract fun taskEventDao(): TaskEventDao
     abstract fun insightDao(): InsightDao
@@ -64,6 +74,99 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v6 → v7: Drop the denormalized `goalName` cache column.
+         * Goal linkage is now resolved exclusively via the `goalId` FK.
+         * Recreates the table to remove the column (SQLite cannot DROP COLUMN
+         * on all supported API levels); all other columns and rows are preserved.
+         */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tasks RENAME TO tasks_old")
+                db.execSQL("""
+                    CREATE TABLE tasks (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        title TEXT NOT NULL,
+                        priority TEXT,
+                        isCompleted INTEGER NOT NULL,
+                        dateEpochMs INTEGER NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        reminderHour INTEGER,
+                        reminderMinute INTEGER,
+                        goalId INTEGER,
+                        lifeAreaId INTEGER,
+                        valueTag TEXT,
+                        FOREIGN KEY(goalId) REFERENCES goals(id) ON DELETE SET NULL
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    INSERT INTO tasks (id, title, priority, isCompleted, dateEpochMs, timestamp,
+                                       reminderHour, reminderMinute, goalId, lifeAreaId, valueTag)
+                    SELECT id, title, priority, isCompleted, dateEpochMs, timestamp,
+                           reminderHour, reminderMinute, goalId, lifeAreaId, valueTag
+                    FROM tasks_old
+                """.trimIndent())
+                db.execSQL("DROP TABLE tasks_old")
+            }
+        }
+
+        /**
+         * v7 → v8: Add the `goal_events` table for goal lifecycle signal logging
+         * (created/completed/paused/resumed/abandoned). No existing table is modified;
+         * the table is created fresh and empty for new installs and migrators alike.
+         */
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS goal_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        goalId INTEGER NOT NULL,
+                        eventType TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        FOREIGN KEY(goalId) REFERENCES goals(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_goal_events_goalId ON goal_events(goalId)")
+            }
+        }
+
+        /**
+         * v8 → v9: Add the Phase 3 progress/behavior projections.
+         *
+         * Two new tables, both rebuildable from existing `tasks`/`task_events` signal:
+         * - `goal_progress_snapshot` (per goal, per day): completed/total/rate.
+         * - `behavior_snapshot` (per day): completed/created/streak/velocity/rescheduleRate.
+         * No existing table is modified; the tables are created fresh and empty for new installs
+         * and migrators alike. Historical rows are filled by the App-Launch Backfill Engine.
+         */
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS goal_progress_snapshot (
+                        dateEpochMs INTEGER NOT NULL,
+                        goalId INTEGER NOT NULL,
+                        completed INTEGER NOT NULL,
+                        total INTEGER NOT NULL,
+                        rate REAL NOT NULL,
+                        PRIMARY KEY(dateEpochMs, goalId),
+                        FOREIGN KEY(goalId) REFERENCES goals(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_goal_progress_snapshot_goalId ON goal_progress_snapshot(goalId)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS behavior_snapshot (
+                        dateEpochMs INTEGER NOT NULL PRIMARY KEY,
+                        completed INTEGER NOT NULL,
+                        created INTEGER NOT NULL,
+                        streak INTEGER NOT NULL,
+                        velocity TEXT NOT NULL,
+                        rescheduleRate REAL NOT NULL
+                    )
+                """.trimIndent())
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -71,7 +174,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "vision_planner_database"
                 )
-                .addMigrations(MIGRATION_5_6)
+                .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance

@@ -6,15 +6,20 @@ import androidx.lifecycle.viewModelScope
 import com.example.core.database.AppDatabase
 import com.example.core.goal.GoalEntity
 import com.example.core.receiver.ReminderScheduler
+import com.example.core.snapshot.RoomSnapshotRepository
+import com.example.core.snapshot.SnapshotAggregator
+import com.example.plugins.planner.data.RoomInsightRepository
 import com.example.plugins.planner.data.TaskEntity
 import com.example.plugins.planner.data.TaskEventDao
 import com.example.plugins.planner.data.TaskEventEntity
 import com.example.plugins.planner.data.TaskRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -22,10 +27,15 @@ import java.util.Calendar
 class PlannerViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: TaskRepository
     private val taskEventDao: TaskEventDao
+    private val snapshotAggregator: SnapshotAggregator
     private val goalDao = AppDatabase.getDatabase(application).goalDao()
 
     private val _lastCompletedTask = MutableStateFlow<TaskEntity?>(null)
     val lastCompletedTask: StateFlow<TaskEntity?> = _lastCompletedTask
+
+    /** One-shot event used to trigger the completion snackbar exactly once. */
+    private val _completionEvents = Channel<TaskEntity>(Channel.BUFFERED)
+    val completionEvents = _completionEvents.receiveAsFlow()
 
     /** Active goals for the Goal Picker in AddTaskDialog */
     val activeGoals: StateFlow<List<GoalEntity>> = goalDao.getActiveGoals()
@@ -39,6 +49,11 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         val database = AppDatabase.getDatabase(application)
         repository = TaskRepository(database.taskDao())
         taskEventDao = database.taskEventDao()
+        snapshotAggregator = SnapshotAggregator(
+            RoomInsightRepository(database.insightDao()),
+            RoomSnapshotRepository(database.snapshotDao()),
+            com.example.core.goal.RoomGoalRepository(database.goalDao(), database.goalEventDao())
+        )
     }
 
     /** Midnight epoch ms of the currently-selected day (local timezone). */
@@ -59,7 +74,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         _selectedDateEpochMs.value = dateEpochMs
     }
 
-    fun addTask(title: String, priority: String?, hour: Int?, minute: Int?, goalId: Int?, goalName: String?, valueTag: String?, lifeAreaId: Int? = null) {
+    fun addTask(title: String, priority: String?, hour: Int?, minute: Int?, goalId: Int?, valueTag: String?, lifeAreaId: Int? = null) {
         viewModelScope.launch {
             val task = TaskEntity(
                 title = title,
@@ -68,7 +83,6 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
                 reminderHour = hour,
                 reminderMinute = minute,
                 goalId = goalId,
-                goalName = goalName,
                 valueTag = valueTag,
                 lifeAreaId = lifeAreaId
             )
@@ -86,6 +100,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
                 val finalTask = task.copy(id = generatedId.toInt())
                 ReminderScheduler.schedule(getApplication(), finalTask)
             }
+            snapshotAggregator.recordDay(getTodayDateEpochMs())
         }
     }
 
@@ -100,6 +115,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
                 )
                 ReminderScheduler.cancel(getApplication(), updatedTask)
                 _lastCompletedTask.value = updatedTask
+                _completionEvents.trySend(updatedTask)
             } else {
                 taskEventDao.insertEvent(
                     TaskEventEntity(taskId = updatedTask.id, eventType = "reopened")
@@ -108,6 +124,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
                     ReminderScheduler.schedule(getApplication(), updatedTask)
                 }
             }
+            snapshotAggregator.recordDay(getTodayDateEpochMs())
         }
     }
 
@@ -123,6 +140,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
             if (reopened.reminderHour != null && reopened.reminderMinute != null) {
                 ReminderScheduler.schedule(getApplication(), reopened)
             }
+            snapshotAggregator.recordDay(getTodayDateEpochMs())
         }
     }
 
@@ -133,6 +151,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
             )
             repository.deleteTask(task)
             ReminderScheduler.cancel(getApplication(), task)
+            snapshotAggregator.recordDay(getTodayDateEpochMs())
         }
     }
 
@@ -151,6 +170,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
             if (updated.reminderHour != null && updated.reminderMinute != null && !updated.isCompleted) {
                 ReminderScheduler.schedule(getApplication(), updated)
             }
+            snapshotAggregator.recordDay(getTodayDateEpochMs())
         }
     }
 

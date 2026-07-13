@@ -47,6 +47,30 @@ Goal → Task → Event → Insight
 | Neumorphic Design | ✅ | Custom NeumorphicSurface, consistent elevation system |
 | Plugin Architecture | ✅ | AppPlugin interface, PluginRegistry, Module Settings |
 | Offline-First | ✅ | 100% local, zero network dependency |
+| First-Run Onboarding | ✅ | Guided 2-step "Value Discovery Journey" (Goal → Task) shown once; creates first goal + task, deep-links to the new goal |
+| Light / Dark / System Theme | ✅ | ThemeSettingsDialog + DataStore-backed ThemeRepository + `LocalIsDarkTheme` |
+| Jalali Calendar Picker | ✅ | True Jalali month grid in a bottom sheet; month nav + month picker |
+| Holiday Awareness | ✅ | Bundled `holidays.json`; Iranian holidays marked in calendar + shown in day context |
+| Infinite Week Navigation | ✅ | Snap-scrolling horizontal week row (±19 years) |
+| Real-Time Search | ✅ | Instant search across tasks + notes with badges, priority markers, one-tap jump |
+| Quick Notes | ✅ | Standalone notes screen (top-bar) with add/delete; separate from task-linked logs |
+| Task Priority | ✅ | HIGH / MEDIUM / LOW priority set in AddTaskDialog, shown on tasks |
+| Weekly Insight Card | ✅ | Compact ring + streak + best day, expandable to a detail bottom sheet |
+| Goal Context Menu | ✅ | Long-press a goal for complete / pause / resume / abandon / delete |
+
+### Feature Notes
+
+Details on features not obvious from the table above:
+
+- **First-Run Onboarding (`core/onboarding`, `ui/onboarding`).** On first launch the app shows a two-step, RTL, animated flow: `OnboardingGoalScreen` (pick/create a long-term goal, with suggestion chips) → `OnboardingTaskScreen` (capture one small task and explicitly *link* it to the goal via a connector node). Submit is disabled until the task is linked, teaching the goal→task model. On finish it writes a real Goal + Task to the DB, sets `OnboardingRepository.isCompleted`, and deep-links into `GoalDetailScreen` for the new goal (`OnboardingDeepLink`). Motion is reduced-motion aware.
+- **Theming (`core/preferences/ThemeRepository`, `ui/theme`, `ui/screens/components/ThemeSettingsDialog`).** `ThemeMode` (LIGHT / DARK / SYSTEM) is persisted in DataStore. `LocalIsDarkTheme` exposes the resolved mode to composables; all colors are read from `MaterialTheme.colorScheme.*`. The dialog is reached from the top-bar settings icon.
+- **Jalali Calendar Picker (`planner/ui/components/DaySelector.kt` → `CalendarPopup`).** A `ModalBottomSheet` rendering a real Jalali month grid (Sat→Fri headers, Persian digits), with prev/next month and a month-picker grid. Selecting a day jumps the Planner to that date.
+- **Holidays (`core/data/HolidayRepository`, `assets/holidays.json`).** Offline holiday data; holiday days get a red marker in the calendar grid and are listed in the expandable **Day Context panel** (`DayContextPanel`) alongside the Gregorian date.
+- **Infinite Week Row (`InfiniteWeekRow`).** Replaces a fixed day selector — a snapping `LazyRow` of weeks spanning ~±19 years, centered on the selected date.
+- **Real-Time Search (`core/search/SearchDialog`).** A full-screen dialog with live filtering across tasks and notes (separate result types), showing day/priority/completion badges. Tapping a task jumps the Planner to that task's date; tapping a note opens the Notes tab.
+- **Quick Notes (`plugins/notes`).** A standalone notes screen (top-bar 📝) for ad-hoc capture and deletion, distinct from the task-linked progress logs created in `TaskDetailScreen`.
+- **Weekly Insight Card (`planner/ui/components/WeeklyInsightCard`).** Compact `NeumorphicSurface` with a completion-rate ring, streak 🔥, and best day; the "بیشتر" affordance opens `InsightDetailsSheetContent` (velocity, procrastination alerts, neglected goal, life-area distribution, unorganized count).
+- **Goal Context Menu.** Long-press on a `GoalCard` opens an `AlertDialog` menu for complete / pause / resume / abandon / delete.
 
 ### Deferred (Per Vision Doc)
 
@@ -74,11 +98,14 @@ Goal → Task → Event → Insight
 | Min SDK | 24 |
 | Target SDK | 36 |
 
-### Database Schema (v4)
+### Database Schema (v9)
 
 ```
 goals          → GoalEntity (id, title, description, status, createdAt, completedAt)
-tasks          → TaskEntity (id, title, priority, isCompleted, dayIndex, goalId FK, lifeAreaId, ...)
+goal_events    → GoalEventEntity (id, goalId FK, eventType, timestamp)  [Phase 2]
+goal_progress_snapshot → GoalProgressSnapshotEntity (dateEpochMs, goalId FK, completed, total, rate)  [Phase 3]
+behavior_snapshot → BehaviorSnapshotEntity (dateEpochMs PK, completed, created, streak, velocity, rescheduleRate)  [Phase 3]
+tasks          → TaskEntity (id, title, priority, isCompleted, dateEpochMs, timestamp, reminderHour, reminderMinute, goalId FK, lifeAreaId, valueTag)
 task_events    → TaskEventEntity (id, taskId, eventType, timestamp)
 notes          → NoteEntity (id, content, timestamp, goalId?, taskId?)
 module_settings → ModuleSettingsEntity (moduleId, isEnabled)
@@ -89,6 +116,9 @@ module_settings → ModuleSettingsEntity (moduleId, isEnabled)
 - `notes.taskId` → `tasks.id` (indexed, nullable)
 - `notes.goalId` → `goals.id` (indexed, nullable)
 - `task_events.taskId` → `tasks.id` (indexed)
+- `goal_progress_snapshot.goalId` → `goals.id` (ForeignKey, CASCADE on delete)
+- `goal_progress_snapshot` / `behavior_snapshot` are **rebuildable projections** of `tasks` +
+  `task_events` (Phase 3, see `docs/ADR-0003`) — not authoritative writes.
 
 ### Project Structure
 
@@ -97,16 +127,22 @@ app/src/main/java/com/example/
 │
 ├── core/
 │   ├── constants/          # DateConstants, LifeAreas
-│   ├── database/           # AppDatabase (v4), ModuleSettings
+│   ├── data/               # HolidayRepository (bundled holidays.json)
+│   ├── database/           # AppDatabase (v9), ModuleSettings
+│   ├── domain/             # CalendarDate, Holiday, DayContext
 │   ├── goal/               # GoalEntity, GoalDao, GoalRepository
-│   ├── plugin/             # AppPlugin interface, PluginRegistry, ModuleSettingsViewModel
+│   └── snapshot/           # Phase 3: GoalProgressSnapshotEntity, BehaviorSnapshotEntity,
+│                       # SnapshotDao, SnapshotRepository, SnapshotAggregator
+│   ├── onboarding/         # OnboardingStep, OnboardingViewModel, OnboardingRepository, OnboardingDeepLink
+│   ├── plugin/             # AppPlugin, PluginRegistry, ModuleSettingsViewModel
+│   ├── preferences/        # ThemeRepository (DataStore)
 │   ├── receiver/           # BootReceiver, ReminderReceiver, ReminderScheduler
 │   ├── search/             # SearchDialog, SearchViewModel
-│   └── util/               # DateTimeUtils, PersianDigits
+│   └── util/               # DateTimeUtils, PersianDigits, JalaliDate
 │
 ├── plugins/
 │   ├── goals/              # GoalsPlugin, GoalDashboardScreen, GoalDetailScreen
-│   │   └── ui/             # GoalViewModel, GoalDetailViewModel, GoalCard, AddGoalDialog
+│   │   └── ui/             # GoalViewModel, GoalDetailViewModel, GoalCard, AddGoalDialog, EditGoalDialog
 │   ├── notes/              # NotesPlugin
 │   │   ├── data/           # NoteEntity, NoteDao, NoteRepository
 │   │   └── ui/             # NotesScreen, NotesViewModel
@@ -115,11 +151,12 @@ app/src/main/java/com/example/
 │       │                   # InsightDao, TaskRepository
 │       └── ui/             # PlannerScreen, PlannerViewModel, TaskDetailScreen,
 │           │               # TaskDetailViewModel, WeeklyInsightViewModel
-│           └── components/ # AddTaskDialog, TaskCard, DaySelector, NeumorphicComponents,
-│                           # WeeklyInsightCard, PlannerEmptyState
+│           └── components/ # AddTaskDialog, TaskCard, InfiniteWeekRow, CalendarPopup,
+│           │               # DayContextPanel, NeumorphicComponents, WeeklyInsightCard, PlannerEmptyState
 │
 ├── ui/
-│   ├── screens/            # MainScreen, MainBottomBar, MainTopBar
+│   ├── onboarding/         # OnboardingHost, OnboardingGoalScreen, OnboardingTaskScreen, OnboardingMotion
+│   ├── screens/            # MainScreen, VisionBottomBar, MainTopBar
 │   └── theme/              # Color, Theme, Type
 │
 └── MainActivity.kt
@@ -156,6 +193,30 @@ Room DAO (Flow) → ViewModel (StateFlow via stateIn) → Composable (collectAsS
 - All reads are reactive via Room `Flow`
 - Writes use `suspend` functions in ViewModels
 - No manual refresh needed — Room re-emits on data changes
+
+### One-Shot UI Events
+
+State that must trigger a side-effect **exactly once** (e.g. a snackbar, navigation, a toast) is **never** exposed as sticky `StateFlow` state. Sticky state survives recomposition and re-entry into composition, so an observer keyed on it (e.g. `LaunchedEffect(state)`) will re-fire every time the screen re-enters — for example when switching tabs via `AnimatedContent`.
+
+One-shot side-effects are delivered through a replay-free `Channel` exposed as a `Flow`:
+
+```kotlin
+// ViewModel
+private val _completionEvents = Channel<TaskEntity>(Channel.BUFFERED)
+val completionEvents = _completionEvents.receiveAsFlow()
+
+// emit once at the action site
+_completionEvents.trySend(updatedTask)
+
+// UI — keyed on Unit, not on the event value
+LaunchedEffect(Unit) {
+    viewModel.completionEvents.collect { task ->
+        /* show snackbar / navigate / etc. */
+    }
+}
+```
+
+The sticky value (e.g. `_lastCompletedTask`, kept for the snackbar's undo action) remains separate from the event stream, so re-composition cannot re-trigger it.
 
 ---
 
@@ -229,7 +290,16 @@ Android Studio is not required.
 | Phase 2 | ✅ | Goal Dashboard — Goal CRUD, GoalDetailScreen, Goal stats, navigation |
 | Phase 3 | ✅ | Behavior Insights — Streak, velocity, procrastination, goal neglect, RTL fixes |
 | Phase 3.5 | ✅ | Task Detail & Editing — TaskDetailScreen, progress logs, edit button, goal reassignment |
+| Phase 3.6 | ✅ | Onboarding, theming, Jalali calendar picker, holiday awareness, infinite week nav, real-time search, quick notes, insight card/sheet |
 | Phase 4 | 🔜 | AI Integration Layer |
+
+---
+
+## Recent Changes
+
+| Date | Change | Files |
+|------|--------|-------|
+| 2026-07-12 | **Fixed duplicate task-completion notification.** The completion snackbar re-fired whenever the user switched tabs (`وظایف` ⇄ `اهداف`) and returned, because the trigger was a sticky `StateFlow` (`lastCompletedTask`) observed via `LaunchedEffect(lastCompletedTask)`. Replaced it with a one-shot `Channel`-based event stream (`completionEvents`) consumed by `LaunchedEffect(Unit)`, while keeping `_lastCompletedTask` as the undo target. | `PlannerViewModel.kt`, `PlannerScreen.kt` |
 
 ---
 

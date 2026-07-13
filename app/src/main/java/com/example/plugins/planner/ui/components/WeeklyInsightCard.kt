@@ -25,7 +25,7 @@ import com.example.core.constants.DateConstants
 import com.example.core.constants.LifeAreas
 import com.example.core.util.RTL
 import com.example.core.util.isolated
-import com.example.plugins.planner.ui.Velocity
+import com.example.domain.insight.Velocity
 import com.example.plugins.planner.ui.WeeklyInsightState
 import com.example.ui.theme.*
 

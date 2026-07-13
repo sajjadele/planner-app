@@ -70,12 +70,11 @@ Goal: "Learn AI Engineering"
 | `title` | `String` | |
 | `priority` | `String?` | `"HIGH"` / `"MEDIUM"` / `"LOW"` |
 | `isCompleted` | `Boolean` | |
-| `dayIndex` | `Int` | 0=Saturday … 6=Friday (Persian week) |
+| `dateEpochMs` | `Long` | Midnight epoch ms of the scheduled day (local timezone) |
 | `reminderHour` | `Int?` | 0–23 |
 | `reminderMinute` | `Int?` | 0–59 |
-| `goalId` | `Int?` | FK → goals.id (SET NULL on delete) |
+| `goalId` | `Int?` | FK → goals.id (SET NULL on delete). **Only** source of goal linkage |
 | `lifeAreaId` | `Int?` | FK → LifeAreas fixed list |
-| `goalName` | `String?` | Denormalized cache (backward compat) |
 | `valueTag` | `String?` | |
 | `timestamp` | `Long` | epoch millis |
 
@@ -123,6 +122,54 @@ Key insight types derived from event data:
 - **NeglectedGoal:** The goal with the lowest completion rate across its tasks.
 - **StreakDays:** Consecutive days where at least one task was completed.
 
+### 3.6 GoalEventEntity (`goal_events` table) — Phase 2
+
+Append-only audit trail of goal lifecycle transitions (distinct from `task_events`, which tracks
+Task actions). Required later for behavioral analysis (Phase 3) and the AI Coach (Phase 5).
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `id` | `Long` (PK, autoGenerate) | |
+| `goalId` | `Int` | FK → goals.id (CASCADE on delete) |
+| `eventType` | `String` | `"created"` / `"completed"` / `"paused"` / `"resumed"` / `"abandoned"` |
+| `timestamp` | `Long` | epoch millis |
+
+Written by `GoalViewModel` on every lifecycle transition; never updated or deleted.
+
+### 3.7 GoalProgressSnapshotEntity / BehaviorSnapshotEntity (`goal_progress_snapshot` / `behavior_snapshot`) — Phase 3
+
+Two **rebuildable projection** tables (DB v9) that store progress/behavior over time so future
+features (Graph View, AI Coach) read one source instead of recomputing from raw events. They are
+always recomputable from `tasks` + `task_events`; the raw events remain the single source of truth.
+See `docs/ADR-0003`.
+
+**`goal_progress_snapshot`** — per goal, per day (PK = `dateEpochMs` + `goalId`):
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `dateEpochMs` | `Long` | midnight epoch of the day (PK part) |
+| `goalId` | `Int` | FK → goals.id (CASCADE on delete), PK part |
+| `completed` | `Int` | tasks for this goal completed on the day |
+| `total` | `Int` | tasks for this goal scheduled on the day |
+| `rate` | `Float` | completion rate % (`completed/total`) |
+
+**`behavior_snapshot`** — one row per day (PK = `dateEpochMs`), task-focused (no `goal_events`
+coupling, no `lifeAreaId` — per-life-area detail stays re-derivable via `InsightDao`):
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `dateEpochMs` | `Long` | midnight epoch of the day (PK) |
+| `completed` | `Int` | tasks completed that day |
+| `created` | `Int` | tasks scheduled that day |
+| `streak` | `Int` | completion streak **as of** that day (end-of-day) |
+| `velocity` | `String` | `Velocity` enum name: `IMPROVING` / `STABLE` / `DECLINING` (vs previous day) |
+| `rescheduleRate` | `Float` | reschedules that day ÷ tasks created that day |
+
+**Refresh strategy:** real-time upsert of *today* via `SnapshotAggregator.recordDay(today)` (fired
+from `PlannerViewModel` and `GoalDetailViewModel` after task writes) + an App-Launch Backfill Engine
+(`SnapshotAggregator.backfillIfNeeded()` from `MainActivity`) that fills any missing historical day.
+No `WorkManager`/scheduler.
+
 ---
 
 ## 4. Architecture — Plugin System
@@ -165,6 +212,30 @@ MainScreen
 ```
 
 Tab switching uses `AnimatedContent` with a fade transition — no Navigation Component, no back stack. Task/goal detail screens are shown inline (they `return` early from their parent composable, replacing the list view).
+
+### 4.4 Domain Layer & Repository Boundary (Phase 2)
+
+Pure-Kotlin, framework-free logic lives in `com.example.domain.*` (no Android imports), so it
+is unit-testable on the host JVM without Robolectric or an emulator.
+
+- `domain.insight.InsightCalculator` — all insight math (streak, completion rate, weekly
+  velocity, procrastination detection, neglected-goal, Persian week range). Extracted from
+  `WeeklyInsightViewModel` in Phase 2; the ViewModel now only assembles the reactive
+  `StateFlow` and delegates computation to the calculator.
+- `domain.insight.Velocity` / `ProcrastinationAlert` — domain models (moved out of the UI
+  package so the domain layer does not depend on the UI).
+
+**Repository boundary (Phase 2):** consumers depend on repository *interfaces*, not DAOs.
+
+- `GoalRepository` (interface) → `RoomGoalRepository` (wraps `GoalDao` + `GoalEventDao`).
+- `InsightRepository` (interface) → `RoomInsightRepository` (wraps `InsightDao`).
+- `WeeklyInsightViewModel` and `GoalDetailViewModel` consume these interfaces; `PlannerViewModel`
+  still reaches `TaskDao` / `GoalDao` directly (a later DI refactor is intentionally deferred —
+  see ROADMAP Phase 2 scope guards).
+
+**Data flow (reactive):** `DAO Flow → Repository interface → stateIn / combine → ViewModel
+StateFlow → Compose collectAsState`. Insight derivation happens in the pure `InsightCalculator`,
+keeping `AndroidViewModel`s free of analytic logic.
 
 ---
 
@@ -322,22 +393,29 @@ NotesScreen
 
 ## 8. Database
 
-### 8.1 AppDatabase (Room, version 5)
+### 8.1 AppDatabase (Room, version 9)
 
-**Tables:** `goals`, `tasks`, `task_events`, `notes`, `module_settings`
+**Tables:** `goals`, `goal_events`, `goal_progress_snapshot`, `behavior_snapshot`, `tasks`,
+`task_events`, `notes`, `module_settings`
 
 Migration strategy: `fallbackToDestructiveMigration()` — safe for local offline development.
 
-**DAOs:** `GoalDao`, `TaskDao`, `TaskEventDao`, `InsightDao`, `NoteDao`, `ModuleSettingsDao`
+**Migrations:** `MIGRATION_5_6` (dayIndex → dateEpochMs), `MIGRATION_6_7` (drop `goalName`),
+`MIGRATION_7_8` (add `goal_events` for goal lifecycle signal), `MIGRATION_8_9` (add
+`goal_progress_snapshot` + `behavior_snapshot` projection tables, Phase 3).
+
+**DAOs:** `GoalDao`, `GoalEventDao`, `SnapshotDao`, `TaskDao`, `TaskEventDao`, `InsightDao`, `NoteDao`, `ModuleSettingsDao`
 
 ### 8.2 Key Queries
 
-- `TaskDao.getTasksByDay(dayIndex)` — tasks for PlannerScreen filtered by selected day
+- `TaskDao.getTasksForDay(dateEpochMs)` — tasks for PlannerScreen filtered by selected day
 - `TaskDao.getActiveReminders()` — tasks with non-null reminder, used by BootReceiver
 - `InsightDao.observeWeeklyStats(...)` — weekly completion + streak + best day
 - `InsightDao.observeGoalCompletionRate(goalId)` — per-goal rate
 - `InsightDao.getProcrastinationAlerts(...)` — tasks rescheduled ≥3 times
 - `InsightDao.observeWeeklyVelocity(...)` — compares current vs. previous week completion rates
+- `SnapshotDao.observeBehaviorRange(start, end)` — daily behavior time-series (Phase 3/4)
+- `SnapshotDao.observeGoalProgress(goalId)` — per-goal daily progress trend (Phase 4)
 
 ---
 
@@ -345,7 +423,7 @@ Migration strategy: `fallbackToDestructiveMigration()` — safe for local offlin
 
 ### 9.1 Components
 
-- **`ReminderScheduler`** — schedules `AlarmManager.setExactAndAllowWhileIdle` for task reminders. Calculates next occurrence based on `dayIndex` (Persian week). Cancels via `PendingIntent` lookup.
+- **`ReminderScheduler`** — schedules `AlarmManager.setExactAndAllowWhileIdle` for task reminders. Computes the next occurrence from `dateEpochMs` (scheduled day) + `reminderHour`/`reminderMinute`. Cancels via `PendingIntent` lookup.
 - **`ReminderReceiver`** (BroadcastReceiver) — shows a system notification with priority markers (`🚨` for HIGH, `☕` for LOW). Creates notification channel `"vision_planner_reminders"`.
 - **`BootReceiver`** (BroadcastReceiver) — re-schedules all active reminders after device reboot. Queries `TaskDao.getActiveReminders()` and re-registers each with `ReminderScheduler`.
 

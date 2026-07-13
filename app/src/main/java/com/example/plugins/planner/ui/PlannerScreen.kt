@@ -61,17 +61,17 @@ fun PlannerScreen(
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
-    val lastCompletedTask by viewModel.lastCompletedTask.collectAsState()
 
-    LaunchedEffect(lastCompletedTask) {
-        val task = lastCompletedTask ?: return@LaunchedEffect
-        val result = snackbarHostState.showSnackbar(
-            message = "تسک انجام شد",
-            actionLabel = "بازگردانی",
-            duration = SnackbarDuration.Short
-        )
-        if (result == SnackbarResult.ActionPerformed) {
-            viewModel.undoLastComplete()
+    LaunchedEffect(Unit) {
+        viewModel.completionEvents.collect { task ->
+            val result = snackbarHostState.showSnackbar(
+                message = "تسک انجام شد",
+                actionLabel = "بازگردانی",
+                duration = SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.undoLastComplete()
+            }
         }
     }
 

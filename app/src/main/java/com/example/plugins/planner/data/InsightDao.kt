@@ -68,7 +68,7 @@ interface InsightDao {
     @Query("""
         SELECT COUNT(*) FROM tasks
         WHERE dateEpochMs BETWEEN :start AND :end
-        AND lifeAreaId IS NULL AND goalId IS NULL AND goalName IS NULL
+        AND lifeAreaId IS NULL AND goalId IS NULL
     """)
     fun observeUnorganizedCount(start: Long, end: Long): Flow<Int>
 
@@ -89,32 +89,26 @@ interface InsightDao {
     fun observeCompletionByDay(start: Long, end: Long): Flow<List<DayCompletion>>
 
     // ──────────────────────────────────────────────
-    // Goal breakdown (legacy goalName-based)
+    // Goal breakdown is derived by FK join in observeGoalCompletionRates
+    // (see below). The legacy goalName-based grouping was removed:
+    // goal linkage is now resolved exclusively via goalId.
     // ──────────────────────────────────────────────
-
-    @Query("""
-        SELECT goalName as goalName, COUNT(*) as count
-        FROM tasks
-        WHERE isCompleted = 1 AND dateEpochMs BETWEEN :start AND :end
-        AND goalName IS NOT NULL AND goalName != ''
-        GROUP BY goalName
-        ORDER BY count DESC
-    """)
-    fun observeCompletionByGoal(start: Long, end: Long): Flow<List<GoalCompletion>>
 
     // ──────────────────────────────────────────────
     // Phase 3: Procrastination Detection
     // Tracks how many times each task has been rescheduled.
     // Tasks with ≥ 3 reschedules signal procrastination patterns.
+    // Joins tasks to resolve the title without a blocking lookup.
     // ──────────────────────────────────────────────
 
     @Query("""
-        SELECT taskId, COUNT(*) as rescheduleCount
-        FROM task_events
-        WHERE eventType = 'rescheduled'
-        GROUP BY taskId
+        SELECT te.taskId AS taskId, t.title AS taskTitle, COUNT(*) AS rescheduleCount
+        FROM task_events te
+        JOIN tasks t ON t.id = te.taskId
+        WHERE te.eventType = 'rescheduled'
+        GROUP BY te.taskId
     """)
-    fun observeRescheduleCounts(): Flow<List<TaskRescheduleCount>>
+    fun observeRescheduleCounts(): Flow<List<TaskRescheduleWithTitle>>
 
     // ──────────────────────────────────────────────
     // Phase 3: Goal Completion Rates
@@ -189,7 +183,35 @@ interface InsightDao {
         WHERE dateEpochMs BETWEEN :start AND :end
     """)
     fun observePreviousWeekCreatedCount(start: Long, end: Long): Flow<Int>
+
+    // ──────────────────────────────────────────────
+    // Phase 3: Snapshot aggregation inputs
+    // ──────────────────────────────────────────────
+
+    /** Reschedule events whose timestamp falls within [start, end] (day-scoped). */
+    @Query("""
+        SELECT COUNT(*) FROM task_events
+        WHERE eventType = 'rescheduled'
+        AND timestamp BETWEEN :start AND :end
+    """)
+    fun observeRescheduleCountBetween(start: Long, end: Long): Flow<Int>
+
+    /** Completed/total task counts for a single goal within [start, end] (day-scoped). */
+    @Query("""
+        SELECT COUNT(*) as total,
+               COALESCE(SUM(CASE WHEN isCompleted = 1 THEN 1 ELSE 0 END), 0) as completed
+        FROM tasks
+        WHERE goalId = :goalId AND dateEpochMs BETWEEN :start AND :end
+    """)
+    suspend fun getGoalDayCounts(goalId: Int, start: Long, end: Long): GoalDayCount
+
+    /** Earliest scheduled task day — backfill start anchor (null when no tasks exist). */
+    @Query("SELECT MIN(dateEpochMs) FROM tasks")
+    suspend fun getEarliestTaskDateEpochMs(): Long?
 }
+
+/** Per-goal task counts for a day, returned by [getGoalDayCounts]. */
+data class GoalDayCount(val total: Int, val completed: Int)
 
 // ──────────────────────────────────────────────
 // Result types for aggregation queries
@@ -197,9 +219,8 @@ interface InsightDao {
 
 data class LifeAreaCompletion(val lifeAreaId: Int, val count: Int)
 data class DayCompletion(val dayIndex: Int, val count: Int)
-data class GoalCompletion(val goalName: String, val count: Int)
 
-data class TaskRescheduleCount(val taskId: Int, val rescheduleCount: Int)
+data class TaskRescheduleWithTitle(val taskId: Int, val taskTitle: String?, val rescheduleCount: Int)
 
 data class GoalRateResult(
     val goalId: Int,

@@ -116,6 +116,8 @@ dependencies {
   testImplementation(libs.androidx.junit)
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
+  testImplementation(libs.mockk)
+  testImplementation(libs.turbine)
   testImplementation(libs.robolectric)
   // testImplementation(libs.roborazzi)  // FROZEN
   // testImplementation(libs.roborazzi.compose)  // FROZEN

@@ -6,15 +6,21 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.core.onboarding.OnboardingDeepLink
+import com.example.core.onboarding.OnboardingRepository
 import com.example.core.plugin.ModuleSettingsViewModel
 import com.example.core.plugin.PluginRegistry
 import com.example.core.preferences.ThemeMode
@@ -23,6 +29,8 @@ import com.example.plugins.goals.ui.AddGoalDialog
 import com.example.plugins.goals.ui.GoalViewModel
 import com.example.plugins.planner.ui.PlannerViewModel
 import com.example.plugins.planner.ui.components.AddTaskDialog
+import com.example.ui.onboarding.OnboardingHost
+import com.example.ui.onboarding.BrandedLoadingScreen
 import com.example.ui.screens.components.VisionBottomBar
 import com.example.ui.screens.components.MainTopBar
 import com.example.ui.screens.components.ThemeSettingsDialog
@@ -37,6 +45,32 @@ fun MainScreen(
     moduleViewModel: ModuleSettingsViewModel = viewModel()
 ) {
     val enabledModulesMap by moduleViewModel.enabledModulesState.collectAsState()
+
+    // Onboarding: show the Value Discovery Journey once, before the main app.
+    // Three-state gate: null = still reading DataStore (neutral), false = onboarding,
+    // true = completed. Never render onboarding for a returning (completed) user.
+    val context = LocalContext.current
+    val onboardingRepo = remember { OnboardingRepository(context) }
+    val onboardingDone by onboardingRepo.isCompleted.collectAsState(initial = null)
+    val deepLinkGoalId = remember { mutableStateOf<Int?>(null) }
+
+    when (onboardingDone) {
+        null -> {
+            BrandedLoadingScreen(modifier = Modifier.fillMaxSize())
+            return
+        }
+        false -> {
+            OnboardingHost(
+                modifier = Modifier.fillMaxSize(),
+                onFinish = { goalId ->
+                    OnboardingDeepLink.set(goalId, showHomeHint = true)
+                    deepLinkGoalId.value = goalId
+                }
+            )
+            return
+        }
+        true -> { /* fall through to the main Planner dashboard below */ }
+    }
 
     // Primary navigation tabs: Planner + Goals (Notes stays in top bar)
     val primaryTabIds = listOf("planner", "goals")
@@ -54,6 +88,10 @@ fun MainScreen(
     }
 
     var selectedTabId by remember { mutableStateOf("planner") }
+
+    LaunchedEffect(deepLinkGoalId.value) {
+        if (deepLinkGoalId.value != null) selectedTabId = "goals"
+    }
 
     // Fallback: if selected tab is disabled, switch to planner
     LaunchedEffect(activePlugins) {
@@ -134,14 +172,13 @@ fun MainScreen(
         AddTaskDialog(
             onDismiss = { showAddTaskDialog = false },
             activeGoals = plannerViewModel.activeGoals,
-            onAddTask = { title, priority, hour, minute, goalId, goalName, valueTag, lifeAreaId ->
+            onAddTask = { title, priority, hour, minute, goalId, valueTag, lifeAreaId ->
                 plannerViewModel.addTask(
                     title = title,
                     priority = priority,
                     hour = hour,
                     minute = minute,
                     goalId = goalId,
-                    goalName = goalName,
                     valueTag = valueTag,
                     lifeAreaId = lifeAreaId
                 )

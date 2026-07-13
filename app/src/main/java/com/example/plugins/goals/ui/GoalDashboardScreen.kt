@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.core.goal.GoalEntity
+import com.example.core.onboarding.OnboardingDeepLink
 import com.example.core.util.isolated
 import com.example.ui.theme.*
 
@@ -30,12 +31,22 @@ fun GoalDashboardScreen(
     var selectedGoal by remember { mutableStateOf<GoalEntity?>(null) }
     var showGoalMenu by remember { mutableStateOf(false) }
     var selectedGoalId by remember { mutableStateOf<Int?>(null) }
+    var homeHintFor by remember { mutableStateOf(false) }
+
+    // Deep-link from onboarding: land directly on the new goal's detail screen.
+    LaunchedEffect(Unit) {
+        OnboardingDeepLink.consume()?.let { (id, hint) ->
+            homeHintFor = hint
+            selectedGoalId = id
+        }
+    }
 
     // Navigate to detail screen if a goal is selected
     selectedGoalId?.let { goalId ->
         GoalDetailScreen(
             goalId = goalId,
-            onBack = { selectedGoalId = null }
+            onBack = { selectedGoalId = null },
+            isOnboarding = homeHintFor
         )
         return
     }

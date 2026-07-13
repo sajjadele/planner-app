@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.core.database.AppDatabase
 import com.example.core.goal.GoalEntity
 import com.example.core.goal.GoalRepository
+import com.example.core.goal.RoomGoalRepository
 import com.example.core.receiver.ReminderScheduler
 import com.example.plugins.notes.data.NoteEntity
 import com.example.plugins.notes.data.NoteRepository
@@ -29,7 +30,7 @@ class TaskDetailViewModel(
     init {
         val database = AppDatabase.getDatabase(application)
         taskDao = database.taskDao()
-        goalRepository = GoalRepository(database.goalDao())
+        goalRepository = RoomGoalRepository(database.goalDao(), database.goalEventDao())
         noteRepository = NoteRepository(database.noteDao())
     }
 
@@ -43,6 +44,15 @@ class TaskDetailViewModel(
 
     /** Active goals for the goal reassignment dropdown */
     val activeGoals: StateFlow<List<GoalEntity>> = goalRepository.getActiveGoals()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    /** All goals — used to resolve the title of a currently-linked goal
+     *  (which may be non-active, e.g. paused/completed). */
+    val allGoals: StateFlow<List<GoalEntity>> = goalRepository.getAllGoals()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -66,25 +76,19 @@ class TaskDetailViewModel(
         }
     }
 
-    /** Update goal assignment — explicitly sets goalId and goalName (both can be null) */
-    fun updateTaskGoal(goalId: Int?, goalName: String?) {
+    /** Update goal assignment — goalId is the only source of truth (both null = unlinked) */
+    fun updateTaskGoal(goalId: Int?) {
         viewModelScope.launch {
             val current = task.value ?: return@launch
-            val updated = current.copy(goalId = goalId, goalName = goalName)
-            taskDao.updateTask(updated)
+            taskDao.updateTask(current.copy(goalId = goalId))
         }
     }
 
-    /** Update task title and/or goal assignment */
-    fun updateTask(title: String? = null, goalId: Int? = null, goalName: String? = null) {
+    /** Update task title (goal linkage is changed via updateTaskGoal) */
+    fun updateTask(title: String? = null) {
         viewModelScope.launch {
             val current = task.value ?: return@launch
-            val updated = current.copy(
-                title = title ?: current.title,
-                goalId = goalId ?: current.goalId,
-                goalName = goalName ?: current.goalName
-            )
-            taskDao.updateTask(updated)
+            taskDao.updateTask(current.copy(title = title ?: current.title))
         }
     }
 

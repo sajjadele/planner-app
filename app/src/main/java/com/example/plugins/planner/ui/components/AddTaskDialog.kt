@@ -56,7 +56,6 @@ fun AddTaskDialog(
         hour: Int?,
         minute: Int?,
         goalId: Int?,
-        goalName: String?,
         valueTag: String?,
         lifeAreaId: Int?
     ) -> Unit
@@ -88,7 +87,6 @@ fun AddTaskDialog(
                 onAddTask(
                     title, priority, selectedHour, selectedMinute,
                     selectedGoalId,
-                    selectedGoalTitle,
                     null,
                     selectedLifeAreaId
                 )
