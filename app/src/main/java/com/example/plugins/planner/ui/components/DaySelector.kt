@@ -389,7 +389,7 @@ private fun CalendarGrid(
                                             .weight(1f)
                                             .aspectRatio(1.3f)
                                             .clickable {
-                                                monthOffset += (monthNum - selectedJalali.month)
+                                                monthOffset += (monthNum - jMonth)
                                                 monthPickerVisible = false
                                             },
                                         shape = RoundedCornerShape(12.dp),
