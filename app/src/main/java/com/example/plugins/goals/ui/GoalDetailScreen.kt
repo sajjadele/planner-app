@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.core.goal.GoalEntity
 import com.example.core.util.RTL
 import com.example.core.util.isolated
 import com.example.plugins.planner.data.TaskEntity
@@ -223,6 +224,14 @@ fun GoalDetailScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // ── Mirror feedback card ──
+            val mirrorInsights by viewModel.mirrorInsights.collectAsState()
+            if (mirrorInsights.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                MirrorFeedbackCard(insights = mirrorInsights)
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
             // ── Section header ──
             Text(
                 text = "${RTL}تسک‌های مرتبط",
@@ -304,6 +313,35 @@ private fun StatItem(
             fontSize = 11.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+@Composable
+private fun MirrorFeedbackCard(insights: List<com.example.domain.mirror.MirrorInsight>) {
+    if (insights.isEmpty()) return
+    val insight = insights.first()
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+        ) {
+            Text(
+                text = "🔎 ${insight.title}",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = insight.message,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f),
+                lineHeight = 18.sp
+            )
+        }
     }
 }
 

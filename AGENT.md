@@ -62,15 +62,21 @@ Primary value:
 
 ## Current Development Focus
 
-Next priority: **Mirror Engine Foundation**
+Mirror Engine Foundation: **COMPLETE** (implemented in `domain.mirror` + `core.mirror`, shown in Goal Detail via `MirrorFeedbackCard`).
 
 Mirror V1:
 - Boulder
 - Initiator vs Finisher
 - Goal Attention
 - Consistency Decay
-- Appears inside Goal Dashboard
-- No separate Mirror screen yet
+- Appears inside Goal Detail (no separate Mirror screen)
+- No forced reflection / journaling
+
+Next priorities:
+- ViewModel tests (not started)
+- UX refinement of feedback card
+- Feedback wording validation
+- Graph remains later exploration (Phase 6)
 
 ## Working Style
 

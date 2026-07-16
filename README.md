@@ -58,6 +58,8 @@ Goal → Task → Event → Snapshot → Mirror → Feedback
 | Real-Time Search | ✅ | Instant search across tasks + notes |
 | Quick Notes | ✅ | Standalone notes screen |
 | Weekly Insight Card | ✅ | Compact insight summary with expandable detail sheet |
+| Mirror Engine (V1) | ✅ | `domain.mirror` + `core.mirror`; patterns Boulder, Initiator/Finisher, Goal Attention, Consistency Decay |
+| Mirror Feedback UI | ✅ | `MirrorFeedbackCard` inside Goal Detail; neutral language, no separate screen |
 
 ### In Progress / Planned
 
@@ -65,7 +67,6 @@ Goal → Task → Event → Snapshot → Mirror → Feedback
 |---|---|---|
 | Task Inbox behavior | 🔜 | Task creation without a goal remains allowed as quick capture |
 | Goal-first main layout | 🔜 | Preserve daily task flow while emphasizing goal context |
-| Mirror V1 | 🔜 | Boulder, Initiator/Finisher, Goal Attention, Consistency Decay |
 | Graph visualization | 🔜 | Simple Goal→Task graph, computed on demand, not stored |
 
 ### Deferred / Out of Scope
@@ -125,12 +126,18 @@ app/src/main/java/com/example/
 │   ├── goal/               # GoalEntity, GoalDao, GoalRepository
 │   ├── snapshot/           # GoalProgressSnapshotEntity, BehaviorSnapshotEntity,
 │   │                        # SnapshotDao, SnapshotRepository, SnapshotAggregator
+│   ├── mirror/             # MirrorRepository, RoomMirrorRepository
 │   ├── onboarding/         # OnboardingStep, OnboardingViewModel, OnboardingRepository
 │   ├── plugin/             # AppPlugin, PluginRegistry, ModuleSettingsViewModel
 │   ├── preferences/        # ThemeRepository (DataStore)
 │   ├── receiver/           # BootReceiver, ReminderReceiver, ReminderScheduler
 │   ├── search/             # SearchDialog, SearchViewModel
 │   └── util/               # DateTimeUtils, PersianDigits, JalaliDate
+│
+├── domain/
+│   ├── insight/            # Streak, rate, velocity, procrastination calculators
+│   ├── snapshot/           # Daily goal progress + behavior projection math
+│   └── mirror/             # MirrorEngine, MirrorHeuristics, MirrorSignal, MirrorInsight
 │
 ├── plugins/
 │   ├── goals/              # GoalsPlugin, GoalDashboardScreen, GoalDetailScreen
@@ -213,9 +220,14 @@ Mirror V1 scope:
 - Goal Attention pattern
 - Consistency Decay pattern
 
+Mirror architecture:
+- `domain.mirror` — pure-Kotlin: `MirrorEngine` (signal → feedback rendering), `MirrorHeuristics` (four detectors), `MirrorSignal` / `MirrorSignalType` / `MirrorInsight`
+- `core.mirror` — `MirrorRepository` interface + `RoomMirrorRepository` (wires Insight / Goal / Snapshot repositories)
+- UI — `MirrorFeedbackCard` rendered inside the **Goal Detail** screen, driven by `GoalDetailViewModel.mirrorInsights`
+
 Mirror constraints:
 - No separate Mirror screen in V1
-- Feedback appears inside Goal Dashboard
+- Feedback appears inside the Goal experience (currently Goal Detail)
 - No forced input, no judgmental language
 - Real analysis matures after roughly 7 days of usage
 
@@ -270,9 +282,10 @@ Android Studio is not required.
 | Phase 1 | ✅ | Schema stabilization, Goal→Task FK, InsightDao extraction |
 | Phase 2 | ✅ | Architecture stabilization, domain layer, `goal_events` |
 | Phase 3 | ✅ | Progress & behavior snapshots, backfill engine |
-| Phase 3.5 | 🔜 | Mirror foundation: heuristics, feedback engine, Goal Dashboard integration |
-| Phase 4 | 🔜 | Simple Graph visualization: Goal→Task only, computed on demand |
-| Phase 5 | 🔜 | AI Insight Generator: consumes structured data and Mirror outputs |
+| Phase 4 | ✅ | Mirror Engine Foundation: heuristics, feedback engine, Goal Detail integration |
+| Phase 5 | 🔜 | Goal Experience Evolution: strengthen goal-first daily UX, Inbox separation |
+| Phase 6 | 🔜 | Graph Exploration: simple Goal→Task graph, computed on demand |
+| Phase 7 | 🔜 | AI Insight Generator: consumes structured data and Mirror outputs |
 
 ---
 

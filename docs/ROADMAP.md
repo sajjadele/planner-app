@@ -30,7 +30,7 @@ Goal → Task → Event → Snapshot → Mirror → Feedback
 | 1 | Foundation | ✅ Complete |
 | 2 | Goal System | ✅ Complete |
 | 3 | Behavior Data Foundation | ✅ Complete |
-| 4 | Mirror Engine Foundation | 🔜 Next |
+| 4 | Mirror Engine Foundation | ✅ Complete |
 | 5 | Goal Experience Evolution | Planned |
 | 6 | Graph Exploration | Planned |
 | 7 | AI Insight Layer | Planned |
@@ -73,24 +73,30 @@ Decision record: `docs/ADR/ADR-0003-progress-behavior-snapshots.md`
 
 ## Phase 4 — Mirror Engine Foundation
 
-**Status:** Next priority
+**Status:** Complete
 
 Goals of this phase:
 - Detect behavioral patterns from existing data
-- Provide neutral feedback inside Goal Dashboard
+- Provide neutral feedback inside Goal Detail
 - No forced reflection / journaling
 - No separate Mirror screen in V1
 
-Initial patterns:
+Initial patterns (all implemented):
 1. Boulder
 2. Initiator vs Finisher
 3. Goal Attention
 4. Consistency Decay
 
-Expected architecture surfaces:
-- `domain.mirror`
-- `MirrorRepository`
-- Goal Dashboard feedback integration
+Implemented architecture surfaces:
+- `domain.mirror` — `MirrorEngine` (signal → insight rendering), `MirrorHeuristics` (four detectors), `MirrorSignal` / `MirrorSignalType` / `MirrorInsight`
+- `core.mirror` — `MirrorRepository` interface + `RoomMirrorRepository` (wires Insight / Goal / Snapshot repositories)
+- `MirrorFeedbackCard` in Goal Detail, driven by `GoalDetailViewModel.mirrorInsights`
+- Snapshots (`behavior_snapshot`) and aggregates are Mirror inputs
+
+Remaining hardening items (post-implementation):
+- ViewModel tests for `GoalDetailViewModel` / `PlannerViewModel`
+- UX refinement of the feedback card
+- Feedback wording validation (neutral, non-judgmental language review)
 
 ---
 
