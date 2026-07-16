@@ -329,7 +329,14 @@ private fun MirrorFeedbackCard(insights: List<com.example.domain.mirror.MirrorIn
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
             Text(
-                text = "🔎 ${insight.title}",
+                text = "🔎 بازتاب پیشرفت هدف",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = insight.title,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -340,6 +347,13 @@ private fun MirrorFeedbackCard(insights: List<com.example.domain.mirror.MirrorIn
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f),
                 lineHeight = 18.sp
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "این بازخورد بر اساس فعالیت‌های اخیر این هدف ایجاد شده است.",
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f),
+                lineHeight = 15.sp
             )
         }
     }

@@ -38,7 +38,7 @@ class GoalDetailViewModel(
     init {
         val database = AppDatabase.getDatabase(application)
         goalRepository = RoomGoalRepository(database.goalDao(), database.goalEventDao())
-        taskRepository = TaskRepository(database.taskDao())
+        taskRepository = TaskRepository(database.taskDao(), database.taskEventDao())
         insightRepository = RoomInsightRepository(database.insightDao())
         snapshotAggregator = SnapshotAggregator(
             insightRepository,

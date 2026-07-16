@@ -51,14 +51,21 @@ class RoomMirrorRepository(
         val rates = insightRepository.observeGoalCompletionRates().first()
         val goalRate = rates.firstOrNull { it.goalId == goalId }
         val goalTasks = insightRepository.observeGoalCompletionRate(goalId).first()
-        val reschedules = insightRepository.observeRescheduleCounts().first()
+        val reschedules = insightRepository.observeRescheduleCountsByGoal(goalId).first()
         val events = goalRepository.observeGoalEvents(goalId).first()
         val behaviors = snapshotRepository.observeBehaviorRange(start, end).first()
 
-        // ── Eligibility gate: no feedback for goals without enough history ──
+        // ── Eligibility gate: only ACTIVE goals with enough history ──
+        val goal = goalRepository.getGoalById(goalId)
         val goalCreatedAtMs = events.firstOrNull { it.eventType == "created" }?.timestamp
         val linkedTaskCount = goalTasks?.totalTasks ?: 0
-        if (!MirrorReadiness.isEligible(goalCreatedAtMs, linkedTaskCount, now)) {
+        if (!MirrorReadiness.isEligible(
+                goalCreatedAtMs = goalCreatedAtMs,
+                linkedTaskCount = linkedTaskCount,
+                goalStatus = goal?.status ?: "",
+                nowMillis = now
+            )
+        ) {
             return emptyList()
         }
 
@@ -71,7 +78,7 @@ class RoomMirrorRepository(
                 taskId = r.taskId,
                 taskTitle = r.taskTitle ?: "تسک ${r.taskId}",
                 rescheduleCount = r.rescheduleCount,
-                createdAtMs = System.currentTimeMillis(),
+                createdAtMs = r.taskCreatedAt,
                 isCompleted = false,
                 nowMillis = now
             )

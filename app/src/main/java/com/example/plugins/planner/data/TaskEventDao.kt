@@ -16,4 +16,7 @@ interface TaskEventDao {
 
     @Insert
     suspend fun insertEvent(event: TaskEventEntity)
+
+    @Query("DELETE FROM task_events WHERE taskId IN (SELECT id FROM tasks WHERE goalId = :goalId)")
+    suspend fun deleteEventsForGoal(goalId: Int)
 }

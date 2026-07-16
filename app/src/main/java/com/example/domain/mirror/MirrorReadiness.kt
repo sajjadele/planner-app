@@ -26,11 +26,16 @@ object MirrorReadiness {
     /** Minimum number of linked tasks before Mirror is considered meaningful. */
     const val MIN_LINKED_TASKS = 1
 
+    /** Only ACTIVE goals receive Mirror feedback. */
+    const val ACTIVE_STATUS = "active"
+
     fun isEligible(
         goalCreatedAtMs: Long?,
         linkedTaskCount: Int,
+        goalStatus: String,
         nowMillis: Long = System.currentTimeMillis()
     ): Boolean {
+        if (goalStatus != ACTIVE_STATUS) return false
         val createdAt = goalCreatedAtMs ?: return false
         if (ageDays(createdAt, nowMillis) < MIN_GOAL_AGE_DAYS) return false
         if (linkedTaskCount < MIN_LINKED_TASKS) return false

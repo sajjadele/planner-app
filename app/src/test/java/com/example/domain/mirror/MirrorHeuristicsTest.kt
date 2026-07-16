@@ -68,6 +68,28 @@ class MirrorHeuristicsTest {
     }
 
     @Test
+    fun detectBoulder_usesActualTaskAge_oldTaskTriggers() {
+        // Mirrors real wiring: task creation timestamp (TaskEntity.timestamp) is supplied.
+        val signal = MirrorHeuristics.detectBoulder(
+            taskId = 6, taskTitle = "Old Stuck",
+            rescheduleCount = 3, createdAtMs = daysAgo(30),
+            isCompleted = false
+        )
+        assertNotNull("old task with reschedules must trigger", signal)
+    }
+
+    @Test
+    fun detectBoulder_usesActualTaskAge_youngTaskSuppressed() {
+        // If the real (young) creation timestamp is passed, age gate must suppress.
+        val signal = MirrorHeuristics.detectBoulder(
+            taskId = 7, taskTitle = "Young Stuck",
+            rescheduleCount = 3, createdAtMs = daysAgo(2),
+            isCompleted = false
+        )
+        assertNull("young task must not trigger despite reschedules", signal)
+    }
+
+    @Test
     fun detectBoulder_confidence_cappedAtOne() {
         val signal = MirrorHeuristics.detectBoulder(
             taskId = 5, taskTitle = "Very Stuck",

@@ -28,6 +28,9 @@ class RoomInsightRepository(private val insightDao: InsightDao) : InsightReposit
     override fun observeRescheduleCounts(): Flow<List<TaskRescheduleWithTitle>> =
         insightDao.observeRescheduleCounts()
 
+    override fun observeRescheduleCountsByGoal(goalId: Int): Flow<List<TaskRescheduleWithTitle>> =
+        insightDao.observeRescheduleCountsByGoal(goalId)
+
     override fun observeGoalCompletionRates(): Flow<List<GoalRateResult>> =
         insightDao.observeGoalCompletionRates()
 

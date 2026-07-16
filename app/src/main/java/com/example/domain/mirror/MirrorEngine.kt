@@ -5,7 +5,7 @@ object MirrorEngine {
     fun render(signal: MirrorSignal): MirrorInsight = when (signal.type) {
         MirrorSignalType.BOULDER -> MirrorInsight(
             title = "تسک مسدودشده",
-            message = "این فعالیت چندبار جابجا شده. شاید کم‌تر و کوچک‌تر Split بشه.",
+            message = "این فعالیت چندبار جابجا شده. شاید به تسک‌های کوچک‌تر تقسیم بشه.",
             relatedTaskId = signal.taskId
         )
         MirrorSignalType.GOAL_ATTENTION -> MirrorInsight(

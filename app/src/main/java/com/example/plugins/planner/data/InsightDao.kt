@@ -102,13 +102,22 @@ interface InsightDao {
     // ──────────────────────────────────────────────
 
     @Query("""
-        SELECT te.taskId AS taskId, t.title AS taskTitle, COUNT(*) AS rescheduleCount
+        SELECT te.taskId AS taskId, t.title AS taskTitle, t.timestamp AS taskCreatedAt, COUNT(*) AS rescheduleCount
         FROM task_events te
         JOIN tasks t ON t.id = te.taskId
         WHERE te.eventType = 'rescheduled'
         GROUP BY te.taskId
     """)
     fun observeRescheduleCounts(): Flow<List<TaskRescheduleWithTitle>>
+
+    @Query("""
+        SELECT te.taskId AS taskId, t.title AS taskTitle, t.timestamp AS taskCreatedAt, COUNT(*) AS rescheduleCount
+        FROM task_events te
+        JOIN tasks t ON t.id = te.taskId
+        WHERE te.eventType = 'rescheduled' AND t.goalId = :goalId
+        GROUP BY te.taskId
+    """)
+    fun observeRescheduleCountsByGoal(goalId: Int): Flow<List<TaskRescheduleWithTitle>>
 
     // ──────────────────────────────────────────────
     // Phase 3: Goal Completion Rates
@@ -220,7 +229,7 @@ data class GoalDayCount(val total: Int, val completed: Int)
 data class LifeAreaCompletion(val lifeAreaId: Int, val count: Int)
 data class DayCompletion(val dayIndex: Int, val count: Int)
 
-data class TaskRescheduleWithTitle(val taskId: Int, val taskTitle: String?, val rescheduleCount: Int)
+data class TaskRescheduleWithTitle(val taskId: Int, val taskTitle: String?, val taskCreatedAt: Long, val rescheduleCount: Int)
 
 data class GoalRateResult(
     val goalId: Int,

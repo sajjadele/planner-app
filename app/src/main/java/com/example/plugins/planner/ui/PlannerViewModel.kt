@@ -47,7 +47,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         val database = AppDatabase.getDatabase(application)
-        repository = TaskRepository(database.taskDao())
+        repository = TaskRepository(database.taskDao(), database.taskEventDao())
         taskEventDao = database.taskEventDao()
         snapshotAggregator = SnapshotAggregator(
             RoomInsightRepository(database.insightDao()),
