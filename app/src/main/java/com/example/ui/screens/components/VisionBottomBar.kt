@@ -1,19 +1,29 @@
 package com.example.ui.screens.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke as DrawScopeStroke
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -21,13 +31,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.plugin.AppPlugin
+import com.example.ui.onboarding.OnboardingMotion
+import com.example.ui.onboarding.pressScale
+import com.example.ui.onboarding.rememberReduceMotion
 import com.example.ui.theme.*
 
 private val FAB_SIZE = 56.dp
 private val FAB_RADIUS = 28.dp
-private val BAR_FLAT_HEIGHT = 80.dp
-private val BAR_TOTAL_HEIGHT = BAR_FLAT_HEIGHT + FAB_RADIUS   // 108.dp
-private val TRANSITION_HALF_WIDTH = 52.dp
+private val BAR_FLAT_HEIGHT = 64.dp
+private val BAR_TOTAL_HEIGHT = BAR_FLAT_HEIGHT + FAB_RADIUS   // 92.dp
+private val TRANSITION_HALF_WIDTH = 76.dp
 
 @Composable
 fun VisionBottomBar(
@@ -41,7 +54,7 @@ fun VisionBottomBar(
     val barHeightPx = with(density) { BAR_FLAT_HEIGHT.toPx() }
     val transitionHalfWidthPx = with(density) { TRANSITION_HALF_WIDTH.toPx() }
 
-    val convexShape: Shape = remember(domeRadiusPx, barHeightPx, transitionHalfWidthPx) {
+    val convexShape = remember(domeRadiusPx, barHeightPx, transitionHalfWidthPx) {
         ConvexBottomBarShape(domeRadiusPx, barHeightPx, transitionHalfWidthPx)
     }
 
@@ -55,23 +68,33 @@ fun VisionBottomBar(
             .testTag("bottom_nav_bar")
             .onGloballyPositioned { boxWidth = it.size.width }
     ) {
-        // ── Layer 1: The continuous surface ──
+        // ── Layer 1: بدنه اصلی نوار خاکستری منطبق با تم کارت‌ها ──
+        val barColor = MaterialTheme.colorScheme.surfaceVariant
         Box(
             modifier = Modifier
                 .matchParentSize()
                 .clip(convexShape)
-                .background(MaterialTheme.colorScheme.surface)
+                .background(barColor)
         )
 
-        // ── Layer 2: Left nav item ──
+        // ── Layer 1b: لبه بالایی روشن، شیک و محو (Highlight) ──
+        val highlightColor = Color.White.copy(alpha = 0.12f)
+        val borderWidthPx = with(density) { 1.5.dp.toPx() }
+        Canvas(modifier = Modifier.matchParentSize()) {
+            drawPath(
+                path = convexShape.crestPath(size),
+                color = highlightColor,
+                style = DrawScopeStroke(width = borderWidthPx)
+            )
+        }
+
+        // ── Layer 2: منوی چپ ──
         activePlugins.getOrNull(0)?.let { plugin ->
             val offsetX = with(density) { (boxWidth / 4f - navItemWidth.toPx() / 2f).toDp() }
             val offsetY = with(density) {
                 (domeRadiusPx + barHeightPx / 2f - navItemHeight.toPx() / 2f).toDp()
             }
-            Box(
-                modifier = Modifier.offset(x = offsetX, y = offsetY)
-            ) {
+            Box(modifier = Modifier.offset(x = offsetX, y = offsetY)) {
                 NavItem(
                     plugin = plugin,
                     isSelected = selectedTabId == plugin.id,
@@ -80,15 +103,13 @@ fun VisionBottomBar(
             }
         }
 
-        // ── Layer 3: Right nav item ──
+        // ── Layer 3: منوی راست ──
         activePlugins.getOrNull(1)?.let { plugin ->
             val offsetX = with(density) { (boxWidth * 3f / 4f - navItemWidth.toPx() / 2f).toDp() }
             val offsetY = with(density) {
                 (domeRadiusPx + barHeightPx / 2f - navItemHeight.toPx() / 2f).toDp()
             }
-            Box(
-                modifier = Modifier.offset(x = offsetX, y = offsetY)
-            ) {
+            Box(modifier = Modifier.offset(x = offsetX, y = offsetY)) {
                 NavItem(
                     plugin = plugin,
                     isSelected = selectedTabId == plugin.id,
@@ -97,15 +118,23 @@ fun VisionBottomBar(
             }
         }
 
-        // ── Layer 4: Center "+" button — embedded in the crest ──
+        // ── Layer 4: Center "+" FAB ──
+        val fabInteraction = remember { MutableInteractionSource() }
         Box(
             modifier = Modifier
-                .size(FAB_SIZE)
                 .align(Alignment.TopCenter)
+                .offset(y = 16.dp) // دکمه را هم‌تراز با مرکز غوصِ جدید پایین می‌آوریم
+                .size(FAB_SIZE)
+                .shadow(4.dp, CircleShape)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primary)
+                .pressScale(fabInteraction)
                 .testTag("center_action_hub")
-                .clickable(onClick = onActionClick),
+                .clickable(
+                    interactionSource = fabInteraction,
+                    indication = null,
+                    onClick = onActionClick
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -124,8 +153,18 @@ private fun NavItem(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val color = if (isSelected) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant
+    val interactionSource = remember { MutableInteractionSource() }
+    val reduceMotion = rememberReduceMotion()
+    val target = if (isSelected) MaterialTheme.colorScheme.primary
+                 else MaterialTheme.colorScheme.onSurfaceVariant
+    val color by animateColorAsState(
+        targetValue = target,
+        animationSpec = tween(
+            if (reduceMotion) 0 else 200,
+            easing = OnboardingMotion.EaseOut
+        ),
+        label = "navItemColor"
+    )
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -137,10 +176,15 @@ private fun NavItem(
             .background(
                 if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                 else Color.Transparent,
-                shape = MaterialTheme.shapes.medium
+                shape = RoundedCornerShape(12.dp)
             )
             .then(if (isSelected) Modifier else Modifier.alpha(0.6f))
-            .clickable(onClick = onClick)
+            .pressScale(interactionSource)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
     ) {
         Icon(
             imageVector = plugin.icon,
