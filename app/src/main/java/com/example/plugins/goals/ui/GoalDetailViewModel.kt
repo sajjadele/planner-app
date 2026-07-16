@@ -89,10 +89,22 @@ class GoalDetailViewModel(
         }
     }
 
-    fun updateGoal(title: String, description: String?) {
+    fun updateGoal(
+        title: String,
+        description: String?,
+        why: String? = null,
+        deadlineEpochMs: Long? = null
+    ) {
         viewModelScope.launch {
             val current = goal.value ?: return@launch
-            goalRepository.updateGoal(current.copy(title = title, description = description))
+            goalRepository.updateGoal(
+                current.copy(
+                    title = title,
+                    description = description,
+                    why = why ?: current.why,
+                    deadlineEpochMs = deadlineEpochMs ?: current.deadlineEpochMs
+                )
+            )
             refreshMirror()
         }
     }

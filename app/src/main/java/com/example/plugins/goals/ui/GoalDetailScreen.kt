@@ -286,8 +286,8 @@ fun GoalDetailScreen(
         EditGoalDialog(
             goal = goal!!,
             onDismiss = { showEditGoalDialog = false },
-            onUpdateGoal = { title, description ->
-                viewModel.updateGoal(title, description)
+            onUpdateGoal = { title, description, why, deadlineEpochMs ->
+                viewModel.updateGoal(title, description, why, deadlineEpochMs)
                 showEditGoalDialog = false
             }
         )

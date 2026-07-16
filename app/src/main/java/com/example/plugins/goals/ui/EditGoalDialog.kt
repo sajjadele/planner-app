@@ -23,7 +23,7 @@ import kotlinx.coroutines.delay
 fun EditGoalDialog(
     goal: GoalEntity,
     onDismiss: () -> Unit,
-    onUpdateGoal: (title: String, description: String?) -> Unit
+    onUpdateGoal: (title: String, description: String?, why: String?, deadlineEpochMs: Long?) -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
         var title by remember { mutableStateOf(goal.title) }
@@ -123,7 +123,7 @@ fun EditGoalDialog(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = {
                             if (title.isNotBlank() && title != goal.title || description.trim() != (goal.description ?: "")) {
-                                onUpdateGoal(title.trim(), description.trim().ifBlank { null })
+                                onUpdateGoal(title.trim(), description.trim().ifBlank { null }, goal.why, goal.deadlineEpochMs)
                             }
                             onDismiss()
                         })
@@ -150,7 +150,7 @@ fun EditGoalDialog(
                     Button(
                         onClick = {
                             if (title.isNotBlank()) {
-                                onUpdateGoal(title.trim(), description.trim().ifBlank { null })
+                                onUpdateGoal(title.trim(), description.trim().ifBlank { null }, goal.why, goal.deadlineEpochMs)
                                 onDismiss()
                             }
                         },

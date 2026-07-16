@@ -22,7 +22,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun AddGoalDialog(
     onDismiss: () -> Unit,
-    onAddGoal: (title: String, description: String?) -> Unit
+    onAddGoal: (title: String, description: String?, why: String?, deadlineEpochMs: Long?) -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
         var title by remember { mutableStateOf("") }
@@ -85,10 +85,13 @@ fun AddGoalDialog(
                     ),
                     shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                    keyboardActions = KeyboardActions(onNext = { showDescription = true })
+                        keyboardActions = KeyboardActions(onNext = { showDescription = true })
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
+
+                // Phase 5.1: why/deadline are model-ready via the callback but the "More details"
+                // expandable UI ships later. Keep creation fast — no extra fields here yet.
 
                 // Description toggle
                 TextButton(
@@ -122,7 +125,7 @@ fun AddGoalDialog(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = {
                             if (title.isNotBlank()) {
-                                onAddGoal(title.trim(), description.trim().ifBlank { null })
+                                onAddGoal(title.trim(), description.trim().ifBlank { null }, null, null)
                                 onDismiss()
                             }
                         })
@@ -149,7 +152,7 @@ fun AddGoalDialog(
                     Button(
                         onClick = {
                             if (title.isNotBlank()) {
-                                onAddGoal(title.trim(), description.trim().ifBlank { null })
+                                onAddGoal(title.trim(), description.trim().ifBlank { null }, null, null)
                                 onDismiss()
                             }
                         },

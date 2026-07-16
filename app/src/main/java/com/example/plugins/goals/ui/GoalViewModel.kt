@@ -7,6 +7,7 @@ import com.example.core.database.AppDatabase
 import com.example.core.goal.GoalEntity
 import com.example.core.goal.GoalEventEntity
 import com.example.core.goal.GoalRepository
+import com.example.core.goal.GoalStatus
 import com.example.core.goal.RoomGoalRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -38,17 +39,24 @@ class GoalViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
-    fun addGoal(title: String, description: String?) {
+    fun addGoal(
+        title: String,
+        description: String?,
+        why: String? = null,
+        deadlineEpochMs: Long? = null
+    ) {
         viewModelScope.launch {
             val id = repository.insertGoal(
                 GoalEntity(
                     title = title,
                     description = description,
-                    status = "active"
+                    status = GoalStatus.ACTIVE,
+                    why = why,
+                    deadlineEpochMs = deadlineEpochMs
                 )
             )
             repository.insertGoalEvent(
-                GoalEventEntity(goalId = id.toInt(), eventType = "created")
+                GoalEventEntity(goalId = id.toInt(), eventType = GoalStatus.ACTIVE)
             )
         }
     }
@@ -58,12 +66,12 @@ class GoalViewModel(application: Application) : AndroidViewModel(application) {
             val goal = repository.getGoalById(goalId) ?: return@launch
             repository.updateGoal(
                 goal.copy(
-                    status = "completed",
+                    status = GoalStatus.COMPLETED,
                     completedAt = System.currentTimeMillis()
                 )
             )
             repository.insertGoalEvent(
-                GoalEventEntity(goalId = goalId, eventType = "completed")
+                GoalEventEntity(goalId = goalId, eventType = GoalStatus.COMPLETED)
             )
         }
     }
@@ -71,9 +79,9 @@ class GoalViewModel(application: Application) : AndroidViewModel(application) {
     fun pauseGoal(goalId: Int) {
         viewModelScope.launch {
             val goal = repository.getGoalById(goalId) ?: return@launch
-            repository.updateGoal(goal.copy(status = "paused"))
+            repository.updateGoal(goal.copy(status = GoalStatus.PAUSED))
             repository.insertGoalEvent(
-                GoalEventEntity(goalId = goalId, eventType = "paused")
+                GoalEventEntity(goalId = goalId, eventType = GoalStatus.PAUSED)
             )
         }
     }
@@ -81,9 +89,9 @@ class GoalViewModel(application: Application) : AndroidViewModel(application) {
     fun resumeGoal(goalId: Int) {
         viewModelScope.launch {
             val goal = repository.getGoalById(goalId) ?: return@launch
-            repository.updateGoal(goal.copy(status = "active", completedAt = null))
+            repository.updateGoal(goal.copy(status = GoalStatus.ACTIVE, completedAt = null))
             repository.insertGoalEvent(
-                GoalEventEntity(goalId = goalId, eventType = "resumed")
+                GoalEventEntity(goalId = goalId, eventType = GoalStatus.ACTIVE)
             )
         }
     }
@@ -91,20 +99,48 @@ class GoalViewModel(application: Application) : AndroidViewModel(application) {
     fun abandonGoal(goalId: Int) {
         viewModelScope.launch {
             val goal = repository.getGoalById(goalId) ?: return@launch
-            repository.updateGoal(goal.copy(status = "abandoned"))
+            repository.updateGoal(goal.copy(status = GoalStatus.ABANDONED))
             repository.insertGoalEvent(
-                GoalEventEntity(goalId = goalId, eventType = "abandoned")
+                GoalEventEntity(goalId = goalId, eventType = GoalStatus.ABANDONED)
             )
         }
     }
 
-    fun updateGoal(goalId: Int, title: String, description: String?) {
+    /**
+     * Archive a goal (terminal status). Delegates to the repository, which validates the
+     * transition (only valid from completed/abandoned) and logs a `archived` lifecycle event.
+     */
+    fun archiveGoal(goalId: Int) {
+        viewModelScope.launch {
+            repository.archiveGoal(goalId)
+        }
+    }
+
+    /**
+     * Generic status change used by the Goal Detail status control. Validation and event
+     * logging are handled by [com.example.core.goal.GoalRepository.updateGoalStatus].
+     */
+    fun updateGoalStatus(goalId: Int, status: String) {
+        viewModelScope.launch {
+            repository.updateGoalStatus(goalId, status)
+        }
+    }
+
+    fun updateGoal(
+        goalId: Int,
+        title: String,
+        description: String?,
+        why: String? = null,
+        deadlineEpochMs: Long? = null
+    ) {
         viewModelScope.launch {
             val goal = repository.getGoalById(goalId) ?: return@launch
             repository.updateGoal(
                 goal.copy(
                     title = title,
-                    description = description
+                    description = description,
+                    why = why,
+                    deadlineEpochMs = deadlineEpochMs
                 )
             )
         }

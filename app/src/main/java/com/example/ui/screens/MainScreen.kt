@@ -190,8 +190,8 @@ fun MainScreen(
     if (showAddGoalDialog) {
         AddGoalDialog(
             onDismiss = { showAddGoalDialog = false },
-            onAddGoal = { title, description ->
-                goalViewModel.addGoal(title, description)
+            onAddGoal = { title, description, why, deadlineEpochMs ->
+                goalViewModel.addGoal(title, description, why, deadlineEpochMs)
                 showAddGoalDialog = false
             }
         )

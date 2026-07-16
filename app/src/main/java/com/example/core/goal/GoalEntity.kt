@@ -18,7 +18,10 @@ data class GoalEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val title: String,
     val description: String? = null,
-    val status: String = "active", // "active" | "completed" | "paused" | "abandoned"
+    val status: String = GoalStatus.ACTIVE, // "active" | "paused" | "completed" | "abandoned" | "archived"
     val createdAt: Long = System.currentTimeMillis(),
-    val completedAt: Long? = null
+    val completedAt: Long? = null,
+    // Phase 5.1: optional, low-friction context. Both nullable; creating a goal stays fast.
+    val why: String? = null,
+    val deadlineEpochMs: Long? = null
 )

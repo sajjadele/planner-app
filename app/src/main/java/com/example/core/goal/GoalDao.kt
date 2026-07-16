@@ -16,6 +16,9 @@ interface GoalDao {
     @Query("SELECT * FROM goals WHERE status = 'active' ORDER BY createdAt DESC")
     fun getActiveGoals(): Flow<List<GoalEntity>>
 
+    @Query("SELECT * FROM goals WHERE status = :status ORDER BY createdAt DESC")
+    fun getGoalsByStatus(status: String): Flow<List<GoalEntity>>
+
     @Query("SELECT * FROM goals WHERE id = :goalId")
     suspend fun getGoalById(goalId: Int): GoalEntity?
 
@@ -36,4 +39,26 @@ interface GoalDao {
 
     @Query("SELECT COUNT(*) FROM goals WHERE status = 'active'")
     fun observeActiveGoalCount(): Flow<Int>
+
+    /**
+     * Latest scheduled activity day for a goal's tasks, derived from `tasks.dateEpochMs`.
+     *
+     * NOTE: this reflects *scheduled* activity days, not necessarily executed actions. A future
+     * refinement may migrate the signal to `task_events`. Kept derived (never stored) so the
+     * single source of truth remains `tasks`/`task_events`.
+     */
+    @Query("SELECT MAX(t.dateEpochMs) FROM tasks t WHERE t.goalId = :goalId")
+    fun observeGoalLastActivity(goalId: Int): Flow<Long?>
+
+    /**
+     * Count of distinct scheduled days on which the goal has tasks, derived from `tasks.dateEpochMs`.
+     *
+     * NOTE: "active day" here means a day with at least one task scheduled for the goal. See the
+     * note on [observeGoalLastActivity] — may later migrate to `task_events`. Derived, not stored.
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT CAST(t.dateEpochMs / 86400000 AS INTEGER))
+        FROM tasks t WHERE t.goalId = :goalId
+    """)
+    fun observeGoalActiveDayCount(goalId: Int): Flow<Int>
 }
