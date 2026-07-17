@@ -114,14 +114,19 @@ Goals of this phase:
 
 ## Phase 6 — Graph Exploration
 
-**Status:** Planned
+**Status:** In progress (foundation aligned — 6.1; visual language delivered — 6.2; adaptive clusters delivered — 6.3; motion & animation delivered — 6.4)
 
 Goals of this phase:
 - Simple Goal→Task graph
 - Computed on demand, never stored
 - Visual understanding tool, not a complex knowledge graph
+- Behavioral Solar System: Goal = Sun, tasks = orbiting satellites
 
-Decision record: `docs/ADR/ADR-0002-graph-architecture.md`
+Status (6.1): domain layer (`domain.graph`) + ViewModel pipeline + Compose Canvas renderer +
+Galaxy entry button + mandatory Help/Legend are implemented and aligned; 9 builder tests passing.
+Remaining: visual polish (6.2); V2 deadline-aware radius, drift/decay; Phase 7 (AI) depends on this.
+
+Decision record: `docs/ADR/ADR-0002-graph-architecture.md`, `docs/ADR/ADR-0004-graph-solar-system.md`, `docs/ADR/ADR-0005-behavioral-solar-system.md`
 
 ---
 

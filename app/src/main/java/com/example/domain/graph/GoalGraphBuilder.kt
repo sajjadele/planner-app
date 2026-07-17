@@ -2,6 +2,7 @@ package com.example.domain.graph
 
 import com.example.domain.goal.GoalProgress
 import kotlin.math.PI
+import kotlin.math.min
 
 /**
  * Deterministic builder for the Behavioral Solar System graph (ADR-0004).
@@ -20,6 +21,17 @@ import kotlin.math.PI
  * Urgency-by-deadline radius mapping is intentionally deferred to V2 (keep core orbits stable).
  */
 object GoalGraphBuilder {
+
+    /**
+     * Adaptive threshold (Phase 6.3). When the number of *active* tasks exceeds this, the graph
+     * renders priority/completion CLUSTERS instead of individual satellites, so a large goal
+     * communicates health in under 2 seconds. Single tunable constant — raise/lower to change
+     * when the overview kicks in.
+     */
+    const val MAX_VISIBLE_TASKS = 8
+
+    /** Synthetic id base for clusters so they never collide with real task/goal ids. */
+    private const val CLUSTER_ID_BASE = 1_000_000
 
     /** Lane radii as fractions of [GoalGraph.viewportRadius]; inner = more urgent/important. */
     private val LANE_FRACTION = mapOf(
@@ -45,6 +57,9 @@ object GoalGraphBuilder {
     )
     private const val DEFAULT_TASK_SIZE = 14f
     private const val GOAL_SIZE = 40f
+
+    /** Priority ranking for displayed-task ordering (§4): HIGH first, then MEDIUM, then LOW/null. */
+    private val PRIORITY_RANK = mapOf("HIGH" to 0, "MEDIUM" to 1, "LOW" to 2, null to 3)
 
     /**
      * @param goalId central goal id
@@ -87,8 +102,23 @@ object GoalGraphBuilder {
         val active = tasks.filter { !it.isCompleted }
         val completed = tasks.filter { it.isCompleted }
 
-        // Group active tasks by lane (priority), defaulting null priority to the outer lane.
-        val byLane = active.groupBy { it.priority ?: NO_PRIORITY_LANE }
+        // Adaptive mode decision (Phase 6.3): overview clusters kick in once active tasks exceed
+        // the tunable threshold. Individual nodes are always computed (needed for expansion and
+        // for INDIVIDUAL mode), so the layout stays deterministic either way.
+        val mode = if (active.size > MAX_VISIBLE_TASKS) GraphMode.CLUSTER else GraphMode.INDIVIDUAL
+
+        // Group active tasks by lane (priority). IMPORTANT: keep null-priority tasks OUT of the
+        // LOW lane — they are placed exactly once on the dedicated outer "undated" ring below.
+        // (Mapping null→LOW here previously double-placed null-priority tasks, causing the
+        // "2 tasks render as 4 circles" duplicate-node bug.)
+        val byLane = active.groupBy { it.priority }
+
+        // Deterministic, priority-ordered placement (§4): most meaningful tasks first.
+        // Order within the active set: HIGH → MEDIUM → LOW → (no priority). This only affects the
+        // angle at which each task lands; all tasks ≤ MAX_VISIBLE_TASKS are still shown.
+        val orderedActive = active.sortedWith(
+            compareBy({ PRIORITY_RANK[it.priority] ?: 3 }, { it.id })
+        )
 
         fun placeLane(laneTasks: List<TaskInput>, baseFraction: Float) {
             val n = laneTasks.size
@@ -111,7 +141,7 @@ object GoalGraphBuilder {
                     isCompleted = false,
                     colorRole = colorFor(task.priority, isBoulder)
                 )
-                edges += GoalGraphEdge(goalId, task.id, 1f)
+                if (mode == GraphMode.INDIVIDUAL) edges += GoalGraphEdge(goalId, task.id, 1f)
             }
         }
 
@@ -143,8 +173,14 @@ object GoalGraphBuilder {
                 isCompleted = true,
                 colorRole = ColorRole.COMPLETED
             )
-            edges += GoalGraphEdge(goalId, task.id, 0.28f)
+            if (mode == GraphMode.INDIVIDUAL) edges += GoalGraphEdge(goalId, task.id, 0.28f)
         }
+
+        // ── Adaptive clusters (only meaningful in CLUSTER mode) ──
+        val clusters = if (mode == GraphMode.CLUSTER) buildClusters(
+            cx = cx, cy = cy, viewportRadius = viewportRadius,
+            active = active, completed = completed, goalId = goalId, edges = edges
+        ) else emptyList()
 
         return GoalGraph(
             centerX = cx,
@@ -152,9 +188,62 @@ object GoalGraphBuilder {
             viewportRadius = viewportRadius,
             goalProgressOverall = progress?.overall ?: 0f,
             nodes = nodes,
-            edges = edges
+            edges = edges,
+            mode = mode,
+            clusters = clusters
         )
     }
+
+    /**
+     * Build the four stable clusters (ACTIVE_HIGH / ACTIVE_MEDIUM / ACTIVE_LOW / COMPLETED) for the
+     * adaptive overview. Positions are deterministic: each cluster sits on its lane radius at a
+     * fixed angle (no Random). [visualSize] grows with task count but is clamped so a cluster never
+     * visually competes with the sun. Sun→cluster edges are appended to [edges].
+     */
+    private fun buildClusters(
+        cx: Float,
+        cy: Float,
+        viewportRadius: Float,
+        active: List<TaskInput>,
+        completed: List<TaskInput>,
+        goalId: Int,
+        edges: MutableList<GoalGraphEdge>
+    ): List<TaskClusterNode> {
+        val specs = listOf(
+            ClusterSpec(ClusterType.ACTIVE_HIGH, "HIGH", 0f, 0.34f),
+            ClusterSpec(ClusterType.ACTIVE_MEDIUM, "MEDIUM", 2f * PI.toFloat() / 3f, 0.58f),
+            ClusterSpec(ClusterType.ACTIVE_LOW, "LOW", 4f * PI.toFloat() / 3f, 0.82f),
+            ClusterSpec(ClusterType.COMPLETED, null, PI.toFloat(), 0.95f)
+        )
+        return specs.mapNotNull { spec ->
+            val members = when (spec.clusterType) {
+                ClusterType.COMPLETED -> completed
+                else -> active.filter { (it.priority ?: NO_PRIORITY_LANE) == spec.priority }
+            }
+            if (members.isEmpty()) return@mapNotNull null
+            val (x, y) = GraphGeometry.project(cx, cy, viewportRadius * spec.fraction, spec.angle)
+            // Clamp size: 20..34 design px, scaled by count but always < GOAL_SIZE (40).
+            val size = (20f + minOf(members.size, 20) * 0.7f).coerceAtMost(34f)
+            edges += GoalGraphEdge(goalId, CLUSTER_ID_BASE + spec.clusterType.ordinal, 0.6f)
+            TaskClusterNode(
+                id = CLUSTER_ID_BASE + spec.clusterType.ordinal,
+                clusterType = spec.clusterType,
+                taskCount = members.size,
+                cx = x,
+                cy = y,
+                visualSize = size,
+                priorityLevel = spec.priority,
+                memberIds = members.map { it.id }
+            )
+        }
+    }
+
+    private data class ClusterSpec(
+        val clusterType: ClusterType,
+        val priority: String?,
+        val angle: Float,
+        val fraction: Float
+    )
 
     /**
      * Deterministic tiny angle offset derived from the task id (no Random), so adjacent lanes

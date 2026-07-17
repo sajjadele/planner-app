@@ -29,6 +29,7 @@ val AccentFire = Color(0xFFF97316)
 val AccentBlue = Color(0xFF3B82F6)
 val AccentGreen = Color(0xFF22C55E)
 val AccentRed = Color(0xFFEF4444)
+val AccentGold = Color(0xFFFFB300)  // warm gold — Behavioral Solar System "Sun" (Goal node)
 val HolidayRed = Color(0xFFEF6B6B)  // soft coral for holiday indicators
 
 // ── Neumorphic Shadow Colors ──

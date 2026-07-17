@@ -173,4 +173,20 @@ class GoalGraphBuilderTest {
         assertEquals(1, graph.nodes.size)
         assertEquals(NodeKind.GOAL, graph.nodes.first().kind)
     }
+
+    // ── Duplicate-node regression: null-priority tasks must not be placed twice ──
+    @Test
+    fun `two null-priority active tasks render exactly two task nodes`() {
+        val graph = GoalGraphBuilder.build(
+            goalId = 1,
+            goalTitle = "Goal",
+            tasks = listOf(task(1, null), task(2, null)),
+            rescheduleCounts = emptyMap(),
+            progress = progress
+        )
+        val taskNodes = graph.nodes.filter { it.kind == NodeKind.TASK }
+        assertEquals(2, taskNodes.size)
+        // no duplicate ids
+        assertEquals(taskNodes.map { it.id }.toSet().size, taskNodes.size)
+    }
 }
