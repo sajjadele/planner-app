@@ -61,4 +61,21 @@ interface GoalDao {
         FROM tasks t WHERE t.goalId = :goalId
     """)
     fun observeGoalActiveDayCount(goalId: Int): Flow<Int>
+
+    /**
+     * Count of distinct scheduled activity days for a goal within a rolling window
+     * [fromEpochMs, toEpochMs]. Used by Goal Progress momentum (Phase 5.2) so a goal's momentum
+     * reflects *recent* behavior, not a burst of activity long ago.
+     *
+     * Derived from `tasks.dateEpochMs` (see the note on [observeGoalLastActivity]); not stored.
+     */
+    @Query("""
+        SELECT COUNT(DISTINCT CAST(t.dateEpochMs / 86400000 AS INTEGER))
+        FROM tasks t WHERE t.goalId = :goalId AND t.dateEpochMs BETWEEN :fromEpochMs AND :toEpochMs
+    """)
+    fun observeGoalActiveDayCountInWindow(
+        goalId: Int,
+        fromEpochMs: Long,
+        toEpochMs: Long
+    ): Flow<Int>
 }

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,7 +59,8 @@ fun AddTaskDialog(
         goalId: Int?,
         valueTag: String?,
         lifeAreaId: Int?
-    ) -> Unit
+    ) -> Unit,
+    initialGoalId: Int? = null
 ) {
     Dialog(onDismissRequest = onDismiss) {
         var title by remember { mutableStateOf("") }
@@ -73,9 +75,20 @@ fun AddTaskDialog(
         val focusRequester = remember { FocusRequester() }
         val context = LocalContext.current
 
-        // Collect the StateFlow to get live goal updates
+        // When opened from a goal (e.g. Goal Detail empty state), preselect that goal so the
+        // task is linked on creation. Reuses the existing goal picker — no new creation flow.
         val goals by activeGoals.collectAsState()
+        LaunchedEffect(initialGoalId) {
+            if (initialGoalId != null && selectedGoalId == null) {
+                val goal = goals.firstOrNull { it.id == initialGoalId }
+                if (goal != null) {
+                    selectedGoalId = goal.id
+                    selectedGoalTitle = goal.title
+                }
+            }
+        }
 
+        // Collect the StateFlow to get live goal updates
         LaunchedEffect(Unit) {
             delay(100)
             focusRequester.requestFocus()

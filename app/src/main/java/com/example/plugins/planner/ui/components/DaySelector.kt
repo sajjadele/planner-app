@@ -34,6 +34,7 @@ import com.example.core.domain.CalendarDate
 import com.example.core.domain.DayContext
 import com.example.core.util.JalaliDate
 import com.example.core.util.isolated
+import com.example.ui.theme.AccentGreen
 import com.example.ui.theme.HolidayRed
 import java.util.Calendar
 import java.util.Locale
@@ -81,6 +82,7 @@ private val GREGORIAN_MONTHS = arrayOf(
 fun InfiniteWeekRow(
     selectedDateEpochMs: Long,
     onDateSelected: (Long) -> Unit,
+    daysWithTasks: Set<Long> = emptySet(),
     modifier: Modifier = Modifier,
     listState: androidx.compose.foundation.lazy.LazyListState = rememberLazyListState()
 ) {
@@ -111,6 +113,7 @@ fun InfiniteWeekRow(
                 saturdayEpoch = saturdayEpoch,
                 selectedDateEpochMs = selectedDateEpochMs,
                 todayEpochMs = todayEpochMs,
+                daysWithTasks = daysWithTasks,
                 onDateSelected = onDateSelected
             )
         })
@@ -122,6 +125,7 @@ private fun WeekRow(
     saturdayEpoch: Long,
     selectedDateEpochMs: Long,
     todayEpochMs: Long,
+    daysWithTasks: Set<Long> = emptySet(),
     onDateSelected: (Long) -> Unit
 ) {
     Row(
@@ -137,6 +141,7 @@ private fun WeekRow(
                 dayEpochMs = dayEpochMs,
                 isSelected = dayEpochMs == selectedDateEpochMs,
                 isToday = dayEpochMs == todayEpochMs,
+                hasTasks = dayEpochMs in daysWithTasks,
                 onClick = { onDateSelected(dayEpochMs) }
             )
         }
@@ -149,6 +154,7 @@ private fun DayCell(
     dayEpochMs: Long,
     isSelected: Boolean,
     isToday: Boolean,
+    hasTasks: Boolean = false,
     onClick: () -> Unit
 ) {
     val jalali = remember(dayEpochMs) { JalaliDate.fromEpochMs(dayEpochMs) }
@@ -207,6 +213,14 @@ private fun DayCell(
                 else -> MaterialTheme.colorScheme.onSurfaceVariant
             }
         )
+        // "Has tasks" indicator — green dot, distinct from the calendar's red holiday dot.
+        Spacer(modifier = Modifier.height(3.dp))
+        Box(
+            modifier = Modifier
+                .size(5.dp)
+                .clip(CircleShape)
+                .background(if (hasTasks && !isSelected) AccentGreen else Color.Transparent)
+        )
     }
 }
 
@@ -218,6 +232,7 @@ private fun DayCell(
 @Composable
 fun CalendarPopup(
     selectedDateEpochMs: Long,
+    daysWithTasks: Set<Long> = emptySet(),
     onDateSelected: (Long) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -233,6 +248,7 @@ fun CalendarPopup(
     ) {
         CalendarGrid(
             selectedDateEpochMs = selectedDateEpochMs,
+            daysWithTasks = daysWithTasks,
             onDateSelected = onDateSelected,
             onDone = onDismiss,
             holidayRepo = holidayRepo
@@ -243,6 +259,7 @@ fun CalendarPopup(
 @Composable
 private fun CalendarGrid(
     selectedDateEpochMs: Long,
+    daysWithTasks: Set<Long> = emptySet(),
     onDateSelected: (Long) -> Unit,
     onDone: () -> Unit,
     holidayRepo: HolidayRepository? = null
@@ -480,6 +497,7 @@ private fun CalendarGrid(
                             val isDaySelected = isSelectedMonth && cellDate.jalaliDay == selectedJalali.day
                             val isDayToday = isTodayMonth && cellDate.isToday
                             val isHoliday = hasDay && thisDay in holidayDays
+                            val isTaskDay = hasDay && cellDate.epochMs in daysWithTasks
 
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -510,14 +528,29 @@ private fun CalendarGrid(
                                         else -> MaterialTheme.colorScheme.onSurface
                                     }
                                 )
-                                if (isHoliday && !isDaySelected) {
-                                    Spacer(modifier = Modifier.height(1.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .size(4.dp)
-                                            .clip(CircleShape)
-                                            .background(HolidayRed)
-                                    )
+                                if ((isHoliday || isTaskDay) && !isDaySelected) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (isHoliday) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(4.dp)
+                                                    .clip(CircleShape)
+                                                    .background(HolidayRed)
+                                            )
+                                        }
+                                        if (isTaskDay) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(4.dp)
+                                                    .clip(CircleShape)
+                                                    .background(AccentGreen)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }

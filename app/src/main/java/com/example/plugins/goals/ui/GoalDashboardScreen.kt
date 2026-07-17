@@ -2,7 +2,6 @@ package com.example.plugins.goals.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,6 +15,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.core.goal.GoalEntity
+import com.example.plugins.goals.ui.AddGoalDialog
+import com.example.core.goal.GoalStatus
 import com.example.core.onboarding.OnboardingDeepLink
 import com.example.core.util.isolated
 import com.example.ui.theme.*
@@ -25,13 +26,16 @@ fun GoalDashboardScreen(
     modifier: Modifier = Modifier,
     viewModel: GoalViewModel = viewModel()
 ) {
-    val activeGoals by viewModel.activeGoals.collectAsState()
-    val allGoals by viewModel.allGoals.collectAsState()
+    val selectedTab by viewModel.selectedTab.collectAsState()
+    val goalsByTab by viewModel.goalsByTab.collectAsState()
 
-    var selectedGoal by remember { mutableStateOf<GoalEntity?>(null) }
-    var showGoalMenu by remember { mutableStateOf(false) }
     var selectedGoalId by remember { mutableStateOf<Int?>(null) }
+    var showGoalMenu by remember { mutableStateOf(false) }
+    var selectedGoal by remember { mutableStateOf<GoalEntity?>(null) }
+    var showEditGoalDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     var homeHintFor by remember { mutableStateOf(false) }
+    var showAddGoalDialog by remember { mutableStateOf(false) }
 
     // Deep-link from onboarding: land directly on the new goal's detail screen.
     LaunchedEffect(Unit) {
@@ -49,6 +53,47 @@ fun GoalDashboardScreen(
             isOnboarding = homeHintFor
         )
         return
+    }
+
+    if (showEditGoalDialog && selectedGoal != null) {
+        EditGoalDialog(
+            goal = selectedGoal!!,
+            onDismiss = { showEditGoalDialog = false },
+            onUpdateGoal = { title, description, why, deadlineEpochMs ->
+                viewModel.updateGoal(selectedGoal!!.id, title, description, why, deadlineEpochMs)
+                showEditGoalDialog = false
+            }
+        )
+    }
+
+    if (showDeleteConfirm && selectedGoal != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("حذف هدف", fontWeight = FontWeight.Bold) },
+            text = { Text("حذف این هدف تمام تسک‌ها و رویدادهای مربوط به آن را نیز حذف می‌کند. ادامه می‌دهید؟") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteGoalWithRelated(selectedGoal!!.id)
+                        showDeleteConfirm = false
+                        selectedGoal = null
+                    }
+                ) { Text("حذف", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("انصراف") }
+            }
+        )
+    }
+
+    if (showAddGoalDialog) {
+        AddGoalDialog(
+            onDismiss = { showAddGoalDialog = false },
+            onAddGoal = { title, description, _, _ ->
+                viewModel.addGoal(title, description, null, null)
+                showAddGoalDialog = false
+            }
+        )
     }
 
     Box(
@@ -72,51 +117,30 @@ fun GoalDashboardScreen(
                 verticalAlignment = Alignment.Bottom
             ) {
                 Text(
-                    text = "اهداف فعال",
-                    fontSize = 14.sp,
+                    text = "اهداف",
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurface,
                     letterSpacing = 0.5.sp
-                )
-
-                val activeCount = activeGoals.count { it.status == "active" }
-                Text(
-                    text = "${activeCount.isolated()} هدف فعال",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
                 )
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Segmented status selector: Active / Completed / Archived
+            GoalStatusTabs(
+                selected = selectedTab,
+                onSelect = { viewModel.selectTab(it) }
+            )
+
             Spacer(modifier = Modifier.height(12.dp))
 
-            if (activeGoals.isEmpty()) {
-                // Empty state
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(text = "🎯", fontSize = 48.sp)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "هنوز هدفی تعریف نشده است",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "برای شروع، یک هدف بلندمدت اضافه کنید",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
+            if (goalsByTab.isEmpty()) {
+                GoalDashboardEmptyState(
+                    isActiveTab = selectedTab == GoalStatus.ACTIVE,
+                    onCreateGoal = { showAddGoalDialog = true },
+                    modifier = Modifier.weight(1f)
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier
@@ -125,112 +149,94 @@ fun GoalDashboardScreen(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
-                    items(activeGoals, key = { it.id }) { goal ->
+                    items(goalsByTab, key = { it.id }) { goal ->
                         GoalCard(
                             goal = goal,
                             onClick = { selectedGoalId = goal.id },
-                            onLongClick = {
+                            onOpen = { selectedGoalId = goal.id },
+                            onEdit = {
                                 selectedGoal = goal
-                                showGoalMenu = true
-                            }
+                                showEditGoalDialog = true
+                            },
+                            onChangeStatus = { next ->
+                                viewModel.changeStatus(goal.id, next)
+                            },
+                            onArchive = { viewModel.archiveGoal(goal.id) },
+                            onDelete = {
+                                selectedGoal = goal
+                                showDeleteConfirm = true
+                            },
+                            viewModel = viewModel
                         )
                     }
                 }
             }
         }
+    }
+}
 
-        // Long-press context menu
-        if (showGoalMenu && selectedGoal != null) {
-            GoalContextMenu(
-                goal = selectedGoal!!,
-                onDismiss = {
-                    showGoalMenu = false
-                    selectedGoal = null
-                },
-                onComplete = {
-                    viewModel.completeGoal(selectedGoal!!.id)
-                    showGoalMenu = false
-                    selectedGoal = null
-                },
-                onPause = {
-                    viewModel.pauseGoal(selectedGoal!!.id)
-                    showGoalMenu = false
-                    selectedGoal = null
-                },
-                onResume = {
-                    viewModel.resumeGoal(selectedGoal!!.id)
-                    showGoalMenu = false
-                    selectedGoal = null
-                },
-                onAbandon = {
-                    viewModel.abandonGoal(selectedGoal!!.id)
-                    showGoalMenu = false
-                    selectedGoal = null
-                },
-                onDelete = {
-                    viewModel.deleteGoal(selectedGoal!!.id)
-                    showGoalMenu = false
-                    selectedGoal = null
-                }
+@Composable
+private fun GoalStatusTabs(
+    selected: String,
+    onSelect: (String) -> Unit
+) {
+    val tabs = listOf(
+        GoalStatus.ACTIVE to "فعال",
+        GoalStatus.COMPLETED to "انجام شده",
+        GoalStatus.ARCHIVED to "آرشیو"
+    )
+    SingleChoiceSegmentedButtonRow(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        tabs.forEachIndexed { index, (status, label) ->
+            SegmentedButton(
+                selected = selected == status,
+                onClick = { onSelect(status) },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = tabs.size),
+                label = { Text(label, fontSize = 12.sp) }
             )
         }
     }
 }
 
 @Composable
-private fun GoalContextMenu(
-    goal: GoalEntity,
-    onDismiss: () -> Unit,
-    onComplete: () -> Unit,
-    onPause: () -> Unit,
-    onResume: () -> Unit,
-    onAbandon: () -> Unit,
-    onDelete: () -> Unit
+private fun GoalDashboardEmptyState(
+    isActiveTab: Boolean,
+    onCreateGoal: () -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
+    Box(
+        modifier = modifier
+            .fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(text = "🎯", fontSize = 48.sp)
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = goal.title,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                text = if (isActiveTab) "هنوز هدف فعالی نداری" else "موردی یافت نشد",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium
             )
-        },
-        text = {
-            Column {
-                when (goal.status) {
-                    "active" -> {
-                        TextButton(onClick = onComplete) {
-                            Text("✅  تکمیل هدف", color = AccentGreen)
-                        }
-                        TextButton(onClick = onPause) {
-                            Text("⏸  توقف موقت", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    "paused" -> {
-                        TextButton(onClick = onResume) {
-                            Text("▶  از سرگیری", color = MaterialTheme.colorScheme.primary)
-                        }
-                        TextButton(onClick = onComplete) {
-                            Text("✅  تکمیل هدف", color = AccentGreen)
-                        }
-                    }
+            if (isActiveTab) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "اولین هدف خودت را بساز و شروع به ساختن پیشرفت کن.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = onCreateGoal,
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
+                ) {
+                    Text("ساخت هدف", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
-                TextButton(onClick = onAbandon) {
-                    Text("🚫  رها کردن هدف", color = Color(0xFFF97316))
-                }
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                TextButton(onClick = onDelete) {
-                    Text("🗑  حذف دائمی", color = MaterialTheme.colorScheme.error)
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("بستن", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-    )
+    }
 }

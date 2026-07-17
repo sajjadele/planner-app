@@ -19,7 +19,9 @@
 
 **Phase 4 — Mirror Engine Foundation — COMPLETE**
 
-**Next development direction:** Phase 5 — Goal Experience Evolution (UX refinement); Graph remains later (Phase 6).
+**Phase 5 — Goal Experience Evolution — IN PROGRESS (5.1–5.3 complete)**
+
+**Next development direction:** Graph remains later (Phase 6).
 
 ---
 
@@ -115,12 +117,17 @@ Snapshots are inputs for Mirror analysis, not only storage/reporting.
 
 | Item | Status |
 |------|--------|
-| Priority | Later (Phase 6) |
-| Scope | Goal→Task only |
-| Persistence | None (computed on demand) |
+| Priority | Phase 6 — in progress (Behavioral Solar System) |
+| Scope | Goal→Task only, contextual per-goal (popup/bottom sheet on Goal Detail) |
+| Persistence | None (computed on demand in `domain.graph`) |
 | Life Area node | Not promoted |
+| Rendering | Custom Compose Canvas, no graph library |
+| Drift/Decay (V2) | Deferred — no new query yet |
+| Tests | `GoalGraphBuilderTest` (9, passing) |
 
-Decision history: `docs/ADR/ADR-0002-graph-architecture.md`
+Implementation: `domain.graph` (`GoalGraphModels`, `GoalGraphBuilder`, `GraphGeometry`) — pure Kotlin, host-JVM testable, no Android/Room imports. UI combines existing flows (`observeGoalById`, `getTasksByGoalId`, `observeRescheduleCountsByGoal`, `goalProgress`) into a `StateFlow<GoalGraph?>`.
+
+Decision history: `docs/ADR/ADR-0002-graph-architecture.md`, `docs/ADR/ADR-0004-graph-solar-system.md`
 
 ---
 
@@ -139,7 +146,15 @@ Decision history: `docs/ADR/ADR-0002-graph-architecture.md`
 | Item | Current / Direction |
 |------|---------------------|
 | Planner | Daily task execution remains primary interaction |
-| Goal context | Goal Cards should make task→goal purpose visible |
+| Goal Dashboard | Segmented tabs (Active / Completed / Archived) via `observeGoalsByStatus`; sorted deadline → recent activity → engagement (`domain.goal.GoalSort`) |
+| Goal Card | 3-section redesign: Identity (title + status badge + overflow), Progress (پیشرفت + big % + bar), Activity Momentum (فعالیت اخیر + active-days + "آخرین حرکت") — all numbers English digits |
+| Goal Detail | `GoalDetailScreen` + `GoalDetailViewModel`: identity + status-chip dropdown (valid transitions only via `GoalStatus.canTransition`), progress card with "ریتم فعالیت" (window momentum) + active-days/last-activity, Mirror as `IconButton` opening `ModalBottomSheet` (badge-ready), collapsible metadata (why/deadline), tasks section with empty-state that reuses `AddTaskDialog` preselecting this goal |
+| Home / Planner | Goal-centric: today's tasks grouped by goal via `PlannerViewModel.goalTaskGroups` (`GoalTaskGroup`); each group = small goal header (🎯 / 📌 بدون هدف) + TaskCards. No progress/mirror in Home |
+| Number formatting | `core.util.NumberFormatter` (`toEnglishDigits`/`toEnglishPercent`): Vision Planner renders Persian UI with English numbers; replaces `toPersianDigits` in goals UI + `GoalActivityFormatter` |
+| Task-day indicators | `PlannerViewModel.daysWithTasks` (Set<Long> of midnight day-keys, ±60d window via `getTasksBetween`); green dot (`AccentGreen`) in `InfiniteWeekRow` `DayCell` and `CalendarGrid` cells. Distinct from red holiday dot (`HolidayRed`) — both show on overlapping days |
+| Goal Dashboard card | `GoalCard` = compact overview: Identity (title + status chip + overflow) + compact "پیشرفت کلی" (18sp % + bar) + minimal activity (`N روز فعالیت` / `آخرین حرکت: …`). Metric boxes / deadline / "فعالیت اخیر" header removed — those live in Goal Detail. Same card bg/typography/bar as Detail. |
+| Popup menus | `ui.screens.components.VisionPopupMenu` + `VisionMenuItem`/`VisionMenuDivider`: dark surface, rounded, RTL, optional icons; used by GoalCard + GoalDetail status dropdown |
+| Progress | `domain.goal.GoalProgressCalculator`: completion weight 0.7 + activity momentum weight 0.3; momentum from rolling 30-day active-day window (not lifetime) |
 | Tasks without goals | Allowed as Inbox/capture; visually separated |
 | Life Area | Metadata only |
 
@@ -149,9 +164,9 @@ Decision history: `docs/ADR/ADR-0002-graph-architecture.md`
 
 | Layer | Status |
 |-------|--------|
-| Domain unit tests | Present for insight + snapshot + mirror calculators |
+| Domain unit tests | Present for insight + snapshot + mirror + goal calculators (GoalProgressCalculator, GoalSort, GoalActivityFormatter) and GoalStatus transitions |
 | Mirror unit tests | Present (`MirrorHeuristicsTest`) |
-| Room DAO tests | Present (Robolectric where SDK available) |
+| Room DAO tests | Present (Robolectric where SDK available) — env-blocked in sandbox (SDK36 needs JDK21 w/ javac; only JDK17 present) |
 | ViewModel tests | Not started |
 
 ---
@@ -174,3 +189,9 @@ Decision history: `docs/ADR/ADR-0002-graph-architecture.md`
 | 2026-07-15 | Product direction consolidated; Mirror prioritized over Graph |
 | 2026-07-16 | Docs hierarchy cleaned; ADRs moved under `docs/ADR/` |
 | 2026-07-16 | Phase 4 Mirror Engine implemented (domain.mirror + core.mirror, Goal Detail integration); docs synchronized |
+| 2026-07-16 | Phase 5.1 Goal Foundation: DB v10, GoalStatus constants + transitions, optional why/deadlineEpochMs, archive, derived activity queries |
+| 2026-07-16 | Phase 5.2 Goal Dashboard Experience: domain.goal (GoalProgressCalculator window-momentum, GoalSort deadline→recent→engagement, GoalActivityFormatter), segmented tabs, rich GoalCard, valid-transition status menu, delete-with-related tasks/events |
+| 2026-07-16 | Phase 5.3 Goal Detail Experience: GoalDetailScreen + GoalDetailViewModel (progress/active-days/last-activity/Mirror sheet/status transitions), AddTaskDialog `initialGoalId` preselect, Mirror as IconButton+ModalBottomSheet, activity label "ریتم فعالیت"; pure tests GoalDetailProgressTest + GoalStatusDetailTransitionTest; assembleDebug SUCCESS |
+| 2026-07-16 | Phase 5.4 UX Polish & Goal-Centric Home: NumberFormatter (English digits, Persian UI rule), GoalActivityFormatter → English digits, GoalCard 3-section redesign, VisionPopupMenu shared component, Home goal-grouped LazyColumn (`GoalTaskGroup` + `PlannerViewModel.goalTaskGroups`); pure tests NumberFormatterTest(7) + GoalTaskGroupingTest(6); assembleDebug SUCCESS |
+| 2026-07-16 | Task-day indicators: `PlannerViewModel.daysWithTasks` (±60d window, `getTasksBetween`), green `AccentGreen` dot in week bar `DayCell` + calendar `CalendarGrid`; red `HolidayRed` holiday dot preserved and distinct; both show on overlap; pure test TaskDayKeysTest(4); assembleDebug SUCCESS |
+| 2026-07-16 | Phase 5.2 UI refinement (3rd pass — split Dashboard vs Detail): `GoalCard` made compact — removed metric boxes (`تکمیل تسک‌ها`/`ریتم فعالیت`), "فعالیت اخیر" header, deadline block; keeps "پیشرفت کلی" (18sp % + bar) + minimal activity lines. Goal Detail `GoalProgressCard` unchanged (full analysis). No ViewModel/DB change; assembleDebug SUCCESS |

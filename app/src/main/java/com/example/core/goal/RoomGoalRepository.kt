@@ -40,6 +40,11 @@ class RoomGoalRepository(
         goalDao.observeGoalLastActivity(goalId)
     override fun observeGoalActiveDayCount(goalId: Int): Flow<Int> =
         goalDao.observeGoalActiveDayCount(goalId)
+    override fun observeGoalActiveDayCountInWindow(
+        goalId: Int,
+        fromEpochMs: Long,
+        toEpochMs: Long
+    ): Flow<Int> = goalDao.observeGoalActiveDayCountInWindow(goalId, fromEpochMs, toEpochMs)
 
     override suspend fun insertGoalEvent(event: GoalEventEntity) = goalEventDao.insertEvent(event)
     override fun observeGoalEvents(): Flow<List<GoalEventEntity>> = goalEventDao.observeAllEvents()

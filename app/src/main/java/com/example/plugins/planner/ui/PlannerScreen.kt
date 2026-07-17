@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.core.goal.GoalEntity
+import com.example.plugins.planner.ui.GoalTaskGroup
 import com.example.core.util.isolated
 import com.example.plugins.planner.ui.components.CalendarPopup
 import com.example.plugins.planner.ui.components.InfiniteWeekRow
@@ -40,6 +44,8 @@ fun PlannerScreen(
 ) {
     val selectedDateEpochMs by viewModel.selectedDateEpochMs.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
+    val goalTaskGroups by viewModel.goalTaskGroups.collectAsState()
+    val daysWithTasks by viewModel.daysWithTasks.collectAsState()
     val insightState by insightViewModel.insightState.collectAsState()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -77,22 +83,23 @@ fun PlannerScreen(
 
     // ── Calendar Popup ──
     if (showCalendarPopup) {
-        CalendarPopup(
-            selectedDateEpochMs = selectedDateEpochMs,
-            onDateSelected = { dateMs ->
-                viewModel.selectDate(dateMs)
-                // Scroll the week row to the selected date's week
-                scope.launch {
-                    val todaySat = com.example.plugins.planner.ui.components.getSaturdayOfWeek(
-                        com.example.plugins.planner.ui.components.todayDateEpochMs()
-                    )
-                    val targetSat = com.example.plugins.planner.ui.components.getSaturdayOfWeek(dateMs)
-                    val offset = ((targetSat - todaySat) / (7L * 86400000L)).toInt() + 1000
-                    weekRowListState.animateScrollToItem(index = offset)
-                }
-            },
-            onDismiss = { showCalendarPopup = false }
-        )
+            CalendarPopup(
+                selectedDateEpochMs = selectedDateEpochMs,
+                daysWithTasks = daysWithTasks,
+                onDateSelected = { dateMs ->
+                    viewModel.selectDate(dateMs)
+                    // Scroll the week row to the selected date's week
+                    scope.launch {
+                        val todaySat = com.example.plugins.planner.ui.components.getSaturdayOfWeek(
+                            com.example.plugins.planner.ui.components.todayDateEpochMs()
+                        )
+                        val targetSat = com.example.plugins.planner.ui.components.getSaturdayOfWeek(dateMs)
+                        val offset = ((targetSat - todaySat) / (7L * 86400000L)).toInt() + 1000
+                        weekRowListState.animateScrollToItem(index = offset)
+                    }
+                },
+                onDismiss = { showCalendarPopup = false }
+            )
     }
 
     // ── Modal Bottom Sheet for insight details ──
@@ -135,6 +142,7 @@ fun PlannerScreen(
                 InfiniteWeekRow(
                     selectedDateEpochMs = selectedDateEpochMs,
                     onDateSelected = { viewModel.selectDate(it) },
+                    daysWithTasks = daysWithTasks,
                     listState = weekRowListState,
                     modifier = Modifier.weight(1f)
                 )
@@ -220,13 +228,18 @@ fun PlannerScreen(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
-                    items(tasks, key = { it.id }) { task ->
-                        TaskCard(
-                            task = task,
-                            onToggleCompletion = { viewModel.toggleTaskCompletion(task) },
-                            onDelete = { viewModel.deleteTask(task) },
-                            onEdit = { selectedTaskId = task.id }
-                        )
+                    goalTaskGroups.forEach { group ->
+                        item(key = "header_${group.goal?.id ?: "none"}") {
+                            GoalSectionHeader(goal = group.goal)
+                        }
+                        items(group.tasks, key = { it.id }) { task ->
+                            TaskCard(
+                                task = task,
+                                onToggleCompletion = { viewModel.toggleTaskCompletion(task) },
+                                onDelete = { viewModel.deleteTask(task) },
+                                onEdit = { selectedTaskId = task.id }
+                            )
+                        }
                     }
                 }
             }
@@ -239,5 +252,33 @@ fun PlannerScreen(
                 .padding(bottom = 80.dp)
         )
 
+    }
+}
+
+/**
+ * Small goal header for the goal-centric Home list. Shows the goal title (or "بدون هدف" when the
+ * group has no goal). Home stays execution-focused — no progress, mirror, or extra metadata.
+ */
+@Composable
+private fun GoalSectionHeader(goal: GoalEntity?) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Icon(
+            imageVector = if (goal != null) Icons.Default.Flag else Icons.Default.PushPin,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(16.dp)
+        )
+        Text(
+            text = goal?.title ?: "بدون هدف",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
     }
 }

@@ -1,34 +1,52 @@
 package com.example.plugins.goals.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ManageSearch
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.AutoGraph
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.core.goal.GoalEntity
+import com.example.core.goal.GoalStatus
 import com.example.core.util.RTL
-import com.example.core.util.isolated
+import com.example.core.util.toEnglishDigits
+import com.example.domain.goal.GoalActivityFormatter
+import com.example.domain.mirror.MirrorInsight
 import com.example.plugins.planner.data.TaskEntity
+import com.example.plugins.planner.ui.PlannerViewModel
+import com.example.plugins.planner.ui.components.AddTaskDialog
 import com.example.plugins.planner.ui.components.NeumorphicSurface
 import com.example.ui.onboarding.pressScale
+import com.example.ui.screens.components.VisionMenuItem
+import com.example.ui.screens.components.VisionPopupMenu
 import com.example.ui.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GoalDetailScreen(
     goalId: Int,
@@ -46,10 +64,23 @@ fun GoalDetailScreen(
     val goal by viewModel.goal.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
     val goalRate by viewModel.goalRate.collectAsState()
+    val goalProgress by viewModel.goalProgress.collectAsState()
+    val activeDays by viewModel.activeDays.collectAsState()
+    val lastActivity by viewModel.lastActivity.collectAsState()
+    val mirrorInsights by viewModel.mirrorInsights.collectAsState()
+    val showMirrorSheet by viewModel.showMirrorSheet.collectAsState()
+    val goalGraph by viewModel.goalGraph.collectAsState()
+    val showGraphSheet by viewModel.showGraphSheet.collectAsState()
 
     var selectedTaskId by remember { mutableStateOf<Int?>(null) }
     var showEditGoalDialog by remember { mutableStateOf(false) }
     var showHomeHint by remember { mutableStateOf(isOnboarding) }
+    var showStatusMenu by remember { mutableStateOf(false) }
+    var showMetadata by remember { mutableStateOf(false) }
+    var showAddTaskDialog by remember { mutableStateOf(false) }
+
+    // PlannerViewModel for the existing task-creation flow (reused, no new architecture).
+    val plannerViewModel: PlannerViewModel = viewModel()
 
     // Navigate to task detail if selected
     selectedTaskId?.let { taskId ->
@@ -60,24 +91,60 @@ fun GoalDetailScreen(
         return
     }
 
-    val completedCount = tasks.count { it.isCompleted }
-    val totalCount = tasks.size
-    val rate = goalRate?.completionRate ?: 0f
-
-    val statusColor = when (goal?.status) {
-        "active" -> MaterialTheme.colorScheme.primary
-        "completed" -> AccentGreen
-        "paused" -> MaterialTheme.colorScheme.onSurfaceVariant
-        "abandoned" -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    val g = goal
+    if (showEditGoalDialog && g != null) {
+        EditGoalDialog(
+            goal = g,
+            onDismiss = { showEditGoalDialog = false },
+            onUpdateGoal = { title, description, why, deadlineEpochMs ->
+                viewModel.updateGoal(title, description, why, deadlineEpochMs)
+                showEditGoalDialog = false
+            }
+        )
     }
 
-    val statusLabel = when (goal?.status) {
-        "active" -> "فعال"
-        "completed" -> "تکمیل شده"
-        "paused" -> "متوقف"
-        "abandoned" -> "رها شده"
-        else -> ""
+    if (showAddTaskDialog) {
+        AddTaskDialog(
+            onDismiss = { showAddTaskDialog = false },
+            activeGoals = plannerViewModel.activeGoals,
+            initialGoalId = goalId,
+            onAddTask = { title, priority, hour, minute, gId, valueTag, lifeAreaId ->
+                plannerViewModel.addTask(
+                    title = title,
+                    priority = priority,
+                    hour = hour,
+                    minute = minute,
+                    goalId = gId,
+                    valueTag = valueTag,
+                    lifeAreaId = lifeAreaId
+                )
+                showAddTaskDialog = false
+            }
+        )
+    }
+
+    // ── Mirror bottom sheet (user-controlled) ──
+    if (showMirrorSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.setMirrorSheetVisible(false) },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            MirrorSheetContent(insights = mirrorInsights)
+        }
+    }
+
+    // ── Behavioral Solar System graph sheet (user-controlled) ──
+    if (showGraphSheet && goalGraph != null) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.setGraphSheetVisible(false) },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            GoalGraphSheetContent(graph = goalGraph!!)
+        }
     }
 
     Box(
@@ -85,52 +152,57 @@ fun GoalDetailScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)
         ) {
             // ── Onboarding home hint (dismissible) ──
             if (showHomeHint) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp)
-                ) {
-                    Row(
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(bottom = 4.dp)
                     ) {
-                        Text(
-                            text = "${RTL}بازگشت به خانه",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Spacer(Modifier.weight(1f))
-                        val homeHintInteraction = remember { MutableInteractionSource() }
-                        TextButton(
-                            onClick = { showHomeHint = false; onBack() },
-                            interactionSource = homeHintInteraction,
-                            modifier = Modifier.pressScale(homeHintInteraction)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("بازگشت", color = MaterialTheme.colorScheme.primary)
+                            Text(
+                                text = "${RTL}بازگشت به خانه",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(Modifier.weight(1f))
+                            val homeHintInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                            TextButton(
+                                onClick = { showHomeHint = false; onBack() },
+                                interactionSource = homeHintInteraction,
+                                modifier = Modifier.pressScale(homeHintInteraction)
+                            ) {
+                                Text("بازگشت", color = MaterialTheme.colorScheme.primary)
+                            }
                         }
                     }
                 }
             }
 
-            // ── Top bar ──
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            // ── Top bar: back + title + Mirror icon ──
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp, bottom = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
@@ -148,7 +220,28 @@ fun GoalDetailScreen(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                // Edit action — opens EditGoalDialog
+                // Mirror trigger (IconButton; architecture ready for a future unread badge)
+                IconButton(
+                    onClick = { viewModel.setMirrorSheetVisible(true) }
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ManageSearch,
+                        contentDescription = "بازتاب هدف",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                // Behavioral Solar System graph trigger
+                IconButton(
+                    onClick = { viewModel.setGraphSheetVisible(true) }
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.AutoGraph,
+                        contentDescription = "منظومه رفتاری",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
                 if (goal != null) {
                     IconButton(onClick = { showEditGoalDialog = true }) {
                         Icon(
@@ -159,202 +252,406 @@ fun GoalDetailScreen(
                         )
                     }
                 }
+                }
             }
 
-            // ── Goal info card ──
-            NeumorphicSurface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                shape = RoundedCornerShape(16.dp),
-                elevation = 6
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    // Status badge
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = statusColor.copy(alpha = 0.1f)
+            // ── Identity block ──
+            if (g != null) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                    // Status chip (clickable → valid transitions only)
+                    StatusChip(
+                        status = g.status,
+                        onClick = { showStatusMenu = true }
+                    )
+
+                    g.deadlineEpochMs?.let { dl ->
+                        val jalali = com.example.core.util.JalaliDate.fromEpochMs(dl)
                         Text(
-                            text = statusLabel,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = statusColor,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            text = "مهلت: ${RTL}${jalali.day.toEnglishDigits()} ${com.example.core.util.JalaliDate.MONTH_NAMES[jalali.month - 1]}",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
-                    // Description
-                    goal?.description?.let { desc ->
-                        if (desc.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = desc,
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 20.sp
+                    // Status dropdown — only valid transitions from GoalStatus.canTransition
+                    VisionPopupMenu(
+                        expanded = showStatusMenu,
+                        onDismissRequest = { showStatusMenu = false }
+                    ) {
+                        val valid = viewModel.validNextStatuses(g.status)
+                        if (valid.isEmpty()) {
+                            VisionMenuItem(
+                                text = "بدون تغییر وضعیت",
+                                enabled = false,
+                                onClick = { showStatusMenu = false }
+                            )
+                        }
+                        valid.forEach { next ->
+                            VisionMenuItem(
+                                text = statusLabel(next),
+                                onClick = {
+                                    showStatusMenu = false
+                                    viewModel.changeStatus(next)
+                                }
                             )
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Stats row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        StatItem(
-                            label = "نرخ تکمیل",
-                            value = "${rate.toInt().isolated()}٪",
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        StatItem(
-                            label = "انجام شده",
-                            value = "${RTL}${completedCount.isolated()} از ${totalCount.isolated()}",
-                            color = AccentGreen
-                        )
-                    }
+                }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // ── Mirror feedback card ──
-            val mirrorInsights by viewModel.mirrorInsights.collectAsState()
-            if (mirrorInsights.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(12.dp))
-                MirrorFeedbackCard(insights = mirrorInsights)
-                Spacer(modifier = Modifier.height(12.dp))
+            // ── Progress overview card ──
+            item {
+                GoalProgressCard(
+                    progress = goalProgress,
+                    completionRate = goalRate?.completionRate,
+                    activeDays = activeDays,
+                    lastActivity = lastActivity
+                )
             }
 
-            // ── Section header ──
-            Text(
-                text = "${RTL}تسک‌های مرتبط",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // ── Tasks list ──
-            if (tasks.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
+            // ── Collapsible metadata ──
+            if (g != null && (!g.why.isNullOrBlank() || g.deadlineEpochMs != null)) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showMetadata = !showMetadata }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    Text(
+                        text = "جزئیات بیشتر",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        imageVector = if (showMetadata) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                if (showMetadata) {
+                    Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                        g.why?.takeIf { it.isNotBlank() }?.let { why ->
+                            Text("چرا این هدف مهم است؟", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(why, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface, lineHeight = 20.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                        g.deadlineEpochMs?.let { dl ->
+                            val jalali = com.example.core.util.JalaliDate.fromEpochMs(dl)
+                            Text("مهلت", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "${RTL}${jalali.day.toEnglishDigits()} ${com.example.core.util.JalaliDate.MONTH_NAMES[jalali.month - 1]}",
+                                fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+                }
+            }
+
+            // ── Tasks section ──
+            item {
+                Text(
+                    text = "${RTL}کارهای این هدف",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+
+            if (tasks.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "📝", fontSize = 36.sp)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "هنوز تسکی برای این هدف ثبت نشده",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 13.sp
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = "📝", fontSize = 36.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "هنوز کاری برای این هدف تعریف نکردی",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 13.sp
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(onClick = { showAddTaskDialog = true }) {
+                                Text("افزودن Task")
+                            }
+                        }
                     }
                 }
             } else {
-                LazyColumn(
+                items(
+                    tasks,
+                    key = { it.id },
+                    contentType = { "task" }
+                ) { task ->
+                    GoalDetailTaskRow(
+                        task = task,
+                        onToggle = { viewModel.toggleTaskCompletion(task) },
+                        onEdit = { selectedTaskId = task.id }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusChip(status: String, onClick: () -> Unit) {
+    val (label, color) = statusLabel(status) to statusColor(status)
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = color.copy(alpha = 0.1f),
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = color
+            )
+            Icon(
+                imageVector = Icons.Default.ExpandMore,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(14.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun GoalProgressCard(
+    progress: com.example.domain.goal.GoalProgress?,
+    completionRate: Float?,
+    activeDays: Int,
+    lastActivity: Long?
+) {
+    val overall = progress?.overall ?: 0f
+    val momentum = progress?.activityMomentum ?: 0f
+    val completion = completionRate ?: 0f
+
+    NeumorphicSurface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        elevation = 6
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            // ── Hero: overall progress ──
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${RTL}پیشرفت کلی",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = "${RTL}${overall.toInt().toEnglishDigits()}%",
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            LinearProgressIndicator(
+                progress = { overall / 100f },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(50)),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // ── Metric cards: completion + momentum ──
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                MetricCard(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    contentPadding = PaddingValues(bottom = 80.dp)
+                    icon = Icons.Filled.TaskAlt,
+                    iconTint = AccentGreen,
+                    value = "${RTL}${completion.toInt().toEnglishDigits()}%",
+                    label = "تکمیل تسک‌ها"
+                )
+                MetricCard(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Filled.LocalFireDepartment,
+                    iconTint = Color(0xFFF97316),
+                    value = "${RTL}${momentum.toInt().toEnglishDigits()}%",
+                    label = "ریتم فعالیت"
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // ── Recent Activity section ──
+            if (activeDays > 0 || GoalActivityFormatter.formatLastActivity(lastActivity).isNotBlank()) {
+                Text(
+                    text = "${RTL}فعالیت اخیر",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(tasks, key = { it.id }) { task ->
-                        GoalDetailTaskRow(
-                            task = task,
-                            onToggle = { viewModel.toggleTaskCompletion(task) },
-                            onEdit = { selectedTaskId = task.id }
+                    if (activeDays > 0) {
+                        MetricCard(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Filled.CalendarToday,
+                            iconTint = MaterialTheme.colorScheme.primary,
+                            value = "${RTL}${activeDays.toEnglishDigits()}",
+                            label = "روزهای فعال"
+                        )
+                    }
+                    val last = GoalActivityFormatter.formatLastActivity(lastActivity)
+                    if (last.isNotBlank()) {
+                        MetricCard(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Filled.AccessTime,
+                            iconTint = MaterialTheme.colorScheme.secondary,
+                            value = last,
+                            label = "آخرین فعالیت"
                         )
                     }
                 }
             }
         }
     }
-
-    // ── Edit Goal Dialog ──
-    if (showEditGoalDialog && goal != null) {
-        EditGoalDialog(
-            goal = goal!!,
-            onDismiss = { showEditGoalDialog = false },
-            onUpdateGoal = { title, description, why, deadlineEpochMs ->
-                viewModel.updateGoal(title, description, why, deadlineEpochMs)
-                showEditGoalDialog = false
-            }
-        )
-    }
 }
 
 @Composable
-private fun StatItem(
-    label: String,
+private fun MetricCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconTint: Color,
     value: String,
-    color: Color
+    label: String,
+    modifier: Modifier = Modifier
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = value,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = color
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-private fun MirrorFeedbackCard(insights: List<com.example.domain.mirror.MirrorInsight>) {
-    if (insights.isEmpty()) return
-    val insight = insights.first()
     Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f),
-        modifier = Modifier.fillMaxWidth()
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        modifier = modifier
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp)
         ) {
-            Text(
-                text = "🔎 بازتاب پیشرفت هدف",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = insight.title,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                text = value,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onSurface
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(1.dp))
             Text(
-                text = insight.message,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f),
-                lineHeight = 18.sp
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "این بازخورد بر اساس فعالیت‌های اخیر این هدف ایجاد شده است.",
+                text = label,
                 fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f),
-                lineHeight = 15.sp
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
+        }
+    }
+}
+
+@Composable
+private fun MirrorSheetContent(insights: List<MirrorInsight>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .padding(bottom = 32.dp)
+    ) {
+        Text(
+            text = "بازتاب هدف",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "این بازخورد بر اساس فعالیت‌های اخیر این هدف ایجاد شده است.",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            lineHeight = 18.sp
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        if (insights.isEmpty()) {
+            Text(
+                text = "هنوز الگویی برای نمایش وجود ندارد.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            insights.forEach { insight ->
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = insight.title,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = insight.message,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f),
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -380,7 +677,6 @@ private fun GoalDetailTaskRow(
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Checkbox — always full opacity
             Checkbox(
                 checked = task.isCompleted,
                 onCheckedChange = { onToggle() },
@@ -392,7 +688,6 @@ private fun GoalDetailTaskRow(
 
             Spacer(modifier = Modifier.width(4.dp))
 
-            // Content — faded when completed
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -408,7 +703,6 @@ private fun GoalDetailTaskRow(
                 )
             }
 
-            // Priority badge + Edit — faded when completed
             task.priority?.let { priority ->
                 val (label, colorV) = when (priority) {
                     "HIGH" -> "بالا" to MaterialTheme.colorScheme.error
@@ -431,7 +725,6 @@ private fun GoalDetailTaskRow(
                 }
             }
 
-            // Edit action
             IconButton(
                 onClick = onEdit,
                 modifier = Modifier.alpha(rowAlpha)
@@ -445,4 +738,24 @@ private fun GoalDetailTaskRow(
             }
         }
     }
+}
+
+@Composable
+private fun statusLabel(status: String): String = when (status) {
+    GoalStatus.ACTIVE -> "فعال"
+    GoalStatus.COMPLETED -> "تکمیل‌شده"
+    GoalStatus.PAUSED -> "متوقف‌شده"
+    GoalStatus.ABANDONED -> "رها‌شده"
+    GoalStatus.ARCHIVED -> "بایگانی‌شده"
+    else -> status
+}
+
+@Composable
+private fun statusColor(status: String): Color = when (status) {
+    GoalStatus.ACTIVE -> MaterialTheme.colorScheme.primary
+    GoalStatus.COMPLETED -> AccentGreen
+    GoalStatus.PAUSED -> MaterialTheme.colorScheme.onSurfaceVariant
+    GoalStatus.ABANDONED -> MaterialTheme.colorScheme.error
+    GoalStatus.ARCHIVED -> MaterialTheme.colorScheme.onSurfaceVariant
+    else -> MaterialTheme.colorScheme.onSurfaceVariant
 }

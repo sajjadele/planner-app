@@ -36,6 +36,12 @@ interface GoalRepository {
     fun observeGoalLastActivity(goalId: Int): Flow<Long?>
     fun observeGoalActiveDayCount(goalId: Int): Flow<Int>
 
+    /**
+     * Rolling-window distinct active-day count for a goal, used by Goal Progress momentum (Phase 5.2).
+     * Derived from `tasks.dateEpochMs`; never stored.
+     */
+    fun observeGoalActiveDayCountInWindow(goalId: Int, fromEpochMs: Long, toEpochMs: Long): Flow<Int>
+
     // ── Goal lifecycle events (Phase 2) ──
     suspend fun insertGoalEvent(event: GoalEventEntity)
     fun observeGoalEvents(): Flow<List<GoalEventEntity>>
