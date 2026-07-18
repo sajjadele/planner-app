@@ -27,9 +27,10 @@ data, pure-Kotlin domain, Compose-only rendering.
   app's progress accent (`AccentCyan`). A faint full-track shows the remaining gap.
 - The **Ring Tide** halo (from 6.1) remains: its intensity grows with `overall`, so a higher-progress
   goal literally glows stronger. No fake values — everything derives from `goalProgressOverall`.
-- Sun color stays `AccentPurple` (decided in 6.2: the established solar-system identity; the app's
-  dark-theme `primary` is `AccentCyan`, used here as the *progress* tint, avoiding a cyan-on-cyan
-  sun).
+- Sun color is **`AccentGold`** (warm gold — the solar-system identity; see `ui/theme/Color.kt:32`).
+  The app's dark-theme `primary` is `AccentCyan`, used here as the *progress* tint, avoiding a
+  cyan-on-cyan sun. (Corrected in 6.5.1: an earlier draft said `AccentPurple`; the implementation has
+  always used `AccentGold`.)
 
 ### Priority as orbital distance + visual weight
 - Layout is **unchanged** (deterministic, from `GoalGraphBuilder`): HIGH inner / MEDIUM middle /
@@ -47,7 +48,7 @@ The domain exposes `ColorRole` only; the UI maps roles → actual colors. Stabil
 
 | Role | Color | Meaning |
 |------|-------|---------|
-| GOAL | `AccentPurple` | Center / identity |
+| GOAL | `AccentGold` | Center / identity (sun) |
 | HIGH | `AccentRed` | Attention |
 | MEDIUM | `AccentFire` | Secondary emphasis |
 | LOW | `AccentGreen` | Neutral / calm |
@@ -78,8 +79,8 @@ The domain never references Android/`android.graphics.Color` — purity preserve
 - Zero architecture change — display-only; all behavior preserved and test-backed.
 
 ### Trade-offs
-- Sun uses `AccentPurple` rather than the strict theme `primary` (`AccentCyan`); a conscious choice
-  documented here to keep the sun distinct from the cyan progress tint.
+- Sun uses `AccentGold` (warm gold) rather than the strict theme `primary` (`AccentCyan`); a conscious
+  choice documented here to keep the sun distinct from the cyan progress tint and to read as a "sun".
 - Tap-to-highlight + Persian label on a satellite is retained as a passive visual aid (no detail
   card/popup), per 6.2 decision — a minor interaction beyond pure "appearance", but already shipped
   in 6.1 and kept intentionally.

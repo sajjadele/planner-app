@@ -13,7 +13,6 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,7 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.core.goal.GoalEntity
 import com.example.core.goal.GoalStatus
 import com.example.core.util.toEnglishDigits
 import com.example.domain.goal.GoalActivityFormatter
@@ -44,16 +42,20 @@ private val STATUS_LABELS = mapOf(
 
 @Composable
 fun GoalCard(
-    goal: GoalEntity,
+    item: DashboardGoalItem,
     onClick: () -> Unit,
     onOpen: () -> Unit,
     onEdit: () -> Unit,
     onChangeStatus: (String) -> Unit,
     onArchive: () -> Unit,
     onDelete: () -> Unit,
-    viewModel: GoalViewModel,
     modifier: Modifier = Modifier
 ) {
+    val goal = item.goal
+    val lastActivity = item.lastActivity
+    val activeDays = item.activeDays
+    val progress = item.progress
+
     val statusColor = when (goal.status) {
         GoalStatus.ACTIVE -> MaterialTheme.colorScheme.primary
         GoalStatus.COMPLETED -> AccentGreen
@@ -62,10 +64,6 @@ fun GoalCard(
         GoalStatus.ARCHIVED -> MaterialTheme.colorScheme.onSurfaceVariant
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-
-    val lastActivity by viewModel.lastActivityFor(goal.id).collectAsState(initial = null)
-    val activeDays by viewModel.activeDaysFor(goal.id).collectAsState(initial = 0)
-    val progress by viewModel.progressFor(goal.id).collectAsState(initial = null)
 
     val deadlineText = remember(goal.deadlineEpochMs) {
         GoalActivityFormatter.formatDeadline(goal.deadlineEpochMs)
@@ -80,7 +78,9 @@ fun GoalCard(
     var showMenu by remember { mutableStateOf(false) }
     var showStatusMenu by remember { mutableStateOf(false) }
 
-    val validStatuses = viewModel.validNextStatuses(goal.status)
+    val validStatuses = GoalStatus.ALL.filter {
+        it != goal.status && GoalStatus.canTransition(goal.status, it)
+    }
 
     NeumorphicSurface(
         modifier = modifier

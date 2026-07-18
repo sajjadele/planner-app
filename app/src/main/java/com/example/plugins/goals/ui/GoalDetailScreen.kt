@@ -71,8 +71,10 @@ fun GoalDetailScreen(
     val showMirrorSheet by viewModel.showMirrorSheet.collectAsState()
     val goalGraph by viewModel.goalGraph.collectAsState()
     val showGraphSheet by viewModel.showGraphSheet.collectAsState()
+    val showGraphEducation by viewModel.showGraphEducation.collectAsState()
 
     var selectedTaskId by remember { mutableStateOf<Int?>(null) }
+    var previewTask by remember { mutableStateOf<TaskEntity?>(null) }
     var showEditGoalDialog by remember { mutableStateOf(false) }
     var showHomeHint by remember { mutableStateOf(isOnboarding) }
     var showStatusMenu by remember { mutableStateOf(false) }
@@ -81,6 +83,11 @@ fun GoalDetailScreen(
 
     // PlannerViewModel for the existing task-creation flow (reused, no new architecture).
     val plannerViewModel: PlannerViewModel = viewModel()
+
+    // One-shot: open the read-only task preview popup exactly once per satellite tap (replay-free).
+    LaunchedEffect(Unit) {
+        viewModel.taskPreviewEvents.collect { previewTask = it }
+    }
 
     // Navigate to task detail if selected
     selectedTaskId?.let { taskId ->
@@ -108,7 +115,7 @@ fun GoalDetailScreen(
             onDismiss = { showAddTaskDialog = false },
             activeGoals = plannerViewModel.activeGoals,
             initialGoalId = goalId,
-            onAddTask = { title, priority, hour, minute, gId, valueTag, lifeAreaId ->
+            onAddTask = { title, priority, hour, minute, gId, valueTag, lifeAreaId, deadlineEpochMs ->
                 plannerViewModel.addTask(
                     title = title,
                     priority = priority,
@@ -116,7 +123,8 @@ fun GoalDetailScreen(
                     minute = minute,
                     goalId = gId,
                     valueTag = valueTag,
-                    lifeAreaId = lifeAreaId
+                    lifeAreaId = lifeAreaId,
+                    deadlineEpochMs = deadlineEpochMs
                 )
                 showAddTaskDialog = false
             }
@@ -136,15 +144,28 @@ fun GoalDetailScreen(
     }
 
     // ── Behavioral Solar System graph sheet (user-controlled) ──
-    if (showGraphSheet && goalGraph != null) {
+            if (showGraphSheet && goalGraph != null) {
         ModalBottomSheet(
             onDismissRequest = { viewModel.setGraphSheetVisible(false) },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
-            GoalGraphSheetContent(graph = goalGraph!!)
+            GoalGraphSheetContent(
+                graph = goalGraph!!,
+                autoShowEducation = showGraphEducation,
+                onEducationDismissed = { viewModel.markGraphIntroductionSeen() },
+                onTaskTap = { viewModel.requestTaskPreview(it) }
+            )
         }
+    }
+
+    // ── Read-only task preview popup (satellite tap) ──
+    previewTask?.let { task ->
+        TaskPreviewDialog(
+            task = task,
+            onDismiss = { previewTask = null }
+        )
     }
 
     Box(
@@ -701,6 +722,25 @@ private fun GoalDetailTaskRow(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+
+            task.deadlineEpochMs?.let { dl ->
+                val overdue = !task.isCompleted && dl < System.currentTimeMillis() - (System.currentTimeMillis() % 86400000L)
+                val jalali = com.example.core.util.JalaliDate.fromEpochMs(dl)
+                val dlColor = if (overdue) Color(0xFFDC2626) else MaterialTheme.colorScheme.onSurfaceVariant
+                Surface(
+                    modifier = Modifier.alpha(rowAlpha),
+                    shape = RoundedCornerShape(6.dp),
+                    color = dlColor.copy(alpha = 0.1f)
+                ) {
+                    Text(
+                        text = "مهلت ${jalali.day.toEnglishDigits()} ${com.example.core.util.JalaliDate.MONTH_NAMES[jalali.month - 1]}",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = dlColor,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
             }
 
             task.priority?.let { priority ->

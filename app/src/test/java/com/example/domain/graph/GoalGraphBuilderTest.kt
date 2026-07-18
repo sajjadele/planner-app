@@ -189,4 +189,159 @@ class GoalGraphBuilderTest {
         // no duplicate ids
         assertEquals(taskNodes.map { it.id }.toSet().size, taskNodes.size)
     }
+
+    // ── Overdue signal (Phase 6.5.6) ──
+    @Test
+    fun `active task with past deadline is flagged overdue and uses OVERDUE role`() {
+        val past = 1_000_000L // far in the past; today's midnight is >> this
+        val graph = GoalGraphBuilder.build(
+            goalId = 1,
+            goalTitle = "Goal",
+            tasks = listOf(task(1, "MEDIUM", isCompleted = false, deadlineEpochMs = past)),
+            rescheduleCounts = emptyMap(),
+            progress = progress,
+            nowMillis = 1_700_000_000_000L
+        )
+        val node = graph.nodes.first { it.kind == NodeKind.TASK }
+        assertTrue(node.isOverdue)
+        assertEquals(ColorRole.OVERDUE, node.colorRole)
+    }
+
+    @Test
+    fun `completed task with past deadline is NOT overdue`() {
+        val past = 1_000_000L
+        val graph = GoalGraphBuilder.build(
+            goalId = 1,
+            goalTitle = "Goal",
+            tasks = listOf(task(1, "MEDIUM", isCompleted = true, deadlineEpochMs = past)),
+            rescheduleCounts = emptyMap(),
+            progress = progress,
+            nowMillis = 1_700_000_000_000L
+        )
+        val node = graph.nodes.first { it.kind == NodeKind.TASK }
+        assertFalse(node.isOverdue)
+        assertEquals(ColorRole.COMPLETED, node.colorRole)
+    }
+
+    @Test
+    fun `task with future deadline is NOT overdue`() {
+        val future = 2_000_000_000_000L // after nowMillis
+        val graph = GoalGraphBuilder.build(
+            goalId = 1,
+            goalTitle = "Goal",
+            tasks = listOf(task(1, "HIGH", isCompleted = false, deadlineEpochMs = future)),
+            rescheduleCounts = emptyMap(),
+            progress = progress,
+            nowMillis = 1_700_000_000_000L
+        )
+        val node = graph.nodes.first { it.kind == NodeKind.TASK }
+        assertFalse(node.isOverdue)
+        assertEquals(ColorRole.HIGH, node.colorRole)
+    }
+
+    // ── Near-deadline signal (exact 24h window: [now, now + 24h)) ──
+    private val now = 1_700_000_000_000L
+
+    @Test
+    fun `active task due in 12h is flagged nearDeadline and not overdue`() {
+        val graph = GoalGraphBuilder.build(
+            goalId = 1,
+            goalTitle = "Goal",
+            tasks = listOf(task(1, "MEDIUM", deadlineEpochMs = now + 12L * 60 * 60 * 1000)),
+            rescheduleCounts = emptyMap(),
+            progress = progress,
+            nowMillis = now
+        )
+        val node = graph.nodes.first { it.kind == NodeKind.TASK }
+        assertTrue(node.isNearDeadline)
+        assertFalse(node.isOverdue)
+    }
+
+    @Test
+    fun `task due exactly at now is nearDeadline (inclusive lower bound)`() {
+        val graph = GoalGraphBuilder.build(
+            goalId = 1,
+            goalTitle = "Goal",
+            tasks = listOf(task(1, "HIGH", deadlineEpochMs = now)),
+            rescheduleCounts = emptyMap(),
+            progress = progress,
+            nowMillis = now
+        )
+        assertTrue(graph.nodes.first { it.kind == NodeKind.TASK }.isNearDeadline)
+    }
+
+    @Test
+    fun `task due exactly at 24h boundary is NOT nearDeadline (exclusive upper bound)`() {
+        val graph = GoalGraphBuilder.build(
+            goalId = 1,
+            goalTitle = "Goal",
+            tasks = listOf(task(1, "HIGH", deadlineEpochMs = now + GoalGraphBuilder.NEAR_DEADLINE_WINDOW_MS)),
+            rescheduleCounts = emptyMap(),
+            progress = progress,
+            nowMillis = now
+        )
+        assertFalse(graph.nodes.first { it.kind == NodeKind.TASK }.isNearDeadline)
+    }
+
+    @Test
+    fun `task due in 25h is NOT nearDeadline`() {
+        val graph = GoalGraphBuilder.build(
+            goalId = 1,
+            goalTitle = "Goal",
+            tasks = listOf(task(1, "LOW", deadlineEpochMs = now + 25L * 60 * 60 * 1000)),
+            rescheduleCounts = emptyMap(),
+            progress = progress,
+            nowMillis = now
+        )
+        assertFalse(graph.nodes.first { it.kind == NodeKind.TASK }.isNearDeadline)
+    }
+
+    @Test
+    fun `overdue task is not also flagged nearDeadline`() {
+        val graph = GoalGraphBuilder.build(
+            goalId = 1,
+            goalTitle = "Goal",
+            tasks = listOf(task(1, "MEDIUM", deadlineEpochMs = 1_000_000L)),
+            rescheduleCounts = emptyMap(),
+            progress = progress,
+            nowMillis = now
+        )
+        val node = graph.nodes.first { it.kind == NodeKind.TASK }
+        assertTrue(node.isOverdue)
+        assertFalse(node.isNearDeadline)
+    }
+
+    @Test
+    fun `completed task due within 24h is NOT nearDeadline`() {
+        val graph = GoalGraphBuilder.build(
+            goalId = 1,
+            goalTitle = "Goal",
+            tasks = listOf(task(1, "HIGH", isCompleted = true, deadlineEpochMs = now + 6L * 60 * 60 * 1000)),
+            rescheduleCounts = emptyMap(),
+            progress = progress,
+            nowMillis = now
+        )
+        assertFalse(graph.nodes.first { it.kind == NodeKind.TASK }.isNearDeadline)
+    }
+
+    @Test
+    fun `nearDeadline is applied regardless of priority`() {
+        val soon = now + 3L * 60 * 60 * 1000
+        val graph = GoalGraphBuilder.build(
+            goalId = 1,
+            goalTitle = "Goal",
+            tasks = listOf(
+                task(1, "HIGH", deadlineEpochMs = soon),
+                task(2, "MEDIUM", deadlineEpochMs = soon),
+                task(3, "LOW", deadlineEpochMs = soon)
+            ),
+            rescheduleCounts = emptyMap(),
+            progress = progress,
+            nowMillis = now
+        )
+        fun taskNode(id: Int) = graph.nodes.first { it.id == id && it.kind == NodeKind.TASK }
+        assertTrue(taskNode(1).isNearDeadline)
+        assertTrue(taskNode(2).isNearDeadline)
+        assertTrue(taskNode(3).isNearDeadline)
+    }
 }

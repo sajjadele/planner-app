@@ -256,3 +256,70 @@ new regression test).
 - `plugins/goals/ui/GoalGraphSheetContent.kt` — gold sun/halo, title-above-sun, edges removed,
   `colorForRole` GOAL → gold.
 
+---
+
+## 10. Orbit/Node Alignment & Sun Realignment (2026-07-17)
+
+Second live-review pass: the duplicate fix was correct, but nodes still looked drifted from the
+rings and the Sun needed to match the ideal blueprint (gold + glow + title & % both centered).
+
+### 10.1 Orbit/satellite alignment (mathematical drift)
+- **Root cause:** the renderer only drew orbit rings at `0.34 / 0.58 / 0.82`, but the domain
+  builder places nodes at **five** distinct radii — HIGH 0.34, MEDIUM 0.58, LOW 0.82,
+  `undated` (null-priority active) **0.92**, and `completed` **0.97**. A goal whose tasks are
+  null-priority (e.g. 2 tasks) therefore drew its satellites at 0.92 while the outermost *drawn*
+  ring was at 0.82 → satellites floated past the rings and read as misaligned.
+- **Fix:** `drawSolarSystem` now draws an orbit ring for **every** fraction the builder uses
+  (`OrbitRing` list: 0.34 / 0.58 / 0.82 / 0.92 / 0.97), using the **identical** pixel formula
+  `graph.viewportRadius * frac * scale` that node mapping (`toCanvas`) uses. No separate hardcoded
+  scale — node radius (`node.designR * scale`) and ring radius are guaranteed equal, so every
+  satellite sits exactly on its ring.
+- No domain change; pure renderer fix. `GoalGraphBuilder` fractions remain the single source of
+  truth for layout.
+
+### 10.2 Sun realignment to ideal blueprint
+- **Color & glow:** Sun disc is `AccentGold` with the soft outward `AccentGold` radial halo
+  (Ring Tide) — already in place from §9.2; confirmed matching the "warm vibrant gold + ambient
+  glow" spec.
+- **Text layout (changed):** the goal **title AND the progress % are now both rendered centered
+  INSIDE the golden sun** (stacked: title above, % below, white text, kept within `sunR` so they
+  never spill onto the orbits). This supersedes the §9.2 "title above sun" choice — the ideal
+  blueprint shows both centered over the sun. Decision D14 is therefore updated.
+
+### 10.3 Decision-log amendments
+- **D14 (sun text)** — superseded: title + % both centered inside the sun (was: title above, % inside).
+- **New D15** — orbit rings mirror all builder placement fractions (0.34/0.58/0.82/0.92/0.97) with
+  the same pixel math as nodes; single source of truth, no separate UI scale.
+
+### 10.4 Files changed in this pass
+- `plugins/goals/ui/GoalGraphSheetContent.kt` — orbit rings for all builder fractions (new
+  `OrbitRing` helper), title+% centered inside sun.
+
+---
+
+## 11. Phase 5.4 — Graph Canvas Render Optimization (ADR-0009)
+
+During the Phase 5.4 performance audit (§architectural, see `docs/ADR/ADR-0009-performance-audit-5.4.md`),
+the Graph sheet was the only always-on infinite animation. The 4s Ring Tide breathing pulse drives
+a 60fps `Canvas` redraw. Two costs were found inside the per-frame draw:
+
+1. `drawSolarSystem` re-scanned the node list every frame (`graph.nodes.first { GOAL }`,
+   `graph.nodes.filter { TASK }` ×2).
+2. `TextMeasurer.measure` ran every frame for the sun title, sun %, selected satellite label, and
+   each cluster count.
+
+**Fix (render-only — no animation/behavior change):**
+- The `Canvas` `onDraw` lambda is **not** a `@Composable` scope, so `remember` is unavailable there.
+  All graph-stable values are now computed **once in the composable scope** with `remember(graph)`
+  and passed into `drawSolarSystem`: `sunNode`, `taskNodes`, sun title/% `TextLayoutResult`s, and a
+  `Map<clusterId, TextLayoutResult>` for cluster counts.
+- The breathing pulse animation is **kept** (per ADR-0008 motion language); only the per-frame text
+  layout + list scan are eliminated. The only per-frame work is the pulse `sin` math + draws.
+
+**Result:** idle Graph sheet no longer re-runs `TextMeasurer` or scans nodes each frame; CPU/GPU
+under an open sheet drop to the pulse math only. Visual output is unchanged.
+
+### 11.1 Decision-log amendments
+- **New D16** — Graph Canvas caches graph-stable lookups + text layouts in the composable scope
+  (`remember(graph)`), not in the non-composable draw lambda.
+

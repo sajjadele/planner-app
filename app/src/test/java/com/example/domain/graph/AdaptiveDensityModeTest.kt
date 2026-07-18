@@ -8,10 +8,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Pure-JVM tests for the Phase 6.3 adaptive Behavioral Solar System.
+ * Pure-JVM tests for the Phase 6.5.6 adaptive density Behavioral Solar System.
  * No Android/Room dependencies. Mirrors GoalGraphBuilderTest style.
  */
-class AdaptiveGraphModeTest {
+class AdaptiveDensityModeTest {
 
     private fun task(
         id: Int,
@@ -28,34 +28,50 @@ class AdaptiveGraphModeTest {
 
     private val progress = GoalProgress(completionRate = 60f, activityMomentum = 30f, overall = 51f)
 
-    // ── Mode selection by active task count (threshold = MAX_VISIBLE_TASKS = 8) ──
+    // ── Density tier selection by active task count (SIMPLE ≤6, CLUSTERED ≤20, SUMMARY >20) ──
     @Test
-    fun `5 active tasks renders INDIVIDUAL mode`() {
+    fun `5 active tasks renders SIMPLE density`() {
         val tasks = (1..5).map { task(it, "MEDIUM") }
         val graph = GoalGraphBuilder.build(1, "G", tasks, emptyMap(), progress)
-        assertEquals(GraphMode.INDIVIDUAL, graph.mode)
+        assertEquals(GraphDensityMode.SIMPLE, graph.densityMode)
         assertTrue(graph.clusters.isEmpty())
     }
 
     @Test
-    fun `8 active tasks renders INDIVIDUAL mode`() {
-        val tasks = (1..8).map { task(it, "MEDIUM") }
+    fun `6 active tasks renders SIMPLE density`() {
+        val tasks = (1..6).map { task(it, "MEDIUM") }
         val graph = GoalGraphBuilder.build(1, "G", tasks, emptyMap(), progress)
-        assertEquals(GraphMode.INDIVIDUAL, graph.mode)
+        assertEquals(GraphDensityMode.SIMPLE, graph.densityMode)
         assertTrue(graph.clusters.isEmpty())
     }
 
     @Test
-    fun `9 active tasks renders CLUSTER mode`() {
-        val tasks = (1..9).map { task(it, "MEDIUM") }
+    fun `7 active tasks renders CLUSTERED density`() {
+        val tasks = (1..7).map { task(it, "MEDIUM") }
         val graph = GoalGraphBuilder.build(1, "G", tasks, emptyMap(), progress)
-        assertEquals(GraphMode.CLUSTER, graph.mode)
+        assertEquals(GraphDensityMode.CLUSTERED, graph.densityMode)
+        assertFalse(graph.clusters.isEmpty())
+    }
+
+    @Test
+    fun `20 active tasks renders CLUSTERED density`() {
+        val tasks = (1..20).map { task(it, "MEDIUM") }
+        val graph = GoalGraphBuilder.build(1, "G", tasks, emptyMap(), progress)
+        assertEquals(GraphDensityMode.CLUSTERED, graph.densityMode)
+        assertFalse(graph.clusters.isEmpty())
+    }
+
+    @Test
+    fun `21 active tasks renders SUMMARY density`() {
+        val tasks = (1..21).map { task(it, "MEDIUM") }
+        val graph = GoalGraphBuilder.build(1, "G", tasks, emptyMap(), progress)
+        assertEquals(GraphDensityMode.SUMMARY, graph.densityMode)
         assertFalse(graph.clusters.isEmpty())
     }
 
     // ── Cluster contents ──
     @Test
-    fun `CLUSTER mode groups high priority tasks into ACTIVE_HIGH cluster`() {
+    fun `CLUSTERED density groups high priority tasks into ACTIVE_HIGH cluster`() {
         val tasks = (1..9).map { task(it, "HIGH") }
         val graph = GoalGraphBuilder.build(1, "G", tasks, emptyMap(), progress)
         val high = graph.clusters.first { it.clusterType == ClusterType.ACTIVE_HIGH }
@@ -65,7 +81,7 @@ class AdaptiveGraphModeTest {
     }
 
     @Test
-    fun `CLUSTER mode groups medium priority tasks into ACTIVE_MEDIUM cluster`() {
+    fun `CLUSTERED density groups medium priority tasks into ACTIVE_MEDIUM cluster`() {
         val tasks = (1..9).map { task(it, "MEDIUM") }
         val graph = GoalGraphBuilder.build(1, "G", tasks, emptyMap(), progress)
         val med = graph.clusters.first { it.clusterType == ClusterType.ACTIVE_MEDIUM }
@@ -74,7 +90,7 @@ class AdaptiveGraphModeTest {
     }
 
     @Test
-    fun `CLUSTER mode groups completed tasks into COMPLETED cluster`() {
+    fun `CLUSTERED density groups completed tasks into COMPLETED cluster`() {
         val active = (1..9).map { task(it, "LOW") }
         val done = (10..14).map { task(it, "LOW", isCompleted = true) }
         val graph = GoalGraphBuilder.build(1, "G", active + done, emptyMap(), progress)
@@ -108,7 +124,7 @@ class AdaptiveGraphModeTest {
 
     @Test
     fun `cluster visualSize never exceeds sun size`() {
-        // Many tasks → cluster size clamps below GOAL_SIZE (40f).
+        // Many tasks → cluster size clamps below GOAL_SIZE (40f). SUMMARY tier.
         val tasks = (1..50).map { task(it, "MEDIUM") }
         val graph = GoalGraphBuilder.build(1, "G", tasks, emptyMap(), progress)
         graph.clusters.forEach { cluster ->
@@ -117,7 +133,7 @@ class AdaptiveGraphModeTest {
     }
 
     @Test
-    fun `individual mode orders displayed tasks by priority rank`() {
+    fun `SIMPLE density orders displayed tasks by priority rank`() {
         val tasks = listOf(
             task(1, "LOW"),
             task(2, "HIGH"),
@@ -126,7 +142,7 @@ class AdaptiveGraphModeTest {
             task(5, "HIGH")
         )
         val graph = GoalGraphBuilder.build(1, "G", tasks, emptyMap(), progress)
-        assertEquals(GraphMode.INDIVIDUAL, graph.mode)
+        assertEquals(GraphDensityMode.SIMPLE, graph.densityMode)
         val active = graph.nodes.filter { it.kind == NodeKind.TASK && !it.isCompleted }
         // HIGH tasks should appear before LOW tasks in the node list (priority ordering).
         val firstHighIdx = active.indexOfFirst { it.priority == "HIGH" }

@@ -1,6 +1,7 @@
 package com.example.core.goal
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
@@ -13,7 +14,10 @@ import androidx.room.PrimaryKey
  * Mental model:
  *   Goal → Task → Event → Insight
  */
-@Entity(tableName = "goals")
+@Entity(
+    tableName = "goals",
+    indices = [Index("status")]
+)
 data class GoalEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val title: String,

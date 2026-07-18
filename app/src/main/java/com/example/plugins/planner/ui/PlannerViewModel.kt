@@ -120,7 +120,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         _selectedDateEpochMs.value = dateEpochMs
     }
 
-    fun addTask(title: String, priority: String?, hour: Int?, minute: Int?, goalId: Int?, valueTag: String?, lifeAreaId: Int? = null) {
+    fun addTask(title: String, priority: String?, hour: Int?, minute: Int?, goalId: Int?, valueTag: String?, lifeAreaId: Int? = null, deadlineEpochMs: Long? = null) {
         viewModelScope.launch {
             val task = TaskEntity(
                 title = title,
@@ -130,7 +130,8 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
                 reminderMinute = minute,
                 goalId = goalId,
                 valueTag = valueTag,
-                lifeAreaId = lifeAreaId
+                lifeAreaId = lifeAreaId,
+                deadlineEpochMs = deadlineEpochMs
             )
             val generatedId = repository.insertTask(task)
 

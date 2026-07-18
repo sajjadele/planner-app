@@ -25,21 +25,35 @@ data class GoalGraphNode(
     /** True when the task is a "Boulder" (rescheduled >= threshold) — drives the wobble halo. */
     val isBoulder: Boolean,
     val isCompleted: Boolean,
+    /** True when the task's deadline has passed and it is not completed — drives the OVERDUE signal. */
+    val isOverdue: Boolean = false,
+    /**
+     * True when the task's deadline is within the next 24h (and not yet overdue/completed) — drives
+     * a calm "near deadline" cue. Independent of [priority]/[colorRole] (rendered as an overlay).
+     */
+    val isNearDeadline: Boolean = false,
     /** Drives UI tint without leaking android.graphics.Color into the domain layer. */
     val colorRole: ColorRole
 )
 
 enum class NodeKind { GOAL, TASK }
 
-enum class ColorRole { GOAL, HIGH, MEDIUM, LOW, COMPLETED, BOULDER }
+enum class ColorRole { GOAL, HIGH, MEDIUM, LOW, COMPLETED, BOULDER, OVERDUE }
 
 /**
- * Rendering mode for the Behavioral Solar System. Decided by [com.example.domain.graph.GoalGraphBuilder]
- * from the active-task count against [com.example.domain.graph.GoalGraphBuilder.MAX_VISIBLE_TASKS].
- * - INDIVIDUAL: every active task is drawn as its own satellite (small goals).
- * - CLUSTER: tasks are summarized into priority/completion clusters (large goals).
+ * Adaptive density tier for the Behavioral Solar System (Phase 6.5.6), decided by
+ * [com.example.domain.graph.GoalGraphBuilder] from the active-task count.
+ * - SIMPLE: few tasks (≤ [GoalGraphBuilder.SIMPLE_MAX_ACTIVE]) — every active task drawn as its own
+ *   satellite (the calm, fully-expanded view).
+ * - CLUSTERED: medium count (≤ [GoalGraphBuilder.CLUSTERED_MAX_ACTIVE]) — tasks summarized into
+ *   priority/completion clusters; tapping a cluster expands ALL its members in-view.
+ * - SUMMARY: many tasks (> [GoalGraphBuilder.CLUSTERED_MAX_ACTIVE]) — same cluster overview, but a
+ *   tapped cluster expands only a priority-ranked sample (L3 cap) with a "و N بیشتر" hint, so a huge
+ *   goal still reads cleanly.
+ *
+ * Replaces the earlier two-tier [GraphMode] (INDIVIDUAL/CLUSTER) with a cleaner 3-tier density system.
  */
-enum class GraphMode { INDIVIDUAL, CLUSTER }
+enum class GraphDensityMode { SIMPLE, CLUSTERED, SUMMARY }
 
 /**
  * The four stable clusters an adaptive graph can show. Each maps to a priority lane (or the
@@ -67,8 +81,8 @@ data class GoalGraphEdge(
  * @param nodes goal sun + task satellites (in CLUSTER mode these are still computed for expansion;
  *              the renderer decides which to draw based on [mode]/expanded cluster)
  * @param edges goal→task or goal→cluster gravity lines (depends on [mode])
- * @param mode INDIVIDUAL (every task shown) or CLUSTER (tasks summarized into [clusters])
- * @param clusters task clusters shown in CLUSTER mode (empty in INDIVIDUAL mode)
+ * @param densityMode SIMPLE (every task shown) / CLUSTERED (clusters, full expand) / SUMMARY (clusters, capped expand)
+ * @param clusters task clusters shown in CLUSTERED/SUMMARY modes (empty in SIMPLE mode)
  */
 data class GoalGraph(
     val centerX: Float,
@@ -77,7 +91,7 @@ data class GoalGraph(
     val goalProgressOverall: Float,
     val nodes: List<GoalGraphNode>,
     val edges: List<GoalGraphEdge>,
-    val mode: GraphMode = GraphMode.INDIVIDUAL,
+    val densityMode: GraphDensityMode = GraphDensityMode.SIMPLE,
     val clusters: List<TaskClusterNode> = emptyList()
 )
 

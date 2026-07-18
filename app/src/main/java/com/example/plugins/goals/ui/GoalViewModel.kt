@@ -9,11 +9,8 @@ import com.example.core.goal.GoalEventEntity
 import com.example.core.goal.GoalRepository
 import com.example.core.goal.GoalStatus
 import com.example.core.goal.RoomGoalRepository
-import com.example.domain.goal.GoalProgress
 import com.example.domain.goal.GoalProgressCalculator
 import com.example.domain.goal.GoalSort
-import com.example.plugins.planner.data.InsightRepository
-import com.example.plugins.planner.data.RoomInsightRepository
 import com.example.plugins.planner.data.TaskRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -21,7 +18,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -31,7 +27,6 @@ import java.util.Calendar
 class GoalViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: GoalRepository
-    private val insightRepository: InsightRepository
     private val taskRepository: TaskRepository
 
     private val windowDays = 30
@@ -39,7 +34,6 @@ class GoalViewModel(application: Application) : AndroidViewModel(application) {
     init {
         val database = AppDatabase.getDatabase(application)
         repository = RoomGoalRepository(database.goalDao(), database.goalEventDao())
-        insightRepository = RoomInsightRepository(database.insightDao())
         taskRepository = TaskRepository(database.taskDao(), database.taskEventDao())
     }
 
@@ -68,56 +62,56 @@ class GoalViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Goals for the selected tab, sorted by deadline → recent activity → engagement via
-     * [GoalSort]. Activity maps are collected from the repository so the sort stays out of Compose.
+     * Goals for the selected tab, enriched once with progress + activity and sorted by
+     * deadline → recent activity → engagement via [GoalSort].
+     *
+     * Phase 5.4 (ADR-0009): previously each goal's activity was re-queried per card (N+1) and
+     * progress was recomputed per card via a fresh `combine().stateIn()`. Now all aggregates are
+     * fetched in **four single `GROUP BY` queries** (goals, completion rate, lifetime activity,
+     * windowed activity) and folded into [DashboardGoalItem] here, so the Composable receives
+     * fully stable values and never subscribes to a Flow.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val goalsByTab: StateFlow<List<GoalEntity>> = _selectedTab
+    val goalsByTab: StateFlow<List<DashboardGoalItem>> = _selectedTab
         .flatMapLatest { status ->
-            repository.observeGoalsByStatus(status)
-                .map { goals -> enrichAndSort(goals) }
+            combine(
+                repository.observeGoalsByStatus(status),
+                repository.observeGoalCompletionRatesByStatus(status),
+                repository.observeGoalActivityBulk(status),
+                run {
+                    val (from, to) = windowBounds()
+                    repository.observeGoalActivityBulkInWindow(status, from, to)
+                }
+            ) { goals, rates, activity, windowed ->
+                val rateMap = rates.associateBy { it.goalId }
+                val activityMap = activity.associateBy { it.goalId }
+                val windowedMap = windowed.associateBy { it.goalId }
+                goals.map { goal ->
+                    val rate = rateMap[goal.id]?.completionRate ?: 0f
+                    val daysInWindow = windowedMap[goal.id]?.activeDaysInWindow ?: 0
+                    DashboardGoalItem(
+                        goal = goal,
+                        progress = GoalProgressCalculator.compute(
+                            completionRate = rate,
+                            activeDaysInWindow = daysInWindow,
+                            windowDays = windowDays
+                        ),
+                        lastActivity = activityMap[goal.id]?.lastActivity,
+                        activeDays = activityMap[goal.id]?.activeDays ?: 0
+                    )
+                }.let { items ->
+                    val activity = items.associate { it.goal.id to it.lastActivity }
+                    val activeDays = items.associate { it.goal.id to it.activeDays }
+                    val sorted = GoalSort.sort(items.map { it.goal }, activity, activeDays)
+                    sorted.map { g -> items.first { it.goal.id == g.id } }
+                }
+            }
         }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
-
-    private suspend fun enrichAndSort(goals: List<GoalEntity>): List<GoalEntity> {
-        val lastActivity = goals.associate { it.id to repository.observeGoalLastActivity(it.id).first() }
-        val activeDays = goals.associate { it.id to repository.observeGoalActiveDayCount(it.id).first() }
-        return GoalSort.sort(goals, lastActivity, activeDays)
-    }
-
-    /**
-     * Goal progress for the detail/card, combining task completion rate with a 30-day activity
-     * momentum via [GoalProgressCalculator]. Calculation lives in the domain layer, not Compose.
-     */
-    @OptIn(ExperimentalCoroutinesApi::class)
-    fun progressFor(goalId: Int): StateFlow<GoalProgress?> {
-        val (from, to) = windowBounds()
-        return combine(
-            insightRepository.observeGoalCompletionRate(goalId),
-            repository.observeGoalActiveDayCountInWindow(goalId, from, to)
-        ) { rate, activeDaysInWindow ->
-            if (rate == null) null
-            else GoalProgressCalculator.compute(
-                completionRate = rate.completionRate,
-                activeDaysInWindow = activeDaysInWindow,
-                windowDays = windowDays
-            )
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = null
-        )
-    }
-
-    /** Latest activity timestamp for a goal (used by the card's "last activity" line). */
-    fun lastActivityFor(goalId: Int): Flow<Long?> = repository.observeGoalLastActivity(goalId)
-
-    /** Lifetime active-day count for a goal (used by the card's "X روز فعالیت" line). */
-    fun activeDaysFor(goalId: Int): Flow<Int> = repository.observeGoalActiveDayCount(goalId)
 
     private fun windowBounds(): Pair<Long, Long> {
         val cal = Calendar.getInstance()

@@ -32,7 +32,7 @@ import com.example.plugins.planner.data.TaskEventEntity
         TaskEventEntity::class,
         NoteEntity::class
     ],
-    version = 10,
+    version = 12,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -185,6 +185,40 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v10 → v11: Phase 5.4 performance indexes (see ADR-0009).
+         *
+         * Purely additive secondary indexes — no schema/column change, fully non-destructive:
+         * - `tasks(dateEpochMs)`      → speeds day-scoped + insight queries (BETWEEN on scheduled day)
+         * - `task_events(eventType)`  → speeds reschedule/completion aggregations (WHERE eventType)
+         * - `goals(status)`           → speeds status-filtered goal/list loads
+         *
+         * `CREATE INDEX IF NOT EXISTS` is idempotent so a re-run is safe. `fallbackToDestructiveMigration()`
+         * remains the safety net for any unhandled jump.
+         */
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_tasks_dateEpochMs ON tasks(dateEpochMs)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_task_events_eventType ON task_events(eventType)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_goals_status ON goals(status)")
+            }
+        }
+
+        /**
+         * v11 → v12: Phase 6.5.6 task deadline.
+         *
+         * Additive, non-destructive column on `tasks`:
+         * - `deadlineEpochMs INTEGER` (optional due date; nullable)
+         *
+         * Mirrors `goals.deadlineEpochMs` (added in v9→v10). Nullable so no default is required and
+         * existing rows are preserved untouched. `fallbackToDestructiveMigration()` remains the safety net.
+         */
+        private val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tasks ADD COLUMN deadlineEpochMs INTEGER")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -197,7 +231,9 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_6_7,
                     MIGRATION_7_8,
                     MIGRATION_8_9,
-                    MIGRATION_9_10
+                    MIGRATION_9_10,
+                    MIGRATION_10_11,
+                    MIGRATION_11_12
                 )
                 .fallbackToDestructiveMigration()
                 .build()

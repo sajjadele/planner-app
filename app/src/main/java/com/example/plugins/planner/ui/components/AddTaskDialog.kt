@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material3.*
@@ -35,9 +36,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.core.calendar.PersianCalendarDialog
 import com.example.core.constants.LifeAreas
 import com.example.core.goal.GoalEntity
+import com.example.core.util.JalaliDate
 import com.example.core.util.isolated
+import com.example.core.util.toEnglishDigits
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import java.util.Calendar
@@ -58,7 +62,8 @@ fun AddTaskDialog(
         minute: Int?,
         goalId: Int?,
         valueTag: String?,
-        lifeAreaId: Int?
+        lifeAreaId: Int?,
+        deadlineEpochMs: Long?
     ) -> Unit,
     initialGoalId: Int? = null
 ) {
@@ -72,6 +77,10 @@ fun AddTaskDialog(
         var selectedGoalTitle by remember { mutableStateOf<String?>(null) }
         var showGoalDropdown by remember { mutableStateOf(false) }
         var selectedLifeAreaId by remember { mutableStateOf<Int?>(null) }
+        // Task-level deadline — fully independent of the Goal picker / Goal deadline. This is a
+        // local optional due date for THIS task only; it never touches goalId or GoalEntity.
+        var selectedDeadline by remember { mutableStateOf<Long?>(null) }
+        var showDeadlineCalendar by remember { mutableStateOf(false) }
         val focusRequester = remember { FocusRequester() }
         val context = LocalContext.current
 
@@ -101,7 +110,8 @@ fun AddTaskDialog(
                     title, priority, selectedHour, selectedMinute,
                     selectedGoalId,
                     null,
-                    selectedLifeAreaId
+                    selectedLifeAreaId,
+                    selectedDeadline
                 )
                 onDismiss()
             }
@@ -425,6 +435,71 @@ fun AddTaskDialog(
                         }
 
                         // ============================================
+                        // Task Deadline (optional) — INDEPENDENT of the Goal deadline above.
+                        // Purely a due date for this task; does not read/write goalId or Goal state.
+                        // ============================================
+                        Column {
+                            Text(
+                                text = "مهلت این کار",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .border(
+                                        border = BorderStroke(
+                                            1.dp,
+                                            if (selectedDeadline != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .clickable { showDeadlineCalendar = true }
+                                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarToday,
+                                        contentDescription = null,
+                                        tint = if (selectedDeadline != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (selectedDeadline != null) {
+                                            val j = JalaliDate.fromEpochMs(selectedDeadline!!)
+                                            "مهلت: ${j.day.toEnglishDigits()} ${JalaliDate.MONTH_NAMES[j.month - 1]}"
+                                        } else
+                                            "تنظیم مهلت",
+                                        fontSize = 13.sp,
+                                        color = if (selectedDeadline != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                if (selectedDeadline != null) {
+                                    IconButton(
+                                        onClick = { selectedDeadline = null },
+                                        modifier = Modifier.size(20.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "حذف مهلت",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // ============================================
                         // Life Area — 2×3 grid for clean layout
                         // ============================================
                         Column {
@@ -467,9 +542,10 @@ fun AddTaskDialog(
                                     )
                                 }
                             }
+                            }
                         }
+
                     }
-                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -505,6 +581,17 @@ fun AddTaskDialog(
                     }
                 }
             }
+        }
+
+        // Persian Calendar Dialog for the task deadline (independent of Goal deadline).
+        if (showDeadlineCalendar) {
+            PersianCalendarDialog(
+                selectedDateEpochMs = selectedDeadline ?: System.currentTimeMillis(),
+                onDateSelected = { epochMs -> selectedDeadline = epochMs },
+                onDismiss = { showDeadlineCalendar = false },
+                confirmButtonText = "انتخاب مهلت",
+                showConfirmButton = true
+            )
         }
     }
 }

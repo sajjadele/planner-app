@@ -149,24 +149,33 @@ fun GoalDashboardScreen(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
-                    items(goalsByTab, key = { it.id }) { goal ->
-                        GoalCard(
-                            goal = goal,
-                            onClick = { selectedGoalId = goal.id },
-                            onOpen = { selectedGoalId = goal.id },
-                            onEdit = {
-                                selectedGoal = goal
+                    items(goalsByTab, key = { it.goal.id }) { item ->
+                        val goalId = item.goal.id
+                        // Cache the per-item action lambdas once per goal so GoalCard stays skippable
+                        // (Phase 5.4 / ADR-0009). Lambdas close over stable ids, not the item object.
+                        val onOpen = remember(goalId) { { selectedGoalId = goalId } }
+                        val onEdit = remember(goalId) {
+                            {
+                                selectedGoal = item.goal
                                 showEditGoalDialog = true
-                            },
-                            onChangeStatus = { next ->
-                                viewModel.changeStatus(goal.id, next)
-                            },
-                            onArchive = { viewModel.archiveGoal(goal.id) },
-                            onDelete = {
-                                selectedGoal = goal
+                            }
+                        }
+                        val onChangeStatus = remember(goalId) { { next: String -> viewModel.changeStatus(goalId, next) } }
+                        val onArchive = remember(goalId) { { viewModel.archiveGoal(goalId) } }
+                        val onDelete = remember(goalId) {
+                            {
+                                selectedGoal = item.goal
                                 showDeleteConfirm = true
-                            },
-                            viewModel = viewModel
+                            }
+                        }
+                        GoalCard(
+                            item = item,
+                            onClick = onOpen,
+                            onOpen = onOpen,
+                            onEdit = onEdit,
+                            onChangeStatus = onChangeStatus,
+                            onArchive = onArchive,
+                            onDelete = onDelete
                         )
                     }
                 }

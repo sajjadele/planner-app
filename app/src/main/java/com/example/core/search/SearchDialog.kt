@@ -203,7 +203,15 @@ fun SearchDialog(
                                 .testTag("search_results_list"),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            items(searchResults) { result ->
+                            items(
+                                searchResults,
+                                key = {
+                                    when (it) {
+                                        is SearchResult.TaskResult -> "task:${it.id}"
+                                        is SearchResult.NoteResult -> "note:${it.id}"
+                                    }
+                                }
+                            ) { result ->
                                 when (result) {
                                     is SearchResult.TaskResult -> {
                                         SearchTaskItem(

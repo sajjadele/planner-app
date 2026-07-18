@@ -23,12 +23,15 @@ import kotlin.math.min
 object GoalGraphBuilder {
 
     /**
-     * Adaptive threshold (Phase 6.3). When the number of *active* tasks exceeds this, the graph
-     * renders priority/completion CLUSTERS instead of individual satellites, so a large goal
-     * communicates health in under 2 seconds. Single tunable constant — raise/lower to change
-     * when the overview kicks in.
+     * Adaptive density thresholds (Phase 6.5.6). The graph's [GraphDensityMode] is chosen from the
+     * *active* (incomplete) task count:
+     * - ≤ [SIMPLE_MAX_ACTIVE]          → SIMPLE     (every task drawn as its own satellite)
+     * - ≤ [CLUSTERED_MAX_ACTIVE]       → CLUSTERED  (priority/completion clusters; full tap-expand)
+     * - > [CLUSTERED_MAX_ACTIVE]       → SUMMARY    (clusters; tap-expand is priority-capped, L3)
+     * Tunable constants — raise/lower to change when each density tier kicks in.
      */
-    const val MAX_VISIBLE_TASKS = 8
+    const val SIMPLE_MAX_ACTIVE = 6
+    const val CLUSTERED_MAX_ACTIVE = 20
 
     /** Synthetic id base for clusters so they never collide with real task/goal ids. */
     private const val CLUSTER_ID_BASE = 1_000_000
@@ -41,13 +44,16 @@ object GoalGraphBuilder {
     )
     /** Active tasks with no priority fall back to the outer LOW lane. */
     private const val NO_PRIORITY_LANE = "LOW"
-    /** Undated active tasks without a goal priority are pushed to the very outer active ring. */
-    private const val NO_DATE_FRACTION = 0.92f
+    /** Undated active tasks without a goal priority share the LOW orbit (0.82) for ring fit. */
+    private const val NO_DATE_FRACTION = 0.82f
     /** Completed tasks orbit on the faded outer edge. */
     private const val COMPLETED_FRACTION = 0.97f
 
     /** Reschedule count at/above which a task is flagged as a Boulder (matches MirrorHeuristics). */
     private const val BOULDER_RESCHEDULE_THRESHOLD = 2
+
+    /** Window (ms) before a deadline within which an active task reads as "near deadline" (24h). */
+    const val NEAR_DEADLINE_WINDOW_MS = 24L * 60L * 60L * 1000L
 
     /** Task node radius by priority (design-space px at the default viewport). */
     private val PRIORITY_SIZE = mapOf(
@@ -68,7 +74,7 @@ object GoalGraphBuilder {
      * @param rescheduleCounts map of taskId -> reschedule event count
      * @param progress goal progress (overall drives Ring Tide); null-safe
      * @param viewportRadius design-space radius (default 320f)
-     * @param nowMillis clock source for any future deadline math
+     * @param nowMillis clock source for overdue computation (midnight epoch ms of "today")
      */
     fun build(
         goalId: Int,
@@ -77,7 +83,7 @@ object GoalGraphBuilder {
         rescheduleCounts: Map<Int, Int>,
         progress: GoalProgress?,
         viewportRadius: Float = 320f,
-        @Suppress("UNUSED_PARAMETER") nowMillis: Long = System.currentTimeMillis()
+        nowMillis: Long = System.currentTimeMillis()
     ): GoalGraph {
         val cx = viewportRadius
         val cy = viewportRadius
@@ -102,10 +108,18 @@ object GoalGraphBuilder {
         val active = tasks.filter { !it.isCompleted }
         val completed = tasks.filter { it.isCompleted }
 
-        // Adaptive mode decision (Phase 6.3): overview clusters kick in once active tasks exceed
-        // the tunable threshold. Individual nodes are always computed (needed for expansion and
-        // for INDIVIDUAL mode), so the layout stays deterministic either way.
-        val mode = if (active.size > MAX_VISIBLE_TASKS) GraphMode.CLUSTER else GraphMode.INDIVIDUAL
+        // Overdue threshold: a task is overdue if its deadline is strictly before today's midnight.
+        // nowMillis is the caller's "today" (defaults to now); floor to midnight for date-only compare.
+        val todayMidnight = nowMillis - (nowMillis % 86400000L)
+
+        // Adaptive density decision (Phase 6.5.6): three tiers from the active-task count. Individual
+        // nodes are always computed (needed for SIMPLE rendering and for cluster expansion), so the
+        // layout stays deterministic in every tier.
+        val densityMode = when {
+            active.size <= SIMPLE_MAX_ACTIVE -> GraphDensityMode.SIMPLE
+            active.size <= CLUSTERED_MAX_ACTIVE -> GraphDensityMode.CLUSTERED
+            else -> GraphDensityMode.SUMMARY
+        }
 
         // Group active tasks by lane (priority). IMPORTANT: keep null-priority tasks OUT of the
         // LOW lane — they are placed exactly once on the dedicated outer "undated" ring below.
@@ -128,6 +142,11 @@ object GoalGraphBuilder {
                 val r = viewportRadius * baseFraction
                 val (x, y) = GraphGeometry.project(cx, cy, r, angle)
                 val isBoulder = (rescheduleCounts[task.id] ?: 0) >= BOULDER_RESCHEDULE_THRESHOLD
+                val isOverdue = task.deadlineEpochMs != null && task.deadlineEpochMs < todayMidnight
+                // Near deadline: exact-time window [now, now + 24h). Never when already overdue.
+                val isNearDeadline = task.deadlineEpochMs != null && !isOverdue &&
+                    task.deadlineEpochMs >= nowMillis &&
+                    task.deadlineEpochMs < nowMillis + NEAR_DEADLINE_WINDOW_MS
                 nodes += GoalGraphNode(
                     id = task.id,
                     label = task.title,
@@ -139,9 +158,11 @@ object GoalGraphBuilder {
                     priority = task.priority,
                     isBoulder = isBoulder,
                     isCompleted = false,
-                    colorRole = colorFor(task.priority, isBoulder)
+                    isOverdue = isOverdue,
+                    isNearDeadline = isNearDeadline,
+                    colorRole = colorFor(task.priority, isBoulder, isOverdue)
                 )
-                if (mode == GraphMode.INDIVIDUAL) edges += GoalGraphEdge(goalId, task.id, 1f)
+                if (densityMode == GraphDensityMode.SIMPLE) edges += GoalGraphEdge(goalId, task.id, 1f)
             }
         }
 
@@ -173,11 +194,11 @@ object GoalGraphBuilder {
                 isCompleted = true,
                 colorRole = ColorRole.COMPLETED
             )
-            if (mode == GraphMode.INDIVIDUAL) edges += GoalGraphEdge(goalId, task.id, 0.28f)
+                if (densityMode == GraphDensityMode.SIMPLE) edges += GoalGraphEdge(goalId, task.id, 0.28f)
         }
 
-        // ── Adaptive clusters (only meaningful in CLUSTER mode) ──
-        val clusters = if (mode == GraphMode.CLUSTER) buildClusters(
+        // ── Adaptive clusters (meaningful in CLUSTERED + SUMMARY tiers) ──
+        val clusters = if (densityMode != GraphDensityMode.SIMPLE) buildClusters(
             cx = cx, cy = cy, viewportRadius = viewportRadius,
             active = active, completed = completed, goalId = goalId, edges = edges
         ) else emptyList()
@@ -189,7 +210,7 @@ object GoalGraphBuilder {
             goalProgressOverall = progress?.overall ?: 0f,
             nodes = nodes,
             edges = edges,
-            mode = mode,
+            densityMode = densityMode,
             clusters = clusters
         )
     }
@@ -251,8 +272,9 @@ object GoalGraphBuilder {
      */
     private fun jitter(id: Int): Float = ((id * 92821) % 1000) / 1000f * 0.25f
 
-    private fun colorFor(priority: String?, isBoulder: Boolean): ColorRole =
-        if (isBoulder) ColorRole.BOULDER
+    private fun colorFor(priority: String?, isBoulder: Boolean, isOverdue: Boolean = false): ColorRole =
+        if (isOverdue) ColorRole.OVERDUE
+        else if (isBoulder) ColorRole.BOULDER
         else when (priority) {
             "HIGH" -> ColorRole.HIGH
             "MEDIUM" -> ColorRole.MEDIUM

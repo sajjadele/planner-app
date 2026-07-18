@@ -1,5 +1,6 @@
 package com.example.core.goal
 
+import com.example.plugins.planner.data.GoalRateResult
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -45,6 +46,19 @@ class RoomGoalRepository(
         fromEpochMs: Long,
         toEpochMs: Long
     ): Flow<Int> = goalDao.observeGoalActiveDayCountInWindow(goalId, fromEpochMs, toEpochMs)
+
+    override fun observeGoalActivityBulk(status: String): Flow<List<GoalActivityBulk>> =
+        goalDao.observeGoalActivityBulk(status)
+
+    override fun observeGoalActivityBulkInWindow(
+        status: String,
+        fromEpochMs: Long,
+        toEpochMs: Long
+    ): Flow<List<GoalActivityBulkInWindow>> =
+        goalDao.observeGoalActivityBulkInWindow(status, fromEpochMs, toEpochMs)
+
+    override fun observeGoalCompletionRatesByStatus(status: String): Flow<List<GoalRateResult>> =
+        goalDao.observeGoalCompletionRatesByStatus(status)
 
     override suspend fun insertGoalEvent(event: GoalEventEntity) = goalEventDao.insertEvent(event)
     override fun observeGoalEvents(): Flow<List<GoalEventEntity>> = goalEventDao.observeAllEvents()

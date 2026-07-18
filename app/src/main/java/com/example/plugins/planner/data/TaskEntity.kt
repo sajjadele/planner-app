@@ -16,7 +16,7 @@ import com.example.core.goal.GoalEntity
             onDelete = ForeignKey.SET_NULL
         )
     ],
-    indices = [Index("goalId")]
+    indices = [Index("goalId"), Index("dateEpochMs")]
 )
 data class TaskEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
@@ -34,5 +34,7 @@ data class TaskEntity(
     val goalId: Int? = null,
     val lifeAreaId: Int? = null,
     // goalName removed: goal linkage is resolved exclusively via goalId (FK)
-    val valueTag: String? = null
+    val valueTag: String? = null,
+    /** Optional due date (midnight epoch ms, local timezone). Null = no deadline. Mirrors GoalEntity.deadlineEpochMs. */
+    val deadlineEpochMs: Long? = null
 )

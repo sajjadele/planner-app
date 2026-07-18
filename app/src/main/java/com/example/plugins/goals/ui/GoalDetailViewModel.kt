@@ -17,21 +17,27 @@ import com.example.domain.goal.GoalProgressCalculator
 import com.example.domain.graph.GoalGraph
 import com.example.domain.graph.GoalGraphBuilder
 import com.example.domain.mirror.MirrorInsight
+import com.example.plugins.goals.GraphViewPreferences
 import com.example.plugins.planner.data.GoalRateResult
 import com.example.plugins.planner.data.InsightRepository
 import com.example.plugins.planner.data.RoomInsightRepository
 import com.example.plugins.planner.data.TaskRepository
 import com.example.plugins.planner.data.TaskEntity
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 class GoalDetailViewModel(
@@ -44,6 +50,7 @@ class GoalDetailViewModel(
     private val insightRepository: InsightRepository
     private val snapshotAggregator: SnapshotAggregator
     private val mirrorRepository: MirrorRepository
+    private val graphPreferences: GraphViewPreferences
 
     private val windowDays = 30
 
@@ -62,6 +69,7 @@ class GoalDetailViewModel(
             goalRepository,
             RoomSnapshotRepository(database.snapshotDao())
         )
+        graphPreferences = GraphViewPreferences(application)
     }
 
     val goal: StateFlow<GoalEntity?> = goalRepository.observeGoalById(goalId)
@@ -124,34 +132,70 @@ class GoalDetailViewModel(
     @OptIn(ExperimentalCoroutinesApi::class)
     val goalGraph: StateFlow<GoalGraph?> = combine(goal, tasks, rescheduleCounts, goalProgress) { g, ts, counts, progress ->
         if (g == null) null
-        else GoalGraphBuilder.build(
-            goalId = g.id,
-            goalTitle = g.title,
-            tasks = ts.map { task ->
-                GoalGraphBuilder.TaskInput(
-                    id = task.id,
-                    title = task.title,
-                    priority = task.priority,
-                    isCompleted = task.isCompleted,
-                    deadlineEpochMs = null
-                )
-            },
-            rescheduleCounts = counts,
-            progress = progress
-        )
+        else withContext(Dispatchers.Default) {
+            GoalGraphBuilder.build(
+                goalId = g.id,
+                goalTitle = g.title,
+                tasks = ts.map { task ->
+                    GoalGraphBuilder.TaskInput(
+                        id = task.id,
+                        title = task.title,
+                        priority = task.priority,
+                        isCompleted = task.isCompleted,
+                        deadlineEpochMs = task.deadlineEpochMs
+                    )
+                },
+                rescheduleCounts = counts,
+                progress = progress
+            )
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private val _showGraphSheet = MutableStateFlow(false)
     val showGraphSheet: StateFlow<Boolean> = _showGraphSheet
 
+    /**
+     * One-shot event: open the read-only task preview popup exactly once per satellite tap.
+     * Replay-free Channel exposed as a Flow (per README "One-Shot UI Events") — never a sticky
+     * StateFlow, so re-collection (config change) does not re-open the popup.
+     */
+    private val _taskPreviewEvents = Channel<TaskEntity>(Channel.BUFFERED)
+    val taskPreviewEvents = _taskPreviewEvents.receiveAsFlow()
+
+    /** Resolve a tapped satellite id to its full [TaskEntity] and emit a one-shot preview event. */
+    fun requestTaskPreview(taskId: Int) {
+        val task = tasks.value.firstOrNull { it.id == taskId } ?: return
+        _taskPreviewEvents.trySend(task)
+    }
+
     fun setGraphSheetVisible(visible: Boolean) {
         _showGraphSheet.value = visible
     }
 
+    /**
+     * Phase 5.5 — first-time Graph education gate. True only while the sheet is open AND the user
+     * has not yet seen the introduction, so the legend auto-shows on first open and never again.
+     * Driven entirely by ViewModel state (survives tab teardown).
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val showGraphEducation: StateFlow<Boolean> = combine(showGraphSheet, graphPreferences.hasSeenIntroduction) { open, seen ->
+        open && !seen
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    /** Persist that the Graph introduction has been seen (called when the education dialog closes). */
+    fun markGraphIntroductionSeen() {
+        viewModelScope.launch { graphPreferences.markIntroductionSeen() }
+    }
+
     init {
         refreshMirror()
+        // Phase 5.4 (ADR-0009): recompute Mirror only after the goal's signals settle, not on
+        // every intermediate emission (e.g. each task toggle fires goalRate). Debounce avoids
+        // running the full Mirror aggregation multiple times per burst. Result is identical.
         viewModelScope.launch {
-            goalRate.collect { refreshMirror() }
+            combine(goalRate, tasks, activeDays) { _, _, _ -> }
+                .debounce(250)
+                .collect { refreshMirror() }
         }
     }
 

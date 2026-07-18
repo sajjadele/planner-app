@@ -42,6 +42,27 @@ interface GoalRepository {
      */
     fun observeGoalActiveDayCountInWindow(goalId: Int, fromEpochMs: Long, toEpochMs: Long): Flow<Int>
 
+    /**
+     * Bulk activity aggregates (last activity + active days) for every goal of [status], in a
+     * single query. Phase 5.4 — replaces per-goal N+1 in the dashboard sort. See ADR-0009.
+     */
+    fun observeGoalActivityBulk(status: String): Flow<List<com.example.core.goal.GoalActivityBulk>>
+
+    /**
+     * Windowed bulk active-day counts (rolling momentum) for every goal of [status]. Phase 5.4.
+     */
+    fun observeGoalActivityBulkInWindow(
+        status: String,
+        fromEpochMs: Long,
+        toEpochMs: Long
+    ): Flow<List<com.example.core.goal.GoalActivityBulkInWindow>>
+
+    /**
+     * Bulk task completion rates for every goal of [status]. Phase 5.4 — replaces per-goal
+     * progress recompute in the dashboard. See ADR-0009.
+     */
+    fun observeGoalCompletionRatesByStatus(status: String): Flow<List<com.example.plugins.planner.data.GoalRateResult>>
+
     // ── Goal lifecycle events (Phase 2) ──
     suspend fun insertGoalEvent(event: GoalEventEntity)
     fun observeGoalEvents(): Flow<List<GoalEventEntity>>
