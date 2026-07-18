@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -32,11 +34,17 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { /* result handled by system */ }
 
+    /** Phase 6.5.7 (launch-jank): prompt for the notification permission only after the first
+     *  frame has drawn, so the system dialog never competes with the cold-start composition. */
+    private var permissionDeferred = false
+    private val mainHandler = Handler(Looper.getMainLooper())
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        requestNotificationPermissionIfNeeded()
-
+        // Phase 6.5.7 (launch-jank): do NOT prompt for the notification permission during the
+        // first composition — the system GrantPermissionsActivity would contend with the initial
+        // draw (cold-start jank). Defer it until after the first frame via onResume+postDelayed.
         val themeRepository = ThemeRepository(applicationContext)
 
         // Phase 3: App-Launch Backfill Engine — fill any missing daily snapshots once per launch.
@@ -65,6 +73,16 @@ class MainActivity : ComponentActivity() {
                     }
                 )
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!permissionDeferred) {
+            permissionDeferred = true
+            // Defer the permission prompt ~1.2s past first resume so the initial draw + staged
+            // entrance are not interrupted by the system GrantPermissionsActivity. One-shot.
+            mainHandler.postDelayed({ requestNotificationPermissionIfNeeded() }, 1200L)
         }
     }
 
