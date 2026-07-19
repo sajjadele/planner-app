@@ -1,9 +1,5 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
@@ -15,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -175,11 +172,39 @@ fun MainScreen(
         }
     ) { innerPadding ->
         val layoutDirection = LocalLayoutDirection.current
-        AnimatedContent(
-            targetState = selectedTabId,
-            transitionSpec = {
-                fadeIn().togetherWith(fadeOut())
-            },
+
+        // Sprint 6 (scenario 3): keep both primary tab contents alive across switches instead of
+        // disposing/rebuilding them on every tab change. `movableContentOf` caches each tab's
+        // composition (LazyColumn scroll position, internal state) and only moves the node between
+        // parents, eliminating the recomposition jank measured on warm tab switches. We render both
+        // and toggle visibility via alpha (no HorizontalPager — forbidden by ADR-0010). The swipe
+        // gesture stays on the container.
+        val plannerContent = remember {
+            movableContentOf {
+                val plannerPlugin = PluginRegistry.allPlugins.find { it.id == "planner" }
+                if (plannerPlugin != null) {
+                    plannerPlugin.Content(
+                        modifier = Modifier.fillMaxSize(),
+                        onNavigateToSettings = { showThemeSettings = true },
+                        onBack = { selectedTabId = "planner" }
+                    )
+                }
+            }
+        }
+        val goalsContent = remember {
+            movableContentOf {
+                val goalsPlugin = PluginRegistry.allPlugins.find { it.id == "goals" }
+                if (goalsPlugin != null) {
+                    goalsPlugin.Content(
+                        modifier = Modifier.fillMaxSize(),
+                        onNavigateToSettings = { showThemeSettings = true },
+                        onBack = { selectedTabId = "planner" }
+                    )
+                }
+            }
+        }
+
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
@@ -198,28 +223,21 @@ fun MainScreen(
                         },
                         onDragCancel = { accumulated = 0f }
                     )
-                },
-            label = "ScreenTransitions"
-        ) { tabId ->
-            val currentPlugin = PluginRegistry.allPlugins.find { it.id == tabId }
-            if (currentPlugin != null) {
-                currentPlugin.Content(
-                    modifier = Modifier.fillMaxSize(),
-                    onNavigateToSettings = { showThemeSettings = true },
-                    onBack = { selectedTabId = "planner" }
-                )
-            } else {
-                // Fallback empty view
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "ماژول غیرفعال است",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
-            }
+        ) {
+            // Both tabs stay composed; the inactive one is hidden via alpha 0 (still composed, so
+            // its state — LazyColumn scroll position, etc. — is retained) without rebuild cost.
+            val goalsVisible = selectedTabId == "goals"
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(if (goalsVisible) 0f else 1f)
+            ) { plannerContent() }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(if (goalsVisible) 1f else 0f)
+            ) { goalsContent() }
         }
     }
 
