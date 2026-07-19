@@ -15,6 +15,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -175,11 +177,44 @@ fun MainScreen(
         }
     ) { innerPadding ->
         val layoutDirection = LocalLayoutDirection.current
-        AnimatedContent(
-            targetState = selectedTabId,
-            transitionSpec = {
-                fadeIn().togetherWith(fadeOut())
-            },
+
+        // Sprint 6 (scenario 3): keep both primary tab contents alive across switches instead of
+        // disposing/rebuilding them on every tab change. `movableContentOf` caches each tab's
+        // composition (LazyColumn scroll position, internal state) and only moves the node between
+        // parents, eliminating the recomposition jank measured on warm tab switches. We render both
+        // and toggle visibility via alpha (no HorizontalPager — forbidden by ADR-0010).
+        //
+        // FIX (regression from first attempt): the inactive tab must NOT intercept pointer events.
+        // Both boxes are full-screen and stacked, so the topmost (later) one would eat all touches
+        // even at alpha 0. We therefore (a) raise the active tab above the inactive one with
+        // `zIndex`, and (b) add a no-op `pointerInput` on the inactive box that makes it opt OUT of
+        // hit-testing, so even if z-order ever changes the hidden tab can never swallow gestures.
+        val plannerContent = remember {
+            movableContentOf {
+                val plannerPlugin = PluginRegistry.allPlugins.find { it.id == "planner" }
+                if (plannerPlugin != null) {
+                    plannerPlugin.Content(
+                        modifier = Modifier.fillMaxSize(),
+                        onNavigateToSettings = { showThemeSettings = true },
+                        onBack = { selectedTabId = "planner" }
+                    )
+                }
+            }
+        }
+        val goalsContent = remember {
+            movableContentOf {
+                val goalsPlugin = PluginRegistry.allPlugins.find { it.id == "goals" }
+                if (goalsPlugin != null) {
+                    goalsPlugin.Content(
+                        modifier = Modifier.fillMaxSize(),
+                        onNavigateToSettings = { showThemeSettings = true },
+                        onBack = { selectedTabId = "planner" }
+                    )
+                }
+            }
+        }
+
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
@@ -198,28 +233,43 @@ fun MainScreen(
                         },
                         onDragCancel = { accumulated = 0f }
                     )
-                },
-            label = "ScreenTransitions"
-        ) { tabId ->
-            val currentPlugin = PluginRegistry.allPlugins.find { it.id == tabId }
-            if (currentPlugin != null) {
-                currentPlugin.Content(
-                    modifier = Modifier.fillMaxSize(),
-                    onNavigateToSettings = { showThemeSettings = true },
-                    onBack = { selectedTabId = "planner" }
-                )
-            } else {
-                // Fallback empty view
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "ماژول غیرفعال است",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
-            }
+        ) {
+            val goalsVisible = selectedTabId == "goals"
+            // Planner tab: on top when active, and blocks pointer input when inactive.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(if (goalsVisible) 0f else 1f)
+                    .zIndex(if (goalsVisible) 0f else 1f)
+                    .then(
+                        if (goalsVisible) {
+                            Modifier.pointerInput(Unit) {
+                                // Inactive: opt out of hit-testing so it can never swallow gestures
+                                // meant for the active (goals) tab beneath it.
+                                awaitPointerEventScope { }
+                            }
+                        } else {
+                            Modifier
+                        }
+                    )
+            ) { plannerContent() }
+            // Goals tab: on top when active, and blocks pointer input when inactive.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(if (goalsVisible) 1f else 0f)
+                    .zIndex(if (goalsVisible) 1f else 0f)
+                    .then(
+                        if (goalsVisible) {
+                            Modifier
+                        } else {
+                            Modifier.pointerInput(Unit) {
+                                awaitPointerEventScope { }
+                            }
+                        }
+                    )
+            ) { goalsContent() }
         }
     }
 
