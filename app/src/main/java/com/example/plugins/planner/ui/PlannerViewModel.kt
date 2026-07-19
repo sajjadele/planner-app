@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.database.AppDatabase
 import com.example.core.goal.GoalEntity
+import com.example.core.goal.GoalStatus
 import com.example.core.receiver.ReminderScheduler
 import com.example.core.snapshot.RoomSnapshotRepository
 import com.example.core.snapshot.SnapshotAggregator
@@ -71,22 +72,17 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
             initialValue = emptyList()
         )
 
-    /** All goals (any status) used to resolve task.goalId → GoalEntity for Home grouping. */
-    private val allGoals: StateFlow<List<GoalEntity>> = goalDao.getAllGoals()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
     /**
-     * Today's (selected day's) tasks grouped by their owning goal. Tasks without a goal land in a
-     * trailing "بدون هدف" group (goal == null). Pure grouping via [groupTasksByGoal].
+     * Sprint 5.2 (F2): `goalTaskGroups` resolves task.goalId → title using the already-loaded
+     * [activeGoals] instead of a second full `getAllGoals()` scan. This removes one cold-start Room
+     * query. Tasks whose goal is non-active (paused/completed/archived) are kept and rendered under a
+     * placeholder "هدف غیرفعال" group (see [groupTasksByGoal]) so they are never dropped — only the
+     * header label differs from active goals.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     val goalTaskGroups: StateFlow<List<GoalTaskGroup>> = _selectedDateEpochMs
         .flatMapLatest { date ->
-            combine(repository.getTasksForDay(date), allGoals) { dayTasks, goals ->
+            combine(repository.getTasksForDay(date), activeGoals) { dayTasks, goals ->
                 groupTasksByGoal(dayTasks, goals)
             }
         }
@@ -106,8 +102,8 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         val today = getTodayDateEpochMs()
         val start = today - TASK_DAY_WINDOW_DAYS * DAY_MS
         val end = today + TASK_DAY_WINDOW_DAYS * DAY_MS
-        repository.getTasksBetween(start, end)
-            .map { taskDayKeys(it) }
+        repository.getTaskDayKeysBetween(start, end)
+            .map { it.toSet() }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5000),
@@ -250,9 +246,15 @@ private const val TASK_DAY_WINDOW_DAYS = 60
 private const val DAY_MS = 86_400_000L
 
 /**
- * Pure grouping of tasks by goal. Tasks with a known goal are grouped under that goal; tasks whose
- * `goalId` is null (or whose goal is missing from [goals]) are collected into a trailing "بدون هدف"
- * group (goal == null). The "بدون هدف" group is omitted entirely when no such tasks exist.
+ * Pure grouping of tasks by goal. Tasks with a known goal are grouped under that goal; tasks with a
+ * null `goalId` land in a trailing "بدون هدف" group (goal == null). Tasks whose `goalId` points to a
+ * goal **not present in [goals]** (e.g. a non-active/paused/completed/archived goal, since the caller
+ * passes only [activeGoals]) are NOT dropped — they are kept under a placeholder "هدف غیرفعال" goal so
+ * the task stays visible. The "بدون هدف" group is omitted entirely when no such tasks exist.
+ *
+ * Sprint 5.2 (F2): previously a second full `getAllGoals()` scan supplied every status; now the
+ * caller reuses [activeGoals], and non-active goals are represented by the placeholder instead of a
+ * heavy extra query.
  *
  * Pure Kotlin (no Android/flow) — host-JVM testable.
  */
@@ -262,7 +264,11 @@ fun groupTasksByGoal(tasks: List<TaskEntity>, goals: List<GoalEntity>): List<Goa
     val withGoal = tasks
         .filter { it.goalId != null }
         .groupBy { it.goalId!! }
-        .mapNotNull { (goalId, grouped) -> goalMap[goalId]?.let { GoalTaskGroup(it, grouped) } }
+        .map { (goalId, grouped) ->
+            val goal = goalMap[goalId]
+                ?: GoalEntity(id = goalId, title = INACTIVE_GOAL_PLACEHOLDER, status = GoalStatus.ARCHIVED)
+            GoalTaskGroup(goal, grouped)
+        }
 
     val withoutGoal = tasks.filter { it.goalId == null }
 
@@ -273,10 +279,13 @@ fun groupTasksByGoal(tasks: List<TaskEntity>, goals: List<GoalEntity>): List<Goa
     }
 }
 
+/** Sprint 5.2 (F2): placeholder goal title for tasks whose goal is non-active (not in [activeGoals]). */
+private const val INACTIVE_GOAL_PLACEHOLDER = "هدف غیرفعال"
+
 /**
  * Pure reduction of tasks to the set of distinct midnight-epoch day keys that contain at least one
- * task. Uses [TaskEntity.dateEpochMs] directly (already midnight-aligned). Pure Kotlin — host-JVM
- * testable.
+ * task. Retained for host-JVM testing; the production path now uses the DAO projection
+ * [com.example.plugins.planner.data.TaskDao.getTaskDayKeysBetween] (Sprint 4, Phase 4.1).
  */
 fun taskDayKeys(tasks: List<TaskEntity>): Set<Long> =
     tasks.map { it.dateEpochMs }.toSet()

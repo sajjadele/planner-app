@@ -59,14 +59,28 @@ class GoalTaskGroupingTest {
     }
 
     @Test
-    fun `tasks whose goal is missing from list are dropped not grouped as no goal`() {
-        // A task references goal 99 which is not in the provided goals -> it has no resolvable
-        // goal, so it must NOT pollute the "no goal" section and must be excluded.
+    fun `tasks whose goal is missing from list are kept under inactive-goal placeholder`() {
+        // Sprint 5.2 (F2): a task whose goal (99) is not in the provided (active) goals must NOT be
+        // dropped — it is kept under a placeholder "هدف غیرفعال" group so the task stays visible.
+        // Here "AI" (goal 10) has no tasks, so only 2 groups result: placeholder + no-goal.
         val tasks = listOf(task(1, 99), task(2, null))
         val groups = groupTasksByGoal(tasks, listOf(goal(10, "AI")))
-        assertEquals(1, groups.size)
-        assertEquals(null, groups[0].goal)
+        assertEquals(2, groups.size)
+        assertEquals("هدف غیرفعال", groups[0].goal?.title)
         assertEquals(1, groups[0].tasks.size)
-        assertEquals(2, groups[0].tasks[0].id)
+        assertEquals(1, groups[0].tasks[0].id)
+        assertEquals(null, groups[1].goal)
+        assertEquals(1, groups[1].tasks.size)
+        assertEquals(2, groups[1].tasks[0].id)
+    }
+
+    @Test
+    fun `inactive-goal placeholder keeps task visible while active goals still group`() {
+        val tasks = listOf(task(1, 10), task(2, 99))
+        val groups = groupTasksByGoal(tasks, listOf(goal(10, "AI")))
+        assertEquals(2, groups.size)
+        assertEquals("AI", groups[0].goal?.title)
+        assertEquals("هدف غیرفعال", groups[1].goal?.title)
+        assertEquals(2, groups[1].tasks[0].id)
     }
 }
