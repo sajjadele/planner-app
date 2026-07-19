@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.AutoGraph
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -61,15 +62,22 @@ fun GoalDetailScreen(
         )
     )
 ) {
+    // Sprint 4 (Phase 4.3): split loading — `goal` (PK read) and `tasks` (goal tasks) are fast,
+    // independent flows so the header + task list render immediately; the slower progress/activity
+    // metrics arrive separately via `metricsState` and populate the progress card a moment later.
     val goal by viewModel.goal.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
-    val goalRate by viewModel.goalRate.collectAsState()
+    // Sprint 5.3 (F3): the combined progress ring is collected separately from the rest of the
+    // metrics, so the card's completion % / active-days / last-activity render as soon as their
+    // (independent) queries resolve, without waiting on the combined ring.
+    val metrics by viewModel.metricsState.collectAsState()
     val goalProgress by viewModel.goalProgress.collectAsState()
-    val activeDays by viewModel.activeDays.collectAsState()
-    val lastActivity by viewModel.lastActivity.collectAsState()
-    val mirrorInsights by viewModel.mirrorInsights.collectAsState()
+    val goalRate = metrics.completionRate
+    val activeDays = metrics.activeDays
+    val lastActivity = metrics.lastActivity
+    val mirrorState by viewModel.mirrorState.collectAsState()
     val showMirrorSheet by viewModel.showMirrorSheet.collectAsState()
-    val goalGraph by viewModel.goalGraph.collectAsState()
+    val goalGraphState by viewModel.goalGraphState.collectAsState()
     val showGraphSheet by viewModel.showGraphSheet.collectAsState()
     val showGraphEducation by viewModel.showGraphEducation.collectAsState()
 
@@ -83,6 +91,7 @@ fun GoalDetailScreen(
 
     // PlannerViewModel for the existing task-creation flow (reused, no new architecture).
     val plannerViewModel: PlannerViewModel = viewModel()
+    val daysWithTasks by plannerViewModel.daysWithTasks.collectAsState()
 
     // One-shot: open the read-only task preview popup exactly once per satellite tap (replay-free).
     LaunchedEffect(Unit) {
@@ -103,6 +112,7 @@ fun GoalDetailScreen(
         EditGoalDialog(
             goal = g,
             onDismiss = { showEditGoalDialog = false },
+            daysWithTasks = daysWithTasks,
             onUpdateGoal = { title, description, why, deadlineEpochMs ->
                 viewModel.updateGoal(title, description, why, deadlineEpochMs)
                 showEditGoalDialog = false
@@ -115,6 +125,7 @@ fun GoalDetailScreen(
             onDismiss = { showAddTaskDialog = false },
             activeGoals = plannerViewModel.activeGoals,
             initialGoalId = goalId,
+            daysWithTasks = daysWithTasks,
             onAddTask = { title, priority, hour, minute, gId, valueTag, lifeAreaId, deadlineEpochMs ->
                 plannerViewModel.addTask(
                     title = title,
@@ -139,12 +150,26 @@ fun GoalDetailScreen(
             containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
-            MirrorSheetContent(insights = mirrorInsights)
+            val insights = (mirrorState as? com.example.plugins.goals.ui.MirrorState.Ready)?.insights
+            if (insights != null) {
+                MirrorSheetContent(insights = insights)
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
         }
     }
 
     // ── Behavioral Solar System graph sheet (user-controlled) ──
-            if (showGraphSheet && goalGraph != null) {
+    if (showGraphSheet) {
+        val graph = (goalGraphState as? com.example.plugins.goals.ui.GraphState.Ready)?.graph
+        if (graph != null) {
         ModalBottomSheet(
             onDismissRequest = { viewModel.setGraphSheetVisible(false) },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -152,11 +177,12 @@ fun GoalDetailScreen(
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
             GoalGraphSheetContent(
-                graph = goalGraph!!,
+                graph = graph,
                 autoShowEducation = showGraphEducation,
                 onEducationDismissed = { viewModel.markGraphIntroductionSeen() },
                 onTaskTap = { viewModel.requestTaskPreview(it) }
             )
+        }
         }
     }
 
@@ -330,7 +356,7 @@ fun GoalDetailScreen(
             item {
                 GoalProgressCard(
                     progress = goalProgress,
-                    completionRate = goalRate?.completionRate,
+                    completionRate = goalRate,
                     activeDays = activeDays,
                     lastActivity = lastActivity
                 )
@@ -421,10 +447,16 @@ fun GoalDetailScreen(
                     key = { it.id },
                     contentType = { "task" }
                 ) { task ->
+                    // Sprint 3 (Phase 3.3): remember row callbacks so they are not recreated on every
+                    // LazyColumn recomposition; only when the keyed task changes.
+                    val onToggle = remember(task.id) { { viewModel.toggleTaskCompletion(task) } }
+                    val onEdit = remember(task.id) { { selectedTaskId = task.id } }
+                    val onDelete = remember(task.id) { { plannerViewModel.deleteTask(task) } }
                     GoalDetailTaskRow(
                         task = task,
-                        onToggle = { viewModel.toggleTaskCompletion(task) },
-                        onEdit = { selectedTaskId = task.id }
+                        onToggle = onToggle,
+                        onEdit = onEdit,
+                        onDelete = onDelete
                     )
                 }
             }
@@ -557,7 +589,7 @@ private fun GoalProgressCard(
                             icon = Icons.Filled.CalendarToday,
                             iconTint = MaterialTheme.colorScheme.primary,
                             value = "${RTL}${activeDays.toEnglishDigits()}",
-                            label = "روزهای فعال"
+                            label = "روزهای فعال (۳۰ روز اخیر)"
                         )
                     }
                     val last = GoalActivityFormatter.formatLastActivity(lastActivity)
@@ -681,7 +713,8 @@ private fun MirrorSheetContent(insights: List<MirrorInsight>) {
 private fun GoalDetailTaskRow(
     task: TaskEntity,
     onToggle: () -> Unit,
-    onEdit: () -> Unit = {}
+    onEdit: () -> Unit = {},
+    onDelete: () -> Unit = {}
 ) {
     val rowAlpha = if (task.isCompleted) 0.5f else 1f
 
@@ -773,6 +806,18 @@ private fun GoalDetailTaskRow(
                     imageVector = Icons.Default.Edit,
                     contentDescription = "ویرایش تسک",
                     tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.alpha(rowAlpha)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DeleteOutline,
+                    contentDescription = "حذف تسک",
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
                     modifier = Modifier.size(20.dp)
                 )
             }
