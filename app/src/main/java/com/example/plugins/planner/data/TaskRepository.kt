@@ -10,6 +10,10 @@ class TaskRepository(
 
     fun getTasksBetween(start: Long, end: Long): Flow<List<TaskEntity>> = taskDao.getTasksBetween(start, end)
 
+    /** Sprint 4 (Phase 4.1): distinct day-key projection for the "days with tasks" indicator. */
+    fun getTaskDayKeysBetween(start: Long, end: Long): Flow<List<Long>> =
+        taskDao.getTaskDayKeysBetween(start, end)
+
     fun getTasksByGoalId(goalId: Int): Flow<List<TaskEntity>> = taskDao.getTasksByGoalId(goalId)
 
     suspend fun insertTask(task: TaskEntity): Long = taskDao.insertTask(task)

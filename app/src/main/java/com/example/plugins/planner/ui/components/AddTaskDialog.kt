@@ -4,8 +4,8 @@ import android.app.TimePickerDialog
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -30,7 +30,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalContext
+import com.example.core.data.HolidayRepository
+import com.example.core.domain.DayContext
+import com.example.ui.theme.AccentGreen
+import com.example.ui.theme.AccentRed
+import com.example.ui.theme.AccentFire
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -63,9 +69,12 @@ fun AddTaskDialog(
         goalId: Int?,
         valueTag: String?,
         lifeAreaId: Int?,
-        deadlineEpochMs: Long?
+        dateEpochMs: Long?
     ) -> Unit,
-    initialGoalId: Int? = null
+    initialGoalId: Int? = null,
+    daysWithTasks: Set<Long> = emptySet(),
+    showDateField: Boolean = false,
+    initialDateEpochMs: Long? = null
 ) {
     Dialog(onDismissRequest = onDismiss) {
         var title by remember { mutableStateOf("") }
@@ -77,10 +86,20 @@ fun AddTaskDialog(
         var selectedGoalTitle by remember { mutableStateOf<String?>(null) }
         var showGoalDropdown by remember { mutableStateOf(false) }
         var selectedLifeAreaId by remember { mutableStateOf<Int?>(null) }
-        // Task-level deadline — fully independent of the Goal picker / Goal deadline. This is a
-        // local optional due date for THIS task only; it never touches goalId or GoalEntity.
-        var selectedDeadline by remember { mutableStateOf<Long?>(null) }
-        var showDeadlineCalendar by remember { mutableStateOf(false) }
+        // Task scheduled date. When showDateField is false (Planner tab) the dialog does not
+        // expose a date UI; the Planner ViewModel supplies the day via its own selected day.
+        // When true (GoalDetail), the user picks a day here and it is passed straight through
+        // as the task's dateEpochMs.
+        var selectedTaskDate by remember { mutableStateOf(initialDateEpochMs) }
+        var showDateCalendar by remember { mutableStateOf(false) }
+        val todayMidnight = remember {
+            val cal = Calendar.getInstance()
+            cal.set(Calendar.HOUR_OF_DAY, 0)
+            cal.set(Calendar.MINUTE, 0)
+            cal.set(Calendar.SECOND, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+            cal.timeInMillis
+        }
         val focusRequester = remember { FocusRequester() }
         val context = LocalContext.current
 
@@ -111,7 +130,7 @@ fun AddTaskDialog(
                     selectedGoalId,
                     null,
                     selectedLifeAreaId,
-                    selectedDeadline
+                    if (showDateField) selectedTaskDate else null
                 )
                 onDismiss()
             }
@@ -177,56 +196,59 @@ fun AddTaskDialog(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // ============================================
-                // REMINDER PILL — shown outside context for quick access
+                // Task scheduled date — always visible when opened from GoalDetail
+                // (showDateField = true). Planner tab supplies the day itself, so it stays hidden.
                 // ============================================
-                if (selectedHour != null && selectedMinute != null) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Reminder pill
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                if (showDateField) {
+                    Column {
+                        Text(
+                            text = "تاریخ",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(
+                                    border = BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.primary
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .clickable { showDateCalendar = true }
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AccessTime,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "یادآوری: ${String.format("%02d:%02d", selectedHour, selectedMinute).isolated()}",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                IconButton(
-                                    onClick = {
-                                        selectedHour = null
-                                        selectedMinute = null
-                                    },
-                                    modifier = Modifier.size(20.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "حذف یادآوری",
-                                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
-                            }
+                            Icon(
+                                imageVector = Icons.Default.CalendarToday,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (selectedTaskDate != null && selectedTaskDate == todayMidnight) {
+                                    "امروز"
+                                } else if (selectedTaskDate != null) {
+                                    val j = JalaliDate.fromEpochMs(selectedTaskDate!!)
+                                    "${j.day.toEnglishDigits()} ${JalaliDate.MONTH_NAMES[j.month - 1]}"
+                                } else {
+                                    "امروز"
+                                },
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
 
                 // ============================================
@@ -262,29 +284,21 @@ fun AddTaskDialog(
                     )
                 }
 
-                // Expandable context section
+                // Expandable context section — fade-only reveal. We deliberately avoid
+                // `expandVertically`/`shrinkVertically` here: on mid-range devices the height
+                // animation re-measures the whole block (Goal DropdownMenu + Reminder row +
+                // Deadline row + 2×3 LifeArea grid) every frame, producing dropped frames / jank.
+                // A pure alpha fade is cheap (no per-frame layout) and reads as a calm reveal.
                 AnimatedVisibility(
                     visible = showContext,
-                    enter = expandVertically(
-                        expandFrom = Alignment.Top,
-                        animationSpec = tween(
-                            durationMillis = 300,
-                            easing = FastOutSlowInEasing
-                        )
-                    ),
-                    exit = shrinkVertically(
-                        shrinkTowards = Alignment.Top,
-                        animationSpec = tween(
-                            durationMillis = 250,
-                            easing = FastOutSlowInEasing
-                        )
-                    )
+                    enter = fadeIn(animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)),
+                    exit = fadeOut(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing))
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         // ============================================
                         // Goal Picker (DropdownMenu)
@@ -369,6 +383,49 @@ fun AddTaskDialog(
                         }
 
                         // ============================================
+                        // PRIORITY ROW — moved into context to keep the
+                        // main area a single-tap capture surface.
+                        // ============================================
+                        Column {
+                            Text(
+                                text = ":اولویت",
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.End,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                PriorityOptionChip(
+                                    label = "بالا",
+                                    color = AccentRed,
+                                    isSelected = priority == "HIGH",
+                                    onClick = { priority = if (priority == "HIGH") null else "HIGH" },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                PriorityOptionChip(
+                                    label = "متوسط",
+                                    color = AccentFire,
+                                    isSelected = priority == "MEDIUM",
+                                    onClick = { priority = if (priority == "MEDIUM") null else "MEDIUM" },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                PriorityOptionChip(
+                                    label = "پایین",
+                                    color = AccentGreen,
+                                    isSelected = priority == "LOW",
+                                    onClick = { priority = if (priority == "LOW") null else "LOW" },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+
+                        // ============================================
                         // Reminder Time — Alarm/Clock button
                         // ============================================
                         Column {
@@ -435,71 +492,6 @@ fun AddTaskDialog(
                         }
 
                         // ============================================
-                        // Task Deadline (optional) — INDEPENDENT of the Goal deadline above.
-                        // Purely a due date for this task; does not read/write goalId or Goal state.
-                        // ============================================
-                        Column {
-                            Text(
-                                text = "مهلت این کار",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(
-                                        border = BorderStroke(
-                                            1.dp,
-                                            if (selectedDeadline != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                                        ),
-                                        shape = RoundedCornerShape(12.dp)
-                                    )
-                                    .clickable { showDeadlineCalendar = true }
-                                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.CalendarToday,
-                                        contentDescription = null,
-                                        tint = if (selectedDeadline != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = if (selectedDeadline != null) {
-                                            val j = JalaliDate.fromEpochMs(selectedDeadline!!)
-                                            "مهلت: ${j.day.toEnglishDigits()} ${JalaliDate.MONTH_NAMES[j.month - 1]}"
-                                        } else
-                                            "تنظیم مهلت",
-                                        fontSize = 13.sp,
-                                        color = if (selectedDeadline != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
-                                if (selectedDeadline != null) {
-                                    IconButton(
-                                        onClick = { selectedDeadline = null },
-                                        modifier = Modifier.size(20.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = "حذف مهلت",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // ============================================
                         // Life Area — 2×3 grid for clean layout
                         // ============================================
                         Column {
@@ -542,7 +534,7 @@ fun AddTaskDialog(
                                     )
                                 }
                             }
-                            }
+                        }
                         }
 
                     }
@@ -583,13 +575,19 @@ fun AddTaskDialog(
             }
         }
 
-        // Persian Calendar Dialog for the task deadline (independent of Goal deadline).
-        if (showDeadlineCalendar) {
+        // Persian Calendar Dialog for the task scheduled date (independent of Goal deadline).
+        if (showDateCalendar) {
+            val ctx = LocalContext.current
+            val holidayRepo = remember(ctx) { HolidayRepository(ctx) }
             PersianCalendarDialog(
-                selectedDateEpochMs = selectedDeadline ?: System.currentTimeMillis(),
-                onDateSelected = { epochMs -> selectedDeadline = epochMs },
-                onDismiss = { showDeadlineCalendar = false },
-                confirmButtonText = "انتخاب مهلت",
+                selectedDateEpochMs = selectedTaskDate ?: System.currentTimeMillis(),
+                onDateSelected = { epochMs -> selectedTaskDate = epochMs },
+                onDismiss = { showDateCalendar = false },
+                holidayRepository = holidayRepo,
+                daysWithIndicators = daysWithTasks,
+                indicatorColor = AccentGreen,
+                showIndicator = { it in daysWithTasks },
+                confirmButtonText = "انتخاب تاریخ",
                 showConfirmButton = true
             )
         }
@@ -628,6 +626,37 @@ private fun LifeAreaChip(
                 fontSize = 10.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 color = if (isSelected) LifeAreaSelectedText else LifeAreaUnselectedText,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun PriorityOptionChip(
+    label: String,
+    color: Color,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.height(40.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = if (isSelected) color.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, if (isSelected) color else MaterialTheme.colorScheme.outline),
+        tonalElevation = if (isSelected) 2.dp else 0.dp
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label,
+                fontSize = 12.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (isSelected) color else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
         }

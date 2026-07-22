@@ -1,5 +1,6 @@
 package com.example.plugins.planner.ui.components
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -47,104 +48,111 @@ fun WeeklyInsightCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            if (state.hasData) {
-                // ── Compact row: Ring + key stats + expand trigger ──
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Progress ring
-                    Box(
-                        modifier = Modifier.size(72.dp),
-                        contentAlignment = Alignment.Center
+            Crossfade(
+                targetState = state.hasData,
+                modifier = Modifier.fillMaxWidth(),
+                // Gentle fade between empty and populated states (no abrupt pop).
+                animationSpec = androidx.compose.animation.core.tween(durationMillis = 350)
+            ) { hasData ->
+                if (hasData) {
+                    // ── Compact row: Ring + key stats + expand trigger ──
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        CircularProgressRing(
-                            progress = state.completionRate / 100f,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                            progressColor = MaterialTheme.colorScheme.primary,
-                            strokeWidth = 9f
-                        )
+                        // Progress ring
+                        Box(
+                            modifier = Modifier.size(72.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressRing(
+                                progress = state.completionRate / 100f,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                progressColor = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 9f
+                            )
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "${state.completionRate.toInt().isolated()}٪",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        // Stats column
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "${RTL}${state.completedCount.isolated()} از ${state.createdCount.isolated()} تسک تکمیل شد",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+
+                            if (state.streakDays > 0) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "${RTL}🔥 ${state.streakDays.isolated()} روز پیاپی",
+                                    fontSize = 12.sp,
+                                    color = AccentFire
+                                )
+                            }
+
+                            state.bestDayIndex?.let { dayIdx ->
+                                Spacer(modifier = Modifier.height(2.dp))
+                                val dayName = DateConstants.persianDayNames.getOrElse(dayIdx) { "—" }
+                                Text(
+                                    text = "${RTL}📅 بهترین روز: $dayName (${state.bestDayCount.isolated()} تسک)",
+                                    fontSize = 11.sp,
+                                    color = AccentBlue
+                                )
+                            }
+                        }
+
+                        // "بیشتر" trigger button
                         Column(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { onShowMore() }
+                                .padding(horizontal = 8.dp, vertical = 12.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
+                            Icon(
+                                imageVector = Icons.Default.ExpandMore,
+                                contentDescription = "جزئیات بیشتر",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
                             Text(
-                                text = "${state.completionRate.toInt().isolated()}٪",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.ExtraBold,
+                                text = "بیشتر",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    // Stats column
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "${RTL}${state.completedCount.isolated()} از ${state.createdCount.isolated()} تسک تکمیل شد",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-
-                        if (state.streakDays > 0) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "${RTL}🔥 ${state.streakDays.isolated()} روز پیاپی",
-                                fontSize = 12.sp,
-                                color = AccentFire
-                            )
-                        }
-
-                        state.bestDayIndex?.let { dayIdx ->
-                            Spacer(modifier = Modifier.height(2.dp))
-                            val dayName = DateConstants.persianDayNames.getOrElse(dayIdx) { "—" }
-                            Text(
-                                text = "${RTL}📅 بهترین روز: $dayName (${state.bestDayCount.isolated()} تسک)",
-                                fontSize = 11.sp,
-                                color = AccentBlue
-                            )
-                        }
-                    }
-
-                    // "بیشتر" trigger button
-                    Column(
+                } else {
+                    // Empty state
+                    Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { onShowMore() }
-                            .padding(horizontal = 8.dp, vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.ExpandMore,
-                            contentDescription = "جزئیات بیشتر",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Text(text = "📊", fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "بیشتر",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.primary
+                            text = "هنوز داده‌ای برای این هفته ثبت نشده",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                }
-            } else {
-                // Empty state
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Text(text = "📊", fontSize = 16.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "هنوز داده‌ای برای این هفته ثبت نشده",
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
             }
         }

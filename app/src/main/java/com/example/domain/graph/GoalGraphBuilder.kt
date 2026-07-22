@@ -18,7 +18,7 @@ import kotlin.math.min
  * - A "Boulder" (rescheduleCount >= [BOULDER_RESCHEDULE_THRESHOLD]) is flagged for the UI wobble.
  * - [GoalProgress.overall] is surfaced for the central "Ring Tide" glow.
  *
- * Urgency-by-deadline radius mapping is intentionally deferred to V2 (keep core orbits stable).
+ * Urgency-by-date radius mapping is intentionally deferred to V2 (keep core orbits stable).
  */
 object GoalGraphBuilder {
 
@@ -52,7 +52,7 @@ object GoalGraphBuilder {
     /** Reschedule count at/above which a task is flagged as a Boulder (matches MirrorHeuristics). */
     private const val BOULDER_RESCHEDULE_THRESHOLD = 2
 
-    /** Window (ms) before a deadline within which an active task reads as "near deadline" (24h). */
+    /** Window (ms) before a scheduled date within which an active task reads as "near due" (24h). */
     const val NEAR_DEADLINE_WINDOW_MS = 24L * 60L * 60L * 1000L
 
     /** Task node radius by priority (design-space px at the default viewport). */
@@ -108,7 +108,7 @@ object GoalGraphBuilder {
         val active = tasks.filter { !it.isCompleted }
         val completed = tasks.filter { it.isCompleted }
 
-        // Overdue threshold: a task is overdue if its deadline is strictly before today's midnight.
+        // Overdue threshold: a task is overdue if its scheduled date is strictly before today's midnight.
         // nowMillis is the caller's "today" (defaults to now); floor to midnight for date-only compare.
         val todayMidnight = nowMillis - (nowMillis % 86400000L)
 
@@ -142,11 +142,11 @@ object GoalGraphBuilder {
                 val r = viewportRadius * baseFraction
                 val (x, y) = GraphGeometry.project(cx, cy, r, angle)
                 val isBoulder = (rescheduleCounts[task.id] ?: 0) >= BOULDER_RESCHEDULE_THRESHOLD
-                val isOverdue = task.deadlineEpochMs != null && task.deadlineEpochMs < todayMidnight
-                // Near deadline: exact-time window [now, now + 24h). Never when already overdue.
-                val isNearDeadline = task.deadlineEpochMs != null && !isOverdue &&
-                    task.deadlineEpochMs >= nowMillis &&
-                    task.deadlineEpochMs < nowMillis + NEAR_DEADLINE_WINDOW_MS
+                val isOverdue = task.dateEpochMs != null && task.dateEpochMs < todayMidnight
+                // Near due: exact-time window [now, now + 24h). Never when already overdue.
+                val isNearDeadline = task.dateEpochMs != null && !isOverdue &&
+                    task.dateEpochMs >= nowMillis &&
+                    task.dateEpochMs < nowMillis + NEAR_DEADLINE_WINDOW_MS
                 nodes += GoalGraphNode(
                     id = task.id,
                     label = task.title,
@@ -171,8 +171,11 @@ object GoalGraphBuilder {
         placeLane(byLane["LOW"] ?: emptyList(), LANE_FRACTION["LOW"]!!)
 
         // Undated active tasks without a priority are pushed to the outermost active ring so they
-        // read as "far / low gravity" rather than cluttering a dated lane.
-        val undated = active.filter { it.deadlineEpochMs == null && it.priority == null }
+        // read as "far / low gravity" rather than cluttering a dated lane. This covers ALL
+        // priority-less tasks — including those that happen to have a date — so they are never
+        // silently dropped from the graph. (Placing them by date would duplicate nodes and the
+        // "undated" ring is the canonical home for null-priority tasks.)
+        val undated = active.filter { it.priority == null }
         placeLane(undated, NO_DATE_FRACTION)
 
         // ── Completed tasks: faded memory points on the outer edge ──
@@ -285,13 +288,14 @@ object GoalGraphBuilder {
     /**
      * Minimal task projection the builder consumes. Keeps [com.example.domain.graph] free of the
      * Android-typed TaskEntity (which lives under plugins.planner.data), protecting the domain
-     * boundary. Deadline is retained for the deferred V2 urgency-radius mapping.
+     * boundary. A Task has a single time concept — its scheduled [dateEpochMs] — which drives the
+     * overdue / near-due signals.
      */
     data class TaskInput(
         val id: Int,
         val title: String,
         val priority: String?,
         val isCompleted: Boolean,
-        val deadlineEpochMs: Long?
+        val dateEpochMs: Long?
     )
 }

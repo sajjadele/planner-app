@@ -14,7 +14,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -30,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.core.constants.LifeAreas
 import com.example.core.util.JalaliDate
 import com.example.core.util.RTL
 import com.example.core.util.toEnglishDigits
@@ -42,6 +42,9 @@ import com.example.plugins.planner.data.TaskEntity
  * path. Shows, in order: name, date (deadline if present else scheduled date), valueTag, and a
  * subtle completed indicator (a small green check beside the name when done). All values come from
  * the already-loaded [TaskEntity]; nothing is queried here.
+ *
+ * The bottom chip shows the task's Life Area (icon + Persian name) resolved from [TaskEntity.lifeAreaId]
+ * via [LifeAreas]; it is hidden when no Life Area is selected.
  */
 @Composable
 fun TaskPreviewDialog(
@@ -102,9 +105,10 @@ fun TaskPreviewDialog(
                     )
                 }
 
-                // 3. valueTag (pill) — only when present
-                val valueTag = task.valueTag?.trim()
-                if (!valueTag.isNullOrEmpty()) {
+                // 3. Life Area (icon + Persian name chip) — only when a Life Area is selected.
+                val lifeAreaId = task.lifeAreaId
+                if (lifeAreaId != null) {
+                    val lifeAreaName = LifeAreas.getName(lifeAreaId)
                     Surface(
                         shape = RoundedCornerShape(20.dp),
                         color = MaterialTheme.colorScheme.primaryContainer,
@@ -114,15 +118,13 @@ fun TaskPreviewDialog(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Sell,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(14.dp)
+                            Text(
+                                text = LifeAreas.getIcon(lifeAreaId),
+                                fontSize = 14.sp
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = valueTag,
+                                text = RTL + lifeAreaName,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.primary

@@ -1,5 +1,8 @@
 package com.example.plugins.goals.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,14 +28,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.core.calendar.PersianCalendarDialog
+import com.example.core.data.HolidayRepository
+import com.example.core.domain.DayContext
 import com.example.core.util.JalaliDate
 import com.example.core.util.toEnglishDigits
+import com.example.plugins.planner.ui.components.DayContextDetails
+import com.example.plugins.planner.ui.components.DayContextHeader
+import com.example.ui.theme.AccentGreen
 import kotlinx.coroutines.delay
 
 @Composable
 fun AddGoalDialog(
     onDismiss: () -> Unit,
-    onAddGoal: (title: String, description: String?, why: String?, deadlineEpochMs: Long?) -> Unit
+    onAddGoal: (title: String, description: String?, why: String?, deadlineEpochMs: Long?) -> Unit,
+    daysWithTasks: Set<Long> = emptySet()
 ) {
     Dialog(onDismissRequest = onDismiss) {
         var title by remember { mutableStateOf("") }
@@ -245,12 +254,33 @@ fun AddGoalDialog(
 
         // Persian Calendar Dialog for deadline selection
         if (showCalendar) {
+            val ctx = LocalContext.current
+            val holidayRepo = remember(ctx) { HolidayRepository(ctx) }
             PersianCalendarDialog(
                 selectedDateEpochMs = selectedDeadline ?: System.currentTimeMillis(),
                 onDateSelected = { epochMs -> selectedDeadline = epochMs },
                 onDismiss = { showCalendar = false },
+                holidayRepository = holidayRepo,
+                daysWithIndicators = daysWithTasks,
+                indicatorColor = AccentGreen,
+                showIndicator = { it in daysWithTasks },
                 confirmButtonText = "انتخاب مهلت",
-                showConfirmButton = true
+                showConfirmButton = true,
+                dayContextContent = { dayContext ->
+                    var showDetails by remember { mutableStateOf(false) }
+                    DayContextHeader(
+                        calendarDate = dayContext.date,
+                        isExpanded = showDetails,
+                        onToggle = { showDetails = !showDetails }
+                    )
+                    AnimatedVisibility(
+                        visible = showDetails,
+                        enter = expandVertically(),
+                        exit = shrinkVertically()
+                    ) {
+                        DayContextDetails(context = dayContext)
+                    }
+                }
             )
         }
     }

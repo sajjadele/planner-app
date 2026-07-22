@@ -12,6 +12,7 @@ import androidx.compose.material.icons.automirrored.filled.ManageSearch
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoGraph
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -32,8 +33,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.util.Calendar
+import com.example.core.calendar.PersianCalendarDialog
+import com.example.core.data.HolidayRepository
 import com.example.core.goal.GoalEntity
 import com.example.core.goal.GoalStatus
+import com.example.core.util.JalaliDate
 import com.example.core.util.RTL
 import com.example.core.util.toEnglishDigits
 import com.example.domain.goal.GoalActivityFormatter
@@ -45,6 +50,7 @@ import com.example.plugins.planner.ui.components.NeumorphicSurface
 import com.example.ui.onboarding.pressScale
 import com.example.ui.screens.components.VisionMenuItem
 import com.example.ui.screens.components.VisionPopupMenu
+import com.example.plugins.planner.ui.components.skeletonShimmerBrush
 import com.example.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,7 +72,10 @@ fun GoalDetailScreen(
     // independent flows so the header + task list render immediately; the slower progress/activity
     // metrics arrive separately via `metricsState` and populate the progress card a moment later.
     val goal by viewModel.goal.collectAsState()
-    val tasks by viewModel.tasks.collectAsState()
+    // Phase 3 — date-filtered task timeline (default: today). Graph/Mirror keep the full list internally.
+    val tasks by viewModel.filteredTasks.collectAsState()
+    val selectedTaskDate by viewModel.selectedTaskDateEpochMs.collectAsState()
+    val futureHint by viewModel.futureHintState.collectAsState()
     // Sprint 5.3 (F3): the combined progress ring is collected separately from the rest of the
     // metrics, so the card's completion % / active-days / last-activity render as soon as their
     // (independent) queries resolve, without waiting on the combined ring.
@@ -88,10 +97,12 @@ fun GoalDetailScreen(
     var showStatusMenu by remember { mutableStateOf(false) }
     var showMetadata by remember { mutableStateOf(false) }
     var showAddTaskDialog by remember { mutableStateOf(false) }
+    var showDateCalendar by remember { mutableStateOf(false) }
 
     // PlannerViewModel for the existing task-creation flow (reused, no new architecture).
     val plannerViewModel: PlannerViewModel = viewModel()
-    val daysWithTasks by plannerViewModel.daysWithTasks.collectAsState()
+    // Goal-scoped marker days (this goal only) — feeds all Goal Detail calendar dialogs.
+    val daysWithTasks by viewModel.goalTaskDays.collectAsState()
 
     // One-shot: open the read-only task preview popup exactly once per satellite tap (replay-free).
     LaunchedEffect(Unit) {
@@ -126,7 +137,9 @@ fun GoalDetailScreen(
             activeGoals = plannerViewModel.activeGoals,
             initialGoalId = goalId,
             daysWithTasks = daysWithTasks,
-            onAddTask = { title, priority, hour, minute, gId, valueTag, lifeAreaId, deadlineEpochMs ->
+            showDateField = true,
+            initialDateEpochMs = todayMidnightEpochMs(),
+            onAddTask = { title, priority, hour, minute, gId, valueTag, lifeAreaId, dateEpochMs ->
                 plannerViewModel.addTask(
                     title = title,
                     priority = priority,
@@ -135,10 +148,29 @@ fun GoalDetailScreen(
                     goalId = gId,
                     valueTag = valueTag,
                     lifeAreaId = lifeAreaId,
-                    deadlineEpochMs = deadlineEpochMs
+                    dateEpochMs = dateEpochMs
                 )
                 showAddTaskDialog = false
             }
+        )
+    }
+
+    if (showDateCalendar) {
+        val ctx = LocalContext.current
+        val holidayRepo = remember(ctx) { HolidayRepository(ctx) }
+        PersianCalendarDialog(
+            selectedDateEpochMs = selectedTaskDate,
+            onDateSelected = { epochMs ->
+                viewModel.selectTaskDate(epochMs)
+                showDateCalendar = false
+            },
+            onDismiss = { showDateCalendar = false },
+            holidayRepository = holidayRepo,
+            daysWithIndicators = daysWithTasks,
+            indicatorColor = AccentGreen,
+            showIndicator = { it in daysWithTasks },
+            confirmButtonText = "انتخاب تاریخ",
+            showConfirmButton = true
         )
     }
 
@@ -358,7 +390,8 @@ fun GoalDetailScreen(
                     progress = goalProgress,
                     completionRate = goalRate,
                     activeDays = activeDays,
-                    lastActivity = lastActivity
+                    lastActivity = lastActivity,
+                    metricsLoaded = metrics.loaded
                 )
             }
 
@@ -409,13 +442,71 @@ fun GoalDetailScreen(
 
             // ── Tasks section ──
             item {
-                Text(
-                    text = "${RTL}کارهای این هدف",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "${RTL}کارهای این هدف",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // Date selector chip (compact) + add button.
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val dateLabel = if (selectedTaskDate == todayMidnightEpochMs()) {
+                            "امروز"
+                        } else {
+                            JalaliDate.fromEpochMs(selectedTaskDate).let { j ->
+                                "${j.day.toEnglishDigits()} ${JalaliDate.MONTH_NAMES[j.month - 1]}"
+                            }
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                            modifier = Modifier
+                                .clickable { showDateCalendar = true }
+                                .height(32.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarToday,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = dateLabel,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            onClick = { showAddTaskDialog = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "افزودن تسک",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
 
             if (tasks.isEmpty()) {
@@ -423,14 +514,22 @@ fun GoalDetailScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 24.dp),
+                            .padding(vertical = 28.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(text = "📝", fontSize = 36.sp)
-                            Spacer(modifier = Modifier.height(8.dp))
+                            val emptyForDay = tasks.isEmpty()
                             Text(
-                                text = "هنوز کاری برای این هدف تعریف نکردی",
+                                text = if (selectedTaskDate == todayMidnightEpochMs()) "🌱" else "📅",
+                                fontSize = 38.sp
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = if (selectedTaskDate == todayMidnightEpochMs()) {
+                                    "هنوز کاری برای این هدف تعریف نکردی"
+                                } else {
+                                    "برای این روز تسکی ثبت نشده"
+                                },
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 13.sp
                             )
@@ -449,9 +548,9 @@ fun GoalDetailScreen(
                 ) { task ->
                     // Sprint 3 (Phase 3.3): remember row callbacks so they are not recreated on every
                     // LazyColumn recomposition; only when the keyed task changes.
-                    val onToggle = remember(task.id) { { viewModel.toggleTaskCompletion(task) } }
+                    val onToggle = remember(task) { { viewModel.toggleTaskCompletion(task) } }
                     val onEdit = remember(task.id) { { selectedTaskId = task.id } }
-                    val onDelete = remember(task.id) { { plannerViewModel.deleteTask(task) } }
+                    val onDelete = remember(task) { { plannerViewModel.deleteTask(task) } }
                     GoalDetailTaskRow(
                         task = task,
                         onToggle = onToggle,
@@ -459,6 +558,79 @@ fun GoalDetailScreen(
                         onDelete = onDelete
                     )
                 }
+            }
+
+            // ── Future Hint (below task list) ──
+            if (futureHint.tomorrowCount > 0 || futureHint.thisWeekCount > 0) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 8.dp, top = 12.dp, end = 8.dp, bottom = 4.dp)
+                    ) {
+                        Text(
+                            text = "نزدیک آینده",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (futureHint.tomorrowCount > 0) {
+                                FutureHintChip(
+                                    label = "فردا",
+                                    count = futureHint.tomorrowCount,
+                                    onClick = { viewModel.selectTaskDate(todayMidnightEpochMs() + 86_400_000L) }
+                                )
+                            }
+                            if (futureHint.thisWeekCount > 0) {
+                                // Phase 4: open week preview popup. Wired but inert for now.
+                                FutureHintChip(
+                                    label = "این هفته",
+                                    count = futureHint.thisWeekCount,
+                                    onClick = { }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FutureHintChip(
+    label: String,
+    count: Int,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Text(
+                text = label,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.primary
+            ) {
+                Text(
+                    text = count.toString().toEnglishDigits(),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                )
             }
         }
     }
@@ -498,7 +670,8 @@ private fun GoalProgressCard(
     progress: com.example.domain.goal.GoalProgress?,
     completionRate: Float?,
     activeDays: Int,
-    lastActivity: Long?
+    lastActivity: Long?,
+    metricsLoaded: Boolean
 ) {
     val overall = progress?.overall ?: 0f
     val momentum = progress?.activityMomentum ?: 0f
@@ -546,63 +719,52 @@ private fun GoalProgressCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // ── Metric cards: completion + momentum ──
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                MetricCard(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Filled.TaskAlt,
-                    iconTint = AccentGreen,
-                    value = "${RTL}${completion.toInt().toEnglishDigits()}%",
-                    label = "تکمیل تسک‌ها"
-                )
-                MetricCard(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Filled.LocalFireDepartment,
-                    iconTint = Color(0xFFF97316),
-                    value = "${RTL}${momentum.toInt().toEnglishDigits()}%",
-                    label = "ریتم فعالیت"
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // ── Recent Activity section ──
-            if (activeDays > 0 || GoalActivityFormatter.formatLastActivity(lastActivity).isNotBlank()) {
-                Text(
-                    text = "${RTL}فعالیت اخیر",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+            if (metricsLoaded) {
+                // ── Metric cards: completion + momentum ──
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    if (activeDays > 0) {
-                        MetricCard(
-                            modifier = Modifier.weight(1f),
-                            icon = Icons.Filled.CalendarToday,
-                            iconTint = MaterialTheme.colorScheme.primary,
-                            value = "${RTL}${activeDays.toEnglishDigits()}",
-                            label = "روزهای فعال (۳۰ روز اخیر)"
-                        )
-                    }
-                    val last = GoalActivityFormatter.formatLastActivity(lastActivity)
-                    if (last.isNotBlank()) {
-                        MetricCard(
-                            modifier = Modifier.weight(1f),
-                            icon = Icons.Filled.AccessTime,
-                            iconTint = MaterialTheme.colorScheme.secondary,
-                            value = last,
-                            label = "آخرین فعالیت"
-                        )
-                    }
+                    MetricCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Filled.TaskAlt,
+                        iconTint = AccentGreen,
+                        value = "${RTL}${completion.toInt().toEnglishDigits()}%",
+                        label = "تکمیل تسک‌ها"
+                    )
+                    MetricCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Filled.LocalFireDepartment,
+                        iconTint = Color(0xFFF97316),
+                        value = "${RTL}${momentum.toInt().toEnglishDigits()}%",
+                        label = "ریتم فعالیت"
+                    )
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // ── Active days + Last activity ──
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    MetricCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Filled.CalendarToday,
+                        iconTint = MaterialTheme.colorScheme.primary,
+                        value = "${RTL}${activeDays.toEnglishDigits()}",
+                        label = "روزهای فعال (۳۰ روز اخیر)"
+                    )
+                    MetricCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Filled.AccessTime,
+                        iconTint = MaterialTheme.colorScheme.secondary,
+                        value = GoalActivityFormatter.formatLastActivity(lastActivity).ifEmpty { "—" },
+                        label = "آخرین فعالیت"
+                    )
+                }
+            } else {
+                GoalMetricsSkeleton()
             }
         }
     }
@@ -646,6 +808,70 @@ private fun MetricCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun GoalMetricsSkeleton() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        MetricCardSkeleton(modifier = Modifier.weight(1f))
+        MetricCardSkeleton(modifier = Modifier.weight(1f))
+    }
+
+    Spacer(modifier = Modifier.height(14.dp))
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        MetricCardSkeleton(modifier = Modifier.weight(1f))
+        MetricCardSkeleton(modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun ShimmerBox(
+    modifier: Modifier = Modifier,
+    height: androidx.compose.ui.unit.Dp = 12.dp
+) {
+    Box(
+        modifier = modifier
+            .height(height)
+            .clip(RoundedCornerShape(6.dp))
+            .background(skeletonShimmerBrush())
+    )
+}
+
+@Composable
+private fun MetricCardSkeleton(modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp)
+        ) {
+            ShimmerBox(
+                modifier = Modifier.size(18.dp),
+                height = 18.dp
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            ShimmerBox(
+                modifier = Modifier.fillMaxWidth(0.5f),
+                height = 16.dp
+            )
+            Spacer(modifier = Modifier.height(1.dp))
+            ShimmerBox(
+                modifier = Modifier.fillMaxWidth(0.6f),
+                height = 10.dp
             )
         }
     }
@@ -843,4 +1069,17 @@ private fun statusColor(status: String): Color = when (status) {
     GoalStatus.ABANDONED -> MaterialTheme.colorScheme.error
     GoalStatus.ARCHIVED -> MaterialTheme.colorScheme.onSurfaceVariant
     else -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+/**
+ * Local-midnight epoch ms for "today". Used as the default scheduled date when the
+ * Goal Detail task dialog is opened (the task belongs to today unless the user picks another day).
+ */
+private fun todayMidnightEpochMs(): Long {
+    val cal = Calendar.getInstance()
+    cal.set(Calendar.HOUR_OF_DAY, 0)
+    cal.set(Calendar.MINUTE, 0)
+    cal.set(Calendar.SECOND, 0)
+    cal.set(Calendar.MILLISECOND, 0)
+    return cal.timeInMillis
 }

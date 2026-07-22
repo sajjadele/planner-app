@@ -279,7 +279,7 @@ fun MainScreen(
         AddTaskDialog(
             onDismiss = { showAddTaskDialog = false },
             activeGoals = plannerViewModel.activeGoals,
-            onAddTask = { title, priority, hour, minute, goalId, valueTag, lifeAreaId, deadlineEpochMs ->
+            onAddTask = { title, priority, hour, minute, goalId, valueTag, lifeAreaId, dateEpochMs ->
                 plannerViewModel.addTask(
                     title = title,
                     priority = priority,
@@ -288,7 +288,7 @@ fun MainScreen(
                     goalId = goalId,
                     valueTag = valueTag,
                     lifeAreaId = lifeAreaId,
-                    deadlineEpochMs = deadlineEpochMs
+                    dateEpochMs = dateEpochMs
                 )
                 showAddTaskDialog = false
             }

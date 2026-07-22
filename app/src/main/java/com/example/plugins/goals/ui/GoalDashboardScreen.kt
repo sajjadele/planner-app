@@ -15,10 +15,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.core.goal.GoalEntity
-import com.example.plugins.goals.ui.AddGoalDialog
 import com.example.core.goal.GoalStatus
 import com.example.core.onboarding.OnboardingDeepLink
 import com.example.core.util.isolated
+import com.example.plugins.goals.ui.AddGoalDialog
+import com.example.plugins.planner.ui.PlannerViewModel
 import com.example.ui.theme.*
 
 @Composable
@@ -28,6 +29,8 @@ fun GoalDashboardScreen(
 ) {
     val selectedTab by viewModel.selectedTab.collectAsState()
     val goalsByTab by viewModel.goalsByTab.collectAsState()
+    val plannerViewModel: PlannerViewModel = viewModel()
+    val daysWithTasks by plannerViewModel.daysWithTasks.collectAsState()
 
     var selectedGoalId by remember { mutableStateOf<Int?>(null) }
     var showGoalMenu by remember { mutableStateOf(false) }
@@ -59,6 +62,7 @@ fun GoalDashboardScreen(
         EditGoalDialog(
             goal = selectedGoal!!,
             onDismiss = { showEditGoalDialog = false },
+            daysWithTasks = daysWithTasks,
             onUpdateGoal = { title, description, why, deadlineEpochMs ->
                 viewModel.updateGoal(selectedGoal!!.id, title, description, why, deadlineEpochMs)
                 showEditGoalDialog = false
@@ -89,6 +93,7 @@ fun GoalDashboardScreen(
     if (showAddGoalDialog) {
         AddGoalDialog(
             onDismiss = { showAddGoalDialog = false },
+            daysWithTasks = daysWithTasks,
             onAddGoal = { title, description, _, _ ->
                 viewModel.addGoal(title, description, null, null)
                 showAddGoalDialog = false

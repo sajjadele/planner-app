@@ -17,6 +17,8 @@ import com.example.plugins.planner.data.TaskRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -66,11 +68,29 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
     @OptIn(ExperimentalCoroutinesApi::class)
     val tasks: StateFlow<List<TaskEntity>> = _selectedDateEpochMs
         .flatMapLatest { date -> repository.getTasksForDay(date) }
+        // Flip the loading flag on the FIRST genuine emission (empty OR non-empty) — never on a
+        // change. Doing this in `init` via `tasks.drop(1).first()` hangs forever on an empty day,
+        // because Room emits exactly one value and nothing changes afterwards, so `drop(1)` waits
+        // for a second emission that never arrives and the skeleton stays stuck. `onEach` is
+        // replay-safe across movableContentOf re-entry (the ViewModel is built once).
+        .onEach { _isTasksLoaded.value = true }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+
+    /**
+     * Explicit loading flag for the task list. `tasks` is a StateFlow seeded with emptyList() and
+     * replays its current value on re-subscription, so the UI must NOT infer loading from
+     * `tasks.isEmpty()`. This is flipped true by `.onEach` on the `tasks` flow on the FIRST genuine
+     * Room emission (empty OR non-empty) — never in an `init { tasks.drop(1).first() }` block, which
+     * hangs forever on an empty day (Room emits once, nothing changes, `drop(1)` waits for a second
+     * emission that never arrives). Once true it stays true — making the three states
+     * (Loading / Loaded+Empty / Loaded+Content) independent and replay-safe.
+     */
+    private val _isTasksLoaded = MutableStateFlow(false)
+    val isTasksLoaded: StateFlow<Boolean> = _isTasksLoaded.asStateFlow()
 
     /**
      * Sprint 5.2 (F2): `goalTaskGroups` resolves task.goalId → title using the already-loaded
@@ -116,18 +136,18 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         _selectedDateEpochMs.value = dateEpochMs
     }
 
-    fun addTask(title: String, priority: String?, hour: Int?, minute: Int?, goalId: Int?, valueTag: String?, lifeAreaId: Int? = null, deadlineEpochMs: Long? = null) {
+    fun addTask(title: String, priority: String?, hour: Int?, minute: Int?, goalId: Int?, valueTag: String?, lifeAreaId: Int? = null, dateEpochMs: Long? = null) {
         viewModelScope.launch {
+            val actualDateEpochMs = dateEpochMs ?: _selectedDateEpochMs.value
             val task = TaskEntity(
                 title = title,
                 priority = priority,
-                dateEpochMs = _selectedDateEpochMs.value,
+                dateEpochMs = actualDateEpochMs,
                 reminderHour = hour,
                 reminderMinute = minute,
                 goalId = goalId,
                 valueTag = valueTag,
-                lifeAreaId = lifeAreaId,
-                deadlineEpochMs = deadlineEpochMs
+                lifeAreaId = lifeAreaId
             )
             val generatedId = repository.insertTask(task)
 

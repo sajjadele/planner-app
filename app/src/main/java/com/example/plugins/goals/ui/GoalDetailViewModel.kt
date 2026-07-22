@@ -23,11 +23,15 @@ import com.example.plugins.planner.data.InsightRepository
 import com.example.plugins.planner.data.RoomInsightRepository
 import com.example.plugins.planner.data.TaskRepository
 import com.example.plugins.planner.data.TaskEntity
+import com.example.plugins.planner.data.TaskEventEntity
+import com.example.core.util.JalaliDate
+import com.example.core.receiver.ReminderScheduler
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -104,8 +108,68 @@ class GoalDetailViewModel(
     val goal: StateFlow<GoalEntity?> = goalRepository.observeGoalById(goalId)
         .stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5000), initialValue = null)
 
-    val tasks: StateFlow<List<TaskEntity>> = taskRepository.getTasksByGoalId(goalId)
+    /**
+     * Phase 3 — full task list for this goal (date-unfiltered). Used by the Solar System graph,
+     * Mirror insights, and task preview (which need ALL tasks), plus as the source for the
+     * date-filtered [filteredTasks] and the Future-Hint counts.
+     */
+    private val allTasks: StateFlow<List<TaskEntity>> = taskRepository.getTasksByGoalId(goalId)
         .stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5000), initialValue = emptyList())
+
+    /**
+     * Phase 3 — goal-scoped set of midnight-epoch day keys that have at least one task for THIS goal.
+     * Derived from [allTasks] (already filtered by goalId) so the Goal Detail calendar shows markers
+     * only for this goal's tasks, not the global Planner set. Reused by all Goal Detail calendar consumers.
+     */
+    val goalTaskDays: StateFlow<Set<Long>> = allTasks.map { tasks ->
+        tasks.mapNotNull { it.dateEpochMs }.toSet()
+    }.stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5000), initialValue = emptySet())
+
+    /**
+     * Phase 3 — selected display date (local-midnight epoch ms). Drives the Goal Detail task
+     * timeline: only tasks whose [TaskEntity.dateEpochMs] matches this day are shown.
+     * Initialized to today so the screen opens on "امروز".
+     */
+    private val _selectedTaskDateEpochMs = MutableStateFlow(todayDateEpochMs())
+    val selectedTaskDateEpochMs: StateFlow<Long> = _selectedTaskDateEpochMs.asStateFlow()
+
+    fun selectTaskDate(epochMs: Long) {
+        _selectedTaskDateEpochMs.value = epochMs
+    }
+
+    /**
+     * Phase 3 — tasks for the [selectedTaskDateEpochMs] day only. Derived from [allTasks] so
+     * graph/mirror keep the full list while the UI shows a single day (default: today).
+     */
+    val filteredTasks: StateFlow<List<TaskEntity>> = combine(
+        allTasks,
+        _selectedTaskDateEpochMs
+    ) { tasks, date ->
+        tasks.filter { it.dateEpochMs == date }
+    }.stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5000), initialValue = emptyList())
+
+    /**
+     * Phase 3 — compact "near future" hint counts for this goal. Non-intrusive nudge showing how
+     * many open tasks are scheduled tomorrow and later this week. Click targets are wired but the
+     * popup preview is deferred to Phase 4.
+     */
+    data class FutureHintState(
+        val tomorrowCount: Int = 0,
+        val thisWeekCount: Int = 0
+    )
+
+    val futureHintState: StateFlow<FutureHintState> = allTasks.map { tasks ->
+        val today = todayDateEpochMs()
+        val tomorrow = today + 86_400_000L
+        val saturday = JalaliDate.saturdayOfWeek(today)
+        val weekEnd = saturday + 7 * 86_400_000L - 1 // Friday midnight (end of Persian week)
+        FutureHintState(
+            tomorrowCount = tasks.count { it.dateEpochMs == tomorrow && !it.isCompleted },
+            thisWeekCount = tasks.count {
+                it.dateEpochMs in (tomorrow + 86_400_000L)..weekEnd && !it.isCompleted
+            }
+        )
+    }.stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5000), initialValue = FutureHintState())
 
     val goalRate: StateFlow<GoalRateResult?> = insightRepository.observeGoalCompletionRate(goalId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -129,6 +193,23 @@ class GoalDetailViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     /**
+     * Explicit readiness for [goalProgress]. Independent of [metricsState] — it resolves from the
+     * same upstreams (goalRate + activeDaysInWindow) and flips true as soon as they first emit, even
+     * when the goal has no tasks (rate == null → progress stays null but IS resolved). This gives the
+     * UI a replay-safe loading signal without relying on `progress == null` or emission counting.
+     */
+    private val _goalProgressLoaded = MutableStateFlow(false)
+    val goalProgressLoaded: StateFlow<Boolean> = _goalProgressLoaded.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            combine(goalRate, activeDaysInWindow) { _, _ -> }
+                .first()
+            _goalProgressLoaded.value = true
+        }
+    }
+
+    /**
      * Active-day count for the card's "X روز فعالیت" line. Sprint 5.3 (F3): bounded to the rolling
      * 30-day window via [activeDaysInWindow] instead of the all-time [observeGoalActiveDayCount] scan,
      * removing one cold-open DB query. The windowed count is already produced for [goalProgress].
@@ -150,7 +231,8 @@ class GoalDetailViewModel(
     data class GoalDetailMetricsState(
         val completionRate: Float? = null,
         val activeDays: Int = 0,
-        val lastActivity: Long? = null
+        val lastActivity: Long? = null,
+        val loaded: Boolean = false
     )
 
     private val _metricsState = MutableStateFlow(GoalDetailMetricsState())
@@ -172,7 +254,8 @@ class GoalDetailViewModel(
                 GoalDetailMetricsState(
                     completionRate = rate?.completionRate,
                     activeDays = days,
-                    lastActivity = last
+                    lastActivity = last,
+                    loaded = true
                 )
             }.collect { _metricsState.value = it }
         }
@@ -220,7 +303,7 @@ class GoalDetailViewModel(
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun graphSource(rescheduleCounts: Map<Int, Int>): Flow<GoalGraph> =
-        combine(goal, tasks, goalProgress) { g, ts, progress ->
+        combine(goal, allTasks, goalProgress) { g, ts, progress ->
             if (g == null) return@combine null
             GoalGraphBuilder.build(
                 goalId = g.id,
@@ -231,7 +314,7 @@ class GoalDetailViewModel(
                         title = task.title,
                         priority = task.priority,
                         isCompleted = task.isCompleted,
-                        deadlineEpochMs = task.deadlineEpochMs
+                        dateEpochMs = task.dateEpochMs
                     )
                 },
                 rescheduleCounts = rescheduleCounts,
@@ -262,7 +345,7 @@ class GoalDetailViewModel(
 
     /** Resolve a tapped satellite id to its full [TaskEntity] and emit a one-shot preview event. */
     fun requestTaskPreview(taskId: Int) {
-        val task = tasks.value.firstOrNull { it.id == taskId } ?: return
+        val task = allTasks.value.firstOrNull { it.id == taskId } ?: return
         _taskPreviewEvents.trySend(task)
     }
 
@@ -322,7 +405,7 @@ class GoalDetailViewModel(
         // running the full Mirror aggregation multiple times per burst. Gated by _showMirrorSheet
         // so it never runs while the Mirror sheet is closed.
         viewModelScope.launch {
-            combine(goalRate, tasks, activeDays) { _, _, _ -> }
+            combine(goalRate, allTasks, activeDays) { _, _, _ -> }
                 .debounce(250)
                 .collect { if (_showMirrorSheet.value) refreshMirror() }
         }
@@ -381,6 +464,17 @@ class GoalDetailViewModel(
         viewModelScope.launch {
             val updated = task.copy(isCompleted = !task.isCompleted)
             taskRepository.updateTask(updated)
+            taskRepository.insertTaskEvent(
+                TaskEventEntity(
+                    taskId = updated.id,
+                    eventType = if (updated.isCompleted) "completed" else "reopened"
+                )
+            )
+            if (updated.isCompleted) {
+                ReminderScheduler.cancel(getApplication(), updated)
+            } else if (updated.reminderHour != null && updated.reminderMinute != null) {
+                ReminderScheduler.schedule(getApplication(), updated)
+            }
             snapshotAggregator.recordDay(todayDateEpochMs())
             if (_showMirrorSheet.value) refreshMirror()
         }

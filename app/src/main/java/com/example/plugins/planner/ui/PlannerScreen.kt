@@ -30,9 +30,12 @@ import com.example.plugins.planner.ui.components.InfiniteWeekRow
 import com.example.plugins.planner.ui.components.InsightDetailsSheetContent
 import com.example.plugins.planner.ui.components.PlannerEmptyState
 import com.example.plugins.planner.ui.components.TaskCard
+import com.example.plugins.planner.ui.components.TaskCardSkeleton
 import com.example.plugins.planner.ui.components.WeeklyInsightCard
 import com.example.plugins.planner.ui.components.persianDayIndex
 import com.example.core.util.JalaliDate
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,13 +43,36 @@ import kotlinx.coroutines.launch
 fun PlannerScreen(
     modifier: Modifier = Modifier,
     viewModel: PlannerViewModel = viewModel(),
-    insightViewModel: WeeklyInsightViewModel = viewModel()
+    insightViewModel: WeeklyInsightViewModel? = null
 ) {
     val selectedDateEpochMs by viewModel.selectedDateEpochMs.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
     val goalTaskGroups by viewModel.goalTaskGroups.collectAsState()
     val daysWithTasks by viewModel.daysWithTasks.collectAsState()
-    val insightState by insightViewModel.insightState.collectAsState()
+
+    // Sprint 6 (skeleton): show TaskCard skeletons ONLY while the task list is actually loading.
+    // Loading readiness comes from the explicit ViewModel flag `isTasksLoaded` (flipped once after the
+    // first genuine Room emission, empty OR non-empty) — NOT from `tasks.isEmpty()`/drop(1).first(),
+    // which is replay-unsafe on re-entry and would strand the skeleton forever on an empty day.
+    // After loading: empty day -> PlannerEmptyState, non-empty -> task list. Three states are independent.
+    // `isTasksLoaded` (from the ViewModel) is TRUE once the first Room emission arrives (empty OR
+    // non-empty). It is a *loaded* flag, NOT a loading flag — so the skeleton must show while it is
+    // FALSE. The previous alias `isTaskListLoading` was semantically inverted and checked
+    // `if (isTaskListLoading) showSkeleton`, which showed the skeleton exactly when data had
+    // actually loaded (and showed content only while still loading) — i.e. stuck-on-skeleton.
+    val tasksLoaded by viewModel.isTasksLoaded.collectAsState()
+
+    // Sprint 5.1 (lazy Weekly Insight): the WeeklyInsightViewModel triggers 10 Room-backed flows in
+    // its init, which previously competed with task loading on cold start. We defer its creation to
+    // after the first frame so today's tasks / goal groups / navigation render first, then the
+    // insight card populates. Before that, the card shows its existing empty (hasData = false) state.
+    var insightRequested by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { insightRequested = true }
+    val resolvedInsightVm = if (insightRequested) (insightViewModel ?: viewModel<WeeklyInsightViewModel>()) else null
+    val insightState by (resolvedInsightVm?.insightState
+        ?: MutableStateFlow(WeeklyInsightState(hasData = false)).asStateFlow())
+        .collectAsState()
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     var showInsightSheet by remember { mutableStateOf(false) }
@@ -211,7 +237,18 @@ fun PlannerScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (tasks.isEmpty()) {
+            if (!tasksLoaded) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("planner_task_skeleton"),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    repeat(3) {
+                        TaskCardSkeleton()
+                    }
+                }
+            } else if (tasks.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()

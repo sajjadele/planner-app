@@ -17,13 +17,13 @@ class AdaptiveDensityModeTest {
         id: Int,
         priority: String? = null,
         isCompleted: Boolean = false,
-        deadlineEpochMs: Long? = null
+        dateEpochMs: Long? = null
     ) = GoalGraphBuilder.TaskInput(
         id = id,
         title = "task-$id",
         priority = priority,
         isCompleted = isCompleted,
-        deadlineEpochMs = deadlineEpochMs
+        dateEpochMs = dateEpochMs
     )
 
     private val progress = GoalProgress(completionRate = 60f, activityMomentum = 30f, overall = 51f)

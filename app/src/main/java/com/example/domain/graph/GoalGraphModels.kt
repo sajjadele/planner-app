@@ -25,11 +25,11 @@ data class GoalGraphNode(
     /** True when the task is a "Boulder" (rescheduled >= threshold) — drives the wobble halo. */
     val isBoulder: Boolean,
     val isCompleted: Boolean,
-    /** True when the task's deadline has passed and it is not completed — drives the OVERDUE signal. */
+    /** True when the task's scheduled date has passed (yesterday or earlier) and it is not completed — drives the OVERDUE signal. */
     val isOverdue: Boolean = false,
     /**
-     * True when the task's deadline is within the next 24h (and not yet overdue/completed) — drives
-     * a calm "near deadline" cue. Independent of [priority]/[colorRole] (rendered as an overlay).
+     * True when the task's scheduled date is within the next 24h (i.e. tomorrow at midnight) and not yet overdue/completed — drives
+     * a calm "near due" cue. Independent of [priority]/[colorRole] (rendered as an overlay).
      */
     val isNearDeadline: Boolean = false,
     /** Drives UI tint without leaking android.graphics.Color into the domain layer. */
