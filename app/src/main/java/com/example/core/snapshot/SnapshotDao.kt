@@ -47,4 +47,10 @@ interface SnapshotDao {
 
     @Query("DELETE FROM goal_progress_snapshot WHERE dateEpochMs = :dateEpochMs")
     suspend fun deleteGoalProgressForDay(dateEpochMs: Long)
+
+    @Query("DELETE FROM behavior_snapshot")
+    suspend fun deleteAllBehaviors()
+
+    @Query("DELETE FROM goal_progress_snapshot")
+    suspend fun deleteAllGoalProgress()
 }

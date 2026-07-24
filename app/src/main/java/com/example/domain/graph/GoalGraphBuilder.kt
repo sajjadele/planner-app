@@ -2,96 +2,39 @@ package com.example.domain.graph
 
 import com.example.domain.goal.GoalProgress
 import kotlin.math.PI
-import kotlin.math.min
 
 /**
- * Deterministic builder for the Behavioral Solar System graph (ADR-0004).
+ * Geometry utilities for the Behavioral Solar System (Phase 2B+ migration).
  *
- * Pure Kotlin, no Android/Room imports. Given a goal, its tasks, per-task reschedule counts,
- * and the goal's progress, it computes a stable polar layout:
+ * Visibility decisions (what is shown, clustering, overview limits) live exclusively in
+ * [VisibilityResolver]. This builder only:
+ * - places the sun (goal) node
+ * - projects [VisibleTask]/[VisibleCluster] polar data into absolute design-space coordinates
+ * - exposes deterministic [jitter] / angle helpers
  *
- * - Tasks are grouped into three concentric priority lanes (HIGH inner, MEDIUM middle, LOW outer).
- * - Within a lane, nodes are spread evenly around the circle; a deterministic id-based jitter
- *   de-aligns lanes so rings don't overlap radially. No [kotlin.random.Random] — same inputs
- *   always yield identical coordinates.
- * - Completed tasks become tiny, faded "memory" points on the outer edge ring.
- * - A "Boulder" (rescheduleCount >= [BOULDER_RESCHEDULE_THRESHOLD]) is flagged for the UI wobble.
- * - [GoalProgress.overall] is surfaced for the central "Ring Tide" glow.
- *
- * Urgency-by-date radius mapping is intentionally deferred to V2 (keep core orbits stable).
+ * Pure Kotlin, no Android/Room imports.
  */
 object GoalGraphBuilder {
 
-    /**
-     * Adaptive density thresholds (Phase 6.5.6). The graph's [GraphDensityMode] is chosen from the
-     * *active* (incomplete) task count:
-     * - ≤ [SIMPLE_MAX_ACTIVE]          → SIMPLE     (every task drawn as its own satellite)
-     * - ≤ [CLUSTERED_MAX_ACTIVE]       → CLUSTERED  (priority/completion clusters; full tap-expand)
-     * - > [CLUSTERED_MAX_ACTIVE]       → SUMMARY    (clusters; tap-expand is priority-capped, L3)
-     * Tunable constants — raise/lower to change when each density tier kicks in.
-     */
-    const val SIMPLE_MAX_ACTIVE = 6
-    const val CLUSTERED_MAX_ACTIVE = 20
+    const val GOAL_SIZE = 40f
+    const val DEFAULT_VIEWPORT_RADIUS = 320f
 
-    /** Synthetic id base for clusters so they never collide with real task/goal ids. */
-    private const val CLUSTER_ID_BASE = 1_000_000
-
-    /** Lane radii as fractions of [GoalGraph.viewportRadius]; inner = more urgent/important. */
-    private val LANE_FRACTION = mapOf(
-        "HIGH" to 0.34f,
-        "MEDIUM" to 0.58f,
-        "LOW" to 0.82f
-    )
-    /** Active tasks with no priority fall back to the outer LOW lane. */
-    private const val NO_PRIORITY_LANE = "LOW"
-    /** Undated active tasks without a goal priority share the LOW orbit (0.82) for ring fit. */
-    private const val NO_DATE_FRACTION = 0.82f
-    /** Completed tasks orbit on the faded outer edge. */
-    private const val COMPLETED_FRACTION = 0.97f
-
-    /** Reschedule count at/above which a task is flagged as a Boulder (matches MirrorHeuristics). */
-    private const val BOULDER_RESCHEDULE_THRESHOLD = 2
-
-    /** Window (ms) before a scheduled date within which an active task reads as "near due" (24h). */
-    const val NEAR_DEADLINE_WINDOW_MS = 24L * 60L * 60L * 1000L
-
-    /** Task node radius by priority (design-space px at the default viewport). */
-    private val PRIORITY_SIZE = mapOf(
-        "HIGH" to 22f,
-        "MEDIUM" to 16f,
-        "LOW" to 12f
-    )
-    private const val DEFAULT_TASK_SIZE = 14f
-    private const val GOAL_SIZE = 40f
-
-    /** Priority ranking for displayed-task ordering (§4): HIGH first, then MEDIUM, then LOW/null. */
-    private val PRIORITY_RANK = mapOf("HIGH" to 0, "MEDIUM" to 1, "LOW" to 2, null to 3)
+    /** Window (ms) for near-deadline flag (shared with VisibilityResolver). */
+    const val NEAR_DEADLINE_WINDOW_MS = VisibilityResolver.NEAR_DEADLINE_WINDOW_MS
 
     /**
-     * @param goalId central goal id
-     * @param goalTitle label for the sun
-     * @param tasks task list already scoped to this goal
-     * @param rescheduleCounts map of taskId -> reschedule event count
-     * @param progress goal progress (overall drives Ring Tide); null-safe
-     * @param viewportRadius design-space radius (default 320f)
-     * @param nowMillis clock source for overdue computation (midnight epoch ms of "today")
+     * Build sun-only scaffolding for Ring Tide / progress (goal metadata).
+     * Task satellites come from [VisibleGraphModel], not from this method.
      */
-    fun build(
+    fun buildSun(
         goalId: Int,
         goalTitle: String,
-        tasks: List<TaskInput>,
-        rescheduleCounts: Map<Int, Int>,
         progress: GoalProgress?,
-        viewportRadius: Float = 320f,
-        nowMillis: Long = System.currentTimeMillis()
+        viewportRadius: Float = DEFAULT_VIEWPORT_RADIUS
     ): GoalGraph {
         val cx = viewportRadius
         val cy = viewportRadius
-        val nodes = mutableListOf<GoalGraphNode>()
-        val edges = mutableListOf<GoalGraphEdge>()
-
-        // ── Sun (central Goal node) ──
-        nodes += GoalGraphNode(
+        val sun = GoalGraphNode(
             id = goalId,
             label = goalTitle,
             kind = NodeKind.GOAL,
@@ -104,198 +47,63 @@ object GoalGraphBuilder {
             isCompleted = false,
             colorRole = ColorRole.GOAL
         )
-
-        val active = tasks.filter { !it.isCompleted }
-        val completed = tasks.filter { it.isCompleted }
-
-        // Overdue threshold: a task is overdue if its scheduled date is strictly before today's midnight.
-        // nowMillis is the caller's "today" (defaults to now); floor to midnight for date-only compare.
-        val todayMidnight = nowMillis - (nowMillis % 86400000L)
-
-        // Adaptive density decision (Phase 6.5.6): three tiers from the active-task count. Individual
-        // nodes are always computed (needed for SIMPLE rendering and for cluster expansion), so the
-        // layout stays deterministic in every tier.
-        val densityMode = when {
-            active.size <= SIMPLE_MAX_ACTIVE -> GraphDensityMode.SIMPLE
-            active.size <= CLUSTERED_MAX_ACTIVE -> GraphDensityMode.CLUSTERED
-            else -> GraphDensityMode.SUMMARY
-        }
-
-        // Group active tasks by lane (priority). IMPORTANT: keep null-priority tasks OUT of the
-        // LOW lane — they are placed exactly once on the dedicated outer "undated" ring below.
-        // (Mapping null→LOW here previously double-placed null-priority tasks, causing the
-        // "2 tasks render as 4 circles" duplicate-node bug.)
-        val byLane = active.groupBy { it.priority }
-
-        // Deterministic, priority-ordered placement (§4): most meaningful tasks first.
-        // Order within the active set: HIGH → MEDIUM → LOW → (no priority). This only affects the
-        // angle at which each task lands; all tasks ≤ MAX_VISIBLE_TASKS are still shown.
-        val orderedActive = active.sortedWith(
-            compareBy({ PRIORITY_RANK[it.priority] ?: 3 }, { it.id })
-        )
-
-        fun placeLane(laneTasks: List<TaskInput>, baseFraction: Float) {
-            val n = laneTasks.size
-            laneTasks.forEachIndexed { i, task ->
-                val angle = if (n == 1) PI.toFloat() / 2f
-                else (i.toFloat() / n) * GraphGeometry.TWO_PI + jitter(task.id)
-                val r = viewportRadius * baseFraction
-                val (x, y) = GraphGeometry.project(cx, cy, r, angle)
-                val isBoulder = (rescheduleCounts[task.id] ?: 0) >= BOULDER_RESCHEDULE_THRESHOLD
-                val isOverdue = task.dateEpochMs != null && task.dateEpochMs < todayMidnight
-                // Near due: exact-time window [now, now + 24h). Never when already overdue.
-                val isNearDeadline = task.dateEpochMs != null && !isOverdue &&
-                    task.dateEpochMs >= nowMillis &&
-                    task.dateEpochMs < nowMillis + NEAR_DEADLINE_WINDOW_MS
-                nodes += GoalGraphNode(
-                    id = task.id,
-                    label = task.title,
-                    kind = NodeKind.TASK,
-                    cx = x,
-                    cy = y,
-                    size = PRIORITY_SIZE[task.priority] ?: DEFAULT_TASK_SIZE,
-                    alpha = 1f,
-                    priority = task.priority,
-                    isBoulder = isBoulder,
-                    isCompleted = false,
-                    isOverdue = isOverdue,
-                    isNearDeadline = isNearDeadline,
-                    colorRole = colorFor(task.priority, isBoulder, isOverdue)
-                )
-                if (densityMode == GraphDensityMode.SIMPLE) edges += GoalGraphEdge(goalId, task.id, 1f)
-            }
-        }
-
-        placeLane(byLane["HIGH"] ?: emptyList(), LANE_FRACTION["HIGH"]!!)
-        placeLane(byLane["MEDIUM"] ?: emptyList(), LANE_FRACTION["MEDIUM"]!!)
-        placeLane(byLane["LOW"] ?: emptyList(), LANE_FRACTION["LOW"]!!)
-
-        // Undated active tasks without a priority are pushed to the outermost active ring so they
-        // read as "far / low gravity" rather than cluttering a dated lane. This covers ALL
-        // priority-less tasks — including those that happen to have a date — so they are never
-        // silently dropped from the graph. (Placing them by date would duplicate nodes and the
-        // "undated" ring is the canonical home for null-priority tasks.)
-        val undated = active.filter { it.priority == null }
-        placeLane(undated, NO_DATE_FRACTION)
-
-        // ── Completed tasks: faded memory points on the outer edge ──
-        val nc = completed.size
-        completed.forEachIndexed { i, task ->
-            val angle = if (nc == 1) 0f else (i.toFloat() / nc) * GraphGeometry.TWO_PI
-            val r = viewportRadius * COMPLETED_FRACTION
-            val (x, y) = GraphGeometry.project(cx, cy, r, angle)
-            nodes += GoalGraphNode(
-                id = task.id,
-                label = task.title,
-                kind = NodeKind.TASK,
-                cx = x,
-                cy = y,
-                size = 6f,
-                alpha = 0.28f,
-                priority = task.priority,
-                isBoulder = false,
-                isCompleted = true,
-                colorRole = ColorRole.COMPLETED
-            )
-                if (densityMode == GraphDensityMode.SIMPLE) edges += GoalGraphEdge(goalId, task.id, 0.28f)
-        }
-
-        // ── Adaptive clusters (meaningful in CLUSTERED + SUMMARY tiers) ──
-        val clusters = if (densityMode != GraphDensityMode.SIMPLE) buildClusters(
-            cx = cx, cy = cy, viewportRadius = viewportRadius,
-            active = active, completed = completed, goalId = goalId, edges = edges
-        ) else emptyList()
-
         return GoalGraph(
             centerX = cx,
             centerY = cy,
             viewportRadius = viewportRadius,
             goalProgressOverall = progress?.overall ?: 0f,
-            nodes = nodes,
-            edges = edges,
-            densityMode = densityMode,
-            clusters = clusters
+            nodes = listOf(sun),
+            edges = emptyList(),
+            densityMode = GraphDensityMode.SIMPLE,
+            clusters = emptyList()
         )
     }
 
     /**
-     * Build the four stable clusters (ACTIVE_HIGH / ACTIVE_MEDIUM / ACTIVE_LOW / COMPLETED) for the
-     * adaptive overview. Positions are deterministic: each cluster sits on its lane radius at a
-     * fixed angle (no Random). [visualSize] grows with task count but is clamped so a cluster never
-     * visually competes with the sun. Sun→cluster edges are appended to [edges].
+     * Project a [VisibleTask] into absolute design-space (cx, cy).
+     * Radius and angle are already decided by [VisibilityResolver].
      */
-    private fun buildClusters(
-        cx: Float,
-        cy: Float,
-        viewportRadius: Float,
-        active: List<TaskInput>,
-        completed: List<TaskInput>,
-        goalId: Int,
-        edges: MutableList<GoalGraphEdge>
-    ): List<TaskClusterNode> {
-        val specs = listOf(
-            ClusterSpec(ClusterType.ACTIVE_HIGH, "HIGH", 0f, 0.34f),
-            ClusterSpec(ClusterType.ACTIVE_MEDIUM, "MEDIUM", 2f * PI.toFloat() / 3f, 0.58f),
-            ClusterSpec(ClusterType.ACTIVE_LOW, "LOW", 4f * PI.toFloat() / 3f, 0.82f),
-            ClusterSpec(ClusterType.COMPLETED, null, PI.toFloat(), 0.95f)
-        )
-        return specs.mapNotNull { spec ->
-            val members = when (spec.clusterType) {
-                ClusterType.COMPLETED -> completed
-                else -> active.filter { (it.priority ?: NO_PRIORITY_LANE) == spec.priority }
-            }
-            if (members.isEmpty()) return@mapNotNull null
-            val (x, y) = GraphGeometry.project(cx, cy, viewportRadius * spec.fraction, spec.angle)
-            // Clamp size: 20..34 design px, scaled by count but always < GOAL_SIZE (40).
-            val size = (20f + minOf(members.size, 20) * 0.7f).coerceAtMost(34f)
-            edges += GoalGraphEdge(goalId, CLUSTER_ID_BASE + spec.clusterType.ordinal, 0.6f)
-            TaskClusterNode(
-                id = CLUSTER_ID_BASE + spec.clusterType.ordinal,
-                clusterType = spec.clusterType,
-                taskCount = members.size,
-                cx = x,
-                cy = y,
-                visualSize = size,
-                priorityLevel = spec.priority,
-                memberIds = members.map { it.id }
-            )
-        }
+    fun projectTask(
+        task: VisibleTask,
+        centerX: Float,
+        centerY: Float
+    ): Pair<Float, Float> = GraphGeometry.project(centerX, centerY, task.radius, task.angle)
+
+    /**
+     * Project a [VisibleCluster] into absolute design-space (cx, cy).
+     */
+    fun projectCluster(
+        cluster: VisibleCluster,
+        centerX: Float,
+        centerY: Float
+    ): Pair<Float, Float> = GraphGeometry.project(centerX, centerY, cluster.radius, cluster.angle)
+
+    /**
+     * Deterministic tiny angle offset from task id (no Random).
+     * Returns a value in [0, 0.25) radians.
+     */
+    fun jitter(id: Int): Float = ((id * 92821) % 1000) / 1000f * 0.25f
+
+    /**
+     * Deterministic angle for even distribution + jitter.
+     */
+    fun deterministicAngle(id: Int, totalCount: Int): Float {
+        if (totalCount <= 0) return 0f
+        if (totalCount == 1) return PI.toFloat() / 2f
+        val baseAngle = (id % totalCount).toFloat() / totalCount * GraphGeometry.TWO_PI
+        return baseAngle + jitter(id)
     }
 
-    private data class ClusterSpec(
-        val clusterType: ClusterType,
-        val priority: String?,
-        val angle: Float,
-        val fraction: Float
-    )
-
     /**
-     * Deterministic tiny angle offset derived from the task id (no Random), so adjacent lanes
-     * don't line up radially. Returns a value in [0, 0.25) radians.
-     */
-    private fun jitter(id: Int): Float = ((id * 92821) % 1000) / 1000f * 0.25f
-
-    private fun colorFor(priority: String?, isBoulder: Boolean, isOverdue: Boolean = false): ColorRole =
-        if (isOverdue) ColorRole.OVERDUE
-        else if (isBoulder) ColorRole.BOULDER
-        else when (priority) {
-            "HIGH" -> ColorRole.HIGH
-            "MEDIUM" -> ColorRole.MEDIUM
-            "LOW" -> ColorRole.LOW
-            else -> ColorRole.LOW
-        }
-
-    /**
-     * Minimal task projection the builder consumes. Keeps [com.example.domain.graph] free of the
-     * Android-typed TaskEntity (which lives under plugins.planner.data), protecting the domain
-     * boundary. A Task has a single time concept — its scheduled [dateEpochMs] — which drives the
-     * overdue / near-due signals.
+     * Minimal task projection kept for tests / adapters.
+     * Visibility no longer reads priority for layout decisions.
      */
     data class TaskInput(
         val id: Int,
         val title: String,
-        val priority: String?,
-        val isCompleted: Boolean,
-        val dateEpochMs: Long?
+        val priority: String? = null,
+        val isCompleted: Boolean = false,
+        val dateEpochMs: Long? = null,
+        val attentionScore: Float? = null
     )
 }

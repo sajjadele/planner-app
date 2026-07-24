@@ -217,7 +217,29 @@ interface InsightDao {
     /** Earliest scheduled task day — backfill start anchor (null when no tasks exist). */
     @Query("SELECT MIN(dateEpochMs) FROM tasks")
     suspend fun getEarliestTaskDateEpochMs(): Long?
+
+    // ──────────────────────────────────────────────
+    // Phase 2A: Attention — meaningful interaction timestamps
+    //
+    // Sources: notes (user-authored logs linked to tasks).
+    // Future expansion: UNION ALL with subtask_events, photo timestamps, etc.
+    // The Attention algorithm receives a single (taskId → timestamp) map and
+    // does not know the source — this query is the only place that decides
+    // which events count as "meaningful".
+    // ──────────────────────────────────────────────
+
+    @Query("""
+        SELECT taskId, MAX(timestamp) AS lastMeaningfulMs
+        FROM notes
+        WHERE taskId IS NOT NULL
+        AND taskId IN (SELECT id FROM tasks WHERE goalId = :goalId)
+        GROUP BY taskId
+    """)
+    suspend fun getLastMeaningfulInteractionPerTask(goalId: Int): List<TaskLastInteraction>
 }
+
+/** Result of the meaningful-interaction aggregation query. */
+data class TaskLastInteraction(val taskId: Int, val lastMeaningfulMs: Long)
 
 /** Per-goal task counts for a day, returned by [getGoalDayCounts]. */
 data class GoalDayCount(val total: Int, val completed: Int)

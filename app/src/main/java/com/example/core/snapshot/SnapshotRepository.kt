@@ -16,4 +16,6 @@ interface SnapshotRepository {
     fun observeBehaviorRange(start: Long, end: Long): Flow<List<BehaviorSnapshotEntity>>
     suspend fun getLatestBehavior(): BehaviorSnapshotEntity?
     suspend fun getCoveredDates(): List<Long>
+    suspend fun deleteAllBehaviors()
+    suspend fun deleteAllGoalProgress()
 }

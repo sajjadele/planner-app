@@ -1,0 +1,490 @@
+package com.example.debug.ui
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.debug.scenarios.GeneratedScenarioResult
+import com.example.debug.scenarios.ScenarioType
+import com.example.debug.validation.ValidationCheck
+import com.example.debug.validation.ValidationResult
+import com.example.debug.validation.ValidationReportFormatter
+import com.example.domain.mirror.MirrorInsight
+import com.example.ui.screens.components.DebugMirrorViewModel
+import com.example.ui.screens.components.SolarSystemQaViewModel
+import com.example.ui.theme.*
+
+@Composable
+fun DeveloperLabDialog(
+    onDismiss: () -> Unit,
+    viewModel: DeveloperLabViewModel = viewModel(),
+    solarQaViewModel: SolarSystemQaViewModel = viewModel(),
+    mirrorViewModel: DebugMirrorViewModel = viewModel()
+) {
+    val state by viewModel.state.collectAsState()
+    val solarStatus by solarQaViewModel.status.collectAsState()
+    val mirrorResult by mirrorViewModel.lastResult.collectAsState()
+    val mirrorStatus by mirrorViewModel.status.collectAsState()
+    val mirrorScenario by mirrorViewModel.lastScenario.collectAsState()
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = if (LocalIsDarkTheme.current) DarkSurfaceVariant else Color.White
+            ),
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.85f)
+                .padding(12.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Developer Lab",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (LocalIsDarkTheme.current) DarkTextPrimary else TextPrimary
+                )
+                Text(
+                    text = "ابزار توسعه‌دهنده — فقط نسخه DEBUG",
+                    fontSize = 11.sp,
+                    color = if (LocalIsDarkTheme.current) DarkTextTertiary else TextTertiary
+                )
+
+                state.message?.let { msg ->
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = msg,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
+
+                ScenarioGeneratorSection(
+                    isRunning = state.isRunning,
+                    onGenerate = { viewModel.generate(it) },
+                    lastGenerated = state.lastGenerated
+                )
+
+                ValidationRunnerSection(
+                    validationResult = state.validationResult,
+                    validationScenario = state.validationScenario,
+                    isRunning = state.isRunning,
+                    onValidate = { viewModel.validate(it) }
+                )
+
+                SolarSystemQaSection(
+                    viewModel = solarQaViewModel,
+                    status = solarStatus
+                )
+
+                MirrorTestingSection(
+                    viewModel = mirrorViewModel,
+                    result = mirrorResult,
+                    status = mirrorStatus,
+                    scenario = mirrorScenario
+                )
+
+                CleanupSection(
+                    isRunning = state.isRunning,
+                    onClear = { viewModel.clearAll() },
+                    onClearSolarQa = { solarQaViewModel.clearQaData() },
+                    onClearMirror = { mirrorViewModel.clearTestData() }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentPurple),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("بستن", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScenarioGeneratorSection(
+    isRunning: Boolean,
+    onGenerate: (ScenarioType) -> Unit,
+    lastGenerated: GeneratedScenarioResult?
+) {
+    SectionCard(title = "Scenario Generator", subtitle = "Generate test users") {
+        ScenarioButton("Productive User", Color(0xFF16A34A), ScenarioType.PRODUCTIVE_USER, isRunning, onGenerate)
+        ScenarioButton("Procrastinator User", Color(0xFFEA580C), ScenarioType.PROCRASTINATOR_USER, isRunning, onGenerate)
+        ScenarioButton("Chaos User", Color(0xFF2563EB), ScenarioType.CHAOS_USER, isRunning, onGenerate)
+        ScenarioButton("Recovery User", Color(0xFF7C3AED), ScenarioType.RECOVERY_USER, isRunning, onGenerate)
+
+        lastGenerated?.let { result ->
+            Spacer(modifier = Modifier.height(8.dp))
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "Generated: ${result.description}",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        lineHeight = 16.sp
+                    )
+                    Text(
+                        text = "Goal ID: ${result.goalId} | Tasks: ${result.createdTaskIds.size}",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ValidationRunnerSection(
+    validationResult: ValidationResult?,
+    validationScenario: ScenarioType?,
+    isRunning: Boolean,
+    onValidate: (ScenarioType) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    SectionCard(title = "Validation Runner", subtitle = "Run scenario validation checks") {
+        ScenarioButton("Validate Productive", Color(0xFF16A34A), ScenarioType.PRODUCTIVE_USER, isRunning, onValidate)
+        ScenarioButton("Validate Procrastinator", Color(0xFFEA580C), ScenarioType.PROCRASTINATOR_USER, isRunning, onValidate)
+        ScenarioButton("Validate Chaos", Color(0xFF2563EB), ScenarioType.CHAOS_USER, isRunning, onValidate)
+        ScenarioButton("Validate Recovery", Color(0xFF7C3AED), ScenarioType.RECOVERY_USER, isRunning, onValidate)
+
+        validationResult?.let { result ->
+            Spacer(modifier = Modifier.height(8.dp))
+            val passColor = if (result.passed) Color(0xFF16A34A) else Color(0xFFDC2626)
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = passColor.copy(alpha = 0.1f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = if (result.passed) "PASS" else "FAIL",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = passColor
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = result.scenario.label,
+                            fontSize = 12.sp,
+                            color = if (LocalIsDarkTheme.current) DarkTextPrimary else TextPrimary
+                        )
+                    }
+                    Text(
+                        text = result.summary,
+                        fontSize = 10.sp,
+                        color = if (LocalIsDarkTheme.current) DarkTextTertiary else TextTertiary,
+                        modifier = Modifier.padding(top = 4.dp),
+                        lineHeight = 14.sp
+                    )
+
+                    TextButton(
+                        onClick = { expanded = !expanded },
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        Text(
+                            if (expanded) "Hide checks" else "Show ${result.checks.size} checks",
+                            fontSize = 11.sp,
+                            color = AccentPurple
+                        )
+                    }
+
+                    AnimatedVisibility(visible = expanded) {
+                        Column(modifier = Modifier.padding(top = 4.dp)) {
+                            result.checks.forEach { check ->
+                                ValidationCheckRow(check)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ValidationCheckRow(check: ValidationCheck) {
+    val icon = if (check.passed) "✓" else "✗"
+    val color = if (check.passed) Color(0xFF16A34A) else Color(0xFFDC2626)
+    Row(
+        modifier = Modifier.padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = icon, fontSize = 12.sp, color = color, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.width(6.dp))
+        Column {
+            Text(
+                text = check.name,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (LocalIsDarkTheme.current) DarkTextPrimary else TextPrimary
+            )
+            Text(
+                text = "expected: ${check.expected} | actual: ${check.actual}",
+                fontSize = 10.sp,
+                color = if (LocalIsDarkTheme.current) DarkTextTertiary else TextTertiary
+            )
+        }
+    }
+}
+
+@Composable
+private fun SolarSystemQaSection(
+    viewModel: SolarSystemQaViewModel,
+    status: String?
+) {
+    SectionCard(title = "Solar System QA", subtitle = "Test visibility levels") {
+        val scenarios = listOf(
+            "Scenario A: 5 tasks" to { viewModel.createScenarioA() },
+            "Scenario B: 20 tasks" to { viewModel.createScenarioB() },
+            "Scenario C: 50+ tasks" to { viewModel.createScenarioC() },
+            "Empty Goal: 0 tasks" to { viewModel.createEmptyGoal() }
+        )
+        scenarios.forEach { (label, action) ->
+            Button(
+                onClick = action,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6D28D9)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 3.dp)
+            ) {
+                Text(label, color = Color.White, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+            }
+        }
+        Button(
+            onClick = { viewModel.clearQaData() },
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF97316)),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 3.dp)
+        ) {
+            Text("Clear QA Data", color = Color.White, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+        }
+        status?.let {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = it,
+                fontSize = 11.sp,
+                color = if (LocalIsDarkTheme.current) DarkTextTertiary else TextTertiary
+            )
+        }
+    }
+}
+
+@Composable
+private fun MirrorTestingSection(
+    viewModel: DebugMirrorViewModel,
+    result: List<MirrorInsight>,
+    status: String?,
+    scenario: String?
+) {
+    SectionCard(title = "Mirror Testing", subtitle = "Test Mirror signal detection") {
+        val buttons = listOf(
+            "7-Day History" to { viewModel.simulateHistory() },
+            "Boulder Scenario" to { viewModel.createBoulderScenario() },
+            "Goal Attention" to { viewModel.createGoalAttentionScenario() },
+            "Initiator/Finisher" to { viewModel.createInitiatorFinisherScenario() },
+            "Consistency Decay" to { viewModel.createConsistencyDecayScenario() }
+        )
+        buttons.forEach { (label, action) ->
+            Button(
+                onClick = action,
+                colors = ButtonDefaults.buttonColors(containerColor = AccentPurple),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 3.dp)
+            ) {
+                Text(label, color = Color.White, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+            }
+        }
+        Button(
+            onClick = { viewModel.clearTestData() },
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF97316)),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 3.dp)
+        ) {
+            Text("Clear Mirror Data", color = Color.White, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+        }
+
+        status?.let {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = it,
+                fontSize = 11.sp,
+                color = if (LocalIsDarkTheme.current) DarkTextTertiary else TextTertiary
+            )
+        }
+
+        if (result.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    scenario?.let {
+                        Text(
+                            text = "Scenario: $it",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                    Text(
+                        text = "Mirror detected (${result.size}):",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    result.forEach { insight ->
+                        Text(
+                            text = "• ${insight.title}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            text = insight.message,
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f),
+                            lineHeight = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CleanupSection(
+    isRunning: Boolean,
+    onClear: () -> Unit,
+    onClearSolarQa: () -> Unit,
+    onClearMirror: () -> Unit
+) {
+    SectionCard(title = "Cleanup", subtitle = "Remove all developer test data") {
+        Button(
+            onClick = {
+                onClear()
+                onClearSolarQa()
+                onClearMirror()
+            },
+            enabled = !isRunning,
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Clear All Developer Test Data", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+        Text(
+            text = "Removes: 🧪 Lab, 🧪 QA, 🧪 Mirror Test data only",
+            fontSize = 10.sp,
+            color = if (LocalIsDarkTheme.current) DarkTextTertiary else TextTertiary,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+    }
+}
+
+@Composable
+private fun ScenarioButton(
+    label: String,
+    color: Color,
+    scenario: ScenarioType,
+    isRunning: Boolean,
+    onClick: (ScenarioType) -> Unit
+) {
+    Button(
+        onClick = { onClick(scenario) },
+        enabled = !isRunning,
+        colors = ButtonDefaults.buttonColors(containerColor = color),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp)
+    ) {
+        Text(label, color = Color.White, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun SectionCard(
+    title: String,
+    subtitle: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (LocalIsDarkTheme.current)
+                DarkBackground.copy(alpha = 0.5f)
+            else
+                Color(0xFFF8FAFC)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (LocalIsDarkTheme.current) DarkTextPrimary else TextPrimary
+            )
+            Text(
+                text = subtitle,
+                fontSize = 10.sp,
+                color = if (LocalIsDarkTheme.current) DarkTextTertiary else TextTertiary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            content()
+        }
+    }
+}

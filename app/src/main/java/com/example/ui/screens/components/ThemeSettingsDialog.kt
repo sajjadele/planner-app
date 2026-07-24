@@ -21,6 +21,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.core.preferences.ThemeMode
 import com.example.ui.theme.*
 import com.example.BuildConfig
+import com.example.debug.ui.DeveloperLabDialog
 
 @Composable
 fun ThemeSettingsDialog(
@@ -28,10 +29,11 @@ fun ThemeSettingsDialog(
     onSelectTheme: (ThemeMode) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var showMirrorTest by remember { mutableStateOf(false) }
-    if (BuildConfig.DEBUG && showMirrorTest) {
-        MirrorTestDialog(onDismiss = { showMirrorTest = false })
+    var showDeveloperLab by remember { mutableStateOf(false) }
+    if (BuildConfig.DEBUG && showDeveloperLab) {
+        DeveloperLabDialog(onDismiss = { showDeveloperLab = false })
     }
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             colors = CardDefaults.cardColors(
@@ -177,15 +179,15 @@ fun ThemeSettingsDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Developer-only: Mirror Testing (DEBUG builds only)
+                // Developer-only: Developer Lab (DEBUG builds only)
                 if (BuildConfig.DEBUG) {
                     Button(
-                        onClick = { showMirrorTest = true },
+                        onClick = { showDeveloperLab = true },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6D28D9)),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("ابزارهای توسعه‌دهنده", color = Color.White, fontWeight = FontWeight.Medium)
+                        Text("Developer Lab", color = Color.White, fontWeight = FontWeight.Medium)
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -203,6 +205,7 @@ fun ThemeSettingsDialog(
         }
     }
 }
+
 
 private enum class ThemeOption(val title: String, val subtitle: String) {
     LIGHT("حالت روشن", "پس‌زمینه روشن با رنگ‌های بنفش"),

@@ -51,4 +51,7 @@ class RoomInsightRepository(private val insightDao: InsightDao) : InsightReposit
 
     override suspend fun getEarliestTaskDateEpochMs(): Long? =
         insightDao.getEarliestTaskDateEpochMs()
+
+    override suspend fun getLastMeaningfulInteractionPerTask(goalId: Int): List<TaskLastInteraction> =
+        insightDao.getLastMeaningfulInteractionPerTask(goalId)
 }

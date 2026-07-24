@@ -24,4 +24,10 @@ class RoomSnapshotRepository(private val snapshotDao: SnapshotDao) : SnapshotRep
 
     override suspend fun getCoveredDates(): List<Long> =
         snapshotDao.getCoveredDates()
+
+    override suspend fun deleteAllBehaviors() =
+        snapshotDao.deleteAllBehaviors()
+
+    override suspend fun deleteAllGoalProgress() =
+        snapshotDao.deleteAllGoalProgress()
 }

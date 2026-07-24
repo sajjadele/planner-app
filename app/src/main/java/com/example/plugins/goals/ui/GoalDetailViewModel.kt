@@ -14,8 +14,14 @@ import com.example.core.snapshot.RoomSnapshotRepository
 import com.example.core.snapshot.SnapshotAggregator
 import com.example.domain.goal.GoalProgress
 import com.example.domain.goal.GoalProgressCalculator
-import com.example.domain.graph.GoalGraph
-import com.example.domain.graph.GoalGraphBuilder
+import com.example.domain.attention.AttentionProvider
+import com.example.domain.attention.AttentionResult
+import com.example.domain.attention.TaskAttentionInput
+import com.example.domain.graph.TaskMetadata
+import com.example.domain.graph.VisibilityInput
+import com.example.domain.graph.VisibilityLevel
+import com.example.domain.graph.VisibilityResolver
+import com.example.domain.graph.VisibleGraphModel
 import com.example.domain.mirror.MirrorInsight
 import com.example.plugins.goals.GraphViewPreferences
 import com.example.plugins.planner.data.GoalRateResult
@@ -49,14 +55,17 @@ import java.util.Calendar
 /**
  * Performance Sprint 1 — lazy Behavioral Solar System computation.
  *
- * The graph is expensive (`GoalGraphBuilder.build` on [Dispatchers.Default]). It must only be computed
- * when the Graph sheet is open. `Ready` retains the last built graph as a cache after the sheet closes,
- * so re-opening is instant and live updates continue while open.
+ * Phase 2B+: [Ready] carries attention-driven [VisibleGraphModel] plus goal metadata
+ * (title/progress). Visibility decisions never live in Compose.
  */
 sealed interface GraphState {
     data object NotRequested : GraphState
     data object Loading : GraphState
-    data class Ready(val graph: GoalGraph) : GraphState
+    data class Ready(
+        val visibleGraph: VisibleGraphModel,
+        val goalTitle: String,
+        val goalProgressOverall: Float
+    ) : GraphState
     data class Error(val throwable: Throwable) : GraphState
 }
 
@@ -282,12 +291,10 @@ class GoalDetailViewModel(
         // No long-running collector for Mirror; nothing to cancel. Cache is retained implicitly.
     }
 
-    // ── Behavioral Solar System graph (Phase 6) ──
+    // ── Behavioral Solar System graph (Phase 6 / 2B+) ──
 
     /**
-     * Live reschedule counts for this goal's tasks (drives the "Boulder" flag). Sprint 3 (Phase 3.1):
-     * NO longer collected on Goal Detail open — fetched on demand only when the Graph sheet opens (see
-     * [startGraphComputation]), so the `task_events` join is removed from the initial load path.
+     * Live reschedule counts for this goal's tasks. Fetched on demand when the Graph sheet opens.
      */
     private suspend fun loadRescheduleCounts(): Map<Int, Int> =
         insightRepository.observeRescheduleCountsByGoal(goalId)
@@ -295,31 +302,62 @@ class GoalDetailViewModel(
             .first()
 
     /**
-     * Cold source for the Behavioral Solar System graph. Pure transformation of existing reactive
-     * sources into a [GoalGraph]; it is NOT collected until the Graph sheet opens (Sprint 1 lazy rule),
-     * so `GoalGraphBuilder.build` never runs on Goal Detail open or on task toggles while closed.
-     * Reschedule counts are injected at collection time (lazy, Phase 3.1) rather than via a separate
-     * always-on flow.
+     * Reactive graph pipeline (Phase 2B+ migration checkpoint):
+     *
+     * allTasks (+ reschedule / meaningful interaction snapshots while open)
+     *   → AttentionProvider (recomputed every emission)
+     *   → VisibilityResolver
+     *   → VisibleGraphModel
+     *
+     * Visibility decisions are never made in GoalGraphBuilder or Compose.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    private fun graphSource(rescheduleCounts: Map<Int, Int>): Flow<GoalGraph> =
-        combine(goal, allTasks, goalProgress) { g, ts, progress ->
+    private fun graphSource(
+        rescheduleCounts: Map<Int, Int>,
+        meaningfulInteractions: Map<Int, Long>
+    ): Flow<Triple<VisibleGraphModel, String, Float>> =
+        combine(goal, allTasks, goalProgress, _visibilityLevel) { g, ts, progress, level ->
             if (g == null) return@combine null
-            GoalGraphBuilder.build(
-                goalId = g.id,
-                goalTitle = g.title,
-                tasks = ts.map { task ->
-                    GoalGraphBuilder.TaskInput(
-                        id = task.id,
-                        title = task.title,
-                        priority = task.priority,
-                        isCompleted = task.isCompleted,
-                        dateEpochMs = task.dateEpochMs
-                    )
-                },
-                rescheduleCounts = rescheduleCounts,
-                progress = progress
+
+            val nowMillis = System.currentTimeMillis()
+            val activeTasks = ts.filter { !it.isCompleted }
+
+            // Reactive attention: recompute on every task list emission while sheet is open.
+            val attentionInputs = activeTasks.map { task ->
+                TaskAttentionInput(
+                    id = task.id,
+                    title = task.title,
+                    dateEpochMs = task.dateEpochMs,
+                    deadlineEpochMs = task.deadlineEpochMs,
+                    lastMeaningfulInteractionMs = meaningfulInteractions[task.id],
+                    rescheduleCount = rescheduleCounts[task.id] ?: 0
+                )
+            }
+            val attentionLookup = AttentionProvider.compute(attentionInputs, nowMillis)
+            _attentionResults.value = attentionLookup
+
+            val taskMetadata = activeTasks.associate { task ->
+                task.id to TaskMetadata(
+                    id = task.id,
+                    title = task.title,
+                    priority = task.priority,
+                    dateEpochMs = task.dateEpochMs,
+                    deadlineEpochMs = task.deadlineEpochMs,
+                    rescheduleCount = rescheduleCounts[task.id] ?: 0
+                )
+            }
+
+            val visibleGraph = VisibilityResolver.resolve(
+                VisibilityInput(
+                    activeTaskIds = activeTasks.map { it.id },
+                    attentionResults = attentionLookup,
+                    taskMetadata = taskMetadata,
+                    level = level,
+                    nowMillis = nowMillis
+                )
             )
+
+            Triple(visibleGraph, g.title, progress?.overall ?: 0f)
         }.filterNotNull()
 
     /**
@@ -334,6 +372,55 @@ class GoalDetailViewModel(
 
     private val _showGraphSheet = MutableStateFlow(false)
     val showGraphSheet: StateFlow<Boolean> = _showGraphSheet
+
+    /**
+     * Phase 2B — progressive disclosure level owned by the ViewModel.
+     * VisibilityResolver receives this level and returns one resolved VisibleGraphModel.
+     */
+    private val _visibilityLevel = MutableStateFlow(VisibilityLevel.OVERVIEW)
+    val visibilityLevel: StateFlow<VisibilityLevel> = _visibilityLevel
+
+    fun setVisibilityLevel(level: VisibilityLevel) {
+        _visibilityLevel.value = level
+    }
+
+    /**
+     * Progressive disclosure from graph chrome ("N more"): OVERVIEW → EXPANDED → INSIGHT.
+     * INSIGHT only when active density exceeds the domain cluster threshold. No mode picker.
+     */
+    fun revealMoreTasks() {
+        when (_visibilityLevel.value) {
+            VisibilityLevel.OVERVIEW -> {
+                _visibilityLevel.value = VisibilityLevel.EXPANDED
+                _expandedClusterId.value = null
+            }
+            VisibilityLevel.EXPANDED -> {
+                val activeCount = allTasks.value.count { !it.isCompleted }
+                if (activeCount > VisibilityResolver.CLUSTER_THRESHOLD) {
+                    _visibilityLevel.value = VisibilityLevel.INSIGHT
+                    _expandedClusterId.value = null
+                }
+            }
+            VisibilityLevel.INSIGHT -> Unit
+        }
+    }
+
+    /**
+     * Phase 2B — expanded cluster id owned by ViewModel because it affects visible content.
+     * Null means overview (no cluster expanded).
+     */
+    private val _expandedClusterId = MutableStateFlow<Int?>(null)
+    val expandedClusterId: StateFlow<Int?> = _expandedClusterId
+
+    fun setExpandedClusterId(clusterId: Int?) {
+        _expandedClusterId.value = clusterId
+    }
+
+    /** Toggle cluster expansion in place (re-tap collapses). */
+    fun toggleExpandedCluster(clusterId: Int) {
+        _expandedClusterId.value =
+            if (_expandedClusterId.value == clusterId) null else clusterId
+    }
 
     /**
      * One-shot event: open the read-only task preview popup exactly once per satellite tap.
@@ -351,13 +438,18 @@ class GoalDetailViewModel(
 
     fun setGraphSheetVisible(visible: Boolean) {
         _showGraphSheet.value = visible
-        if (visible) startGraphComputation() else stopGraphComputation()
+        if (visible) {
+            startGraphComputation()
+        } else {
+            stopGraphComputation()
+            _expandedClusterId.value = null
+            _visibilityLevel.value = VisibilityLevel.OVERVIEW
+        }
     }
 
     /**
-     * Begin lazily collecting [graphSource] (Sprint 1). Re-emits on every source change while open, so
-     * the graph stays live during task toggles. The last [GraphState.Ready] is retained as a cache; we
-     * only reset to [GraphState.Loading] if we had no cached graph yet.
+     * Begin lazily collecting [graphSource]. Re-emits on every source change while open so
+     * attention + visibility stay live during task toggles.
      */
     private fun startGraphComputation() {
         if (graphCollectionJob?.isActive == true) return
@@ -365,13 +457,33 @@ class GoalDetailViewModel(
             _goalGraphState.value = GraphState.Loading
         }
         graphCollectionJob = viewModelScope.launch {
-            // Phase 3.1: fetch reschedule counts only now (Graph sheet open), not on Goal Detail open.
             val rescheduleCounts = loadRescheduleCounts()
-            graphSource(rescheduleCounts).collect { graph ->
-                _goalGraphState.value = GraphState.Ready(graph)
+            val meaningfulInteractions = loadMeaningfulInteractions()
+            graphSource(rescheduleCounts, meaningfulInteractions).collect { (visible, title, progress) ->
+                _goalGraphState.value = GraphState.Ready(
+                    visibleGraph = visible,
+                    goalTitle = title,
+                    goalProgressOverall = progress
+                )
             }
         }
     }
+
+    /**
+     * Phase 2A: fetch last meaningful interaction timestamp per task for this goal.
+     * Fetched lazily on Graph sheet open (same pattern as reschedule counts).
+     * Returns taskId → last meaningful timestamp (epoch ms).
+     */
+    private suspend fun loadMeaningfulInteractions(): Map<Int, Long> =
+        insightRepository.getLastMeaningfulInteractionPerTask(goalId)
+            .associate { it.taskId to it.lastMeaningfulMs }
+
+    /**
+     * Attention results for this goal's active tasks. Updated reactively while the Graph sheet
+     * is open (every allTasks emission). Completed tasks are excluded (completion gate).
+     */
+    private val _attentionResults = MutableStateFlow<Map<Int, AttentionResult>>(emptyMap())
+    val attentionResults: StateFlow<Map<Int, AttentionResult>> = _attentionResults
 
     /**
      * Stop graph collection on sheet close (Sprint 1). The last [GraphState.Ready] is intentionally

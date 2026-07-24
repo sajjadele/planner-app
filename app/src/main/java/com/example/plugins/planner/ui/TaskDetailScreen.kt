@@ -246,27 +246,30 @@ fun TaskDetailScreen(
 
                     val context = LocalContext.current
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            .clickable {
-                                val cal = java.util.Calendar.getInstance()
-                                val h = task?.reminderHour ?: cal.get(java.util.Calendar.HOUR_OF_DAY)
-                                val m = task?.reminderMinute ?: cal.get(java.util.Calendar.MINUTE)
-                                TimePickerDialog(
-                                    context,
-                                    { _, hourOfDay, minute ->
-                                        viewModel.setReminder(hourOfDay, minute)
-                                    },
-                                    h, m, true
-                                ).show()
-                            }
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .clickable {
+                                    val cal = java.util.Calendar.getInstance()
+                                    val h = task?.reminderHour ?: cal.get(java.util.Calendar.HOUR_OF_DAY)
+                                    val m = task?.reminderMinute ?: cal.get(java.util.Calendar.MINUTE)
+                                    TimePickerDialog(
+                                        context,
+                                        { _, hourOfDay, minute ->
+                                            viewModel.setReminder(hourOfDay, minute)
+                                        },
+                                        h, m, true
+                                    ).show()
+                                }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.AccessTime,
                                 contentDescription = null,
@@ -287,7 +290,7 @@ fun TaskDetailScreen(
                         if (task?.reminderHour != null) {
                             IconButton(
                                 onClick = { viewModel.clearReminder() },
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(24.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Close,

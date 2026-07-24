@@ -92,6 +92,7 @@ fun GoalDetailScreen(
 
     var selectedTaskId by remember { mutableStateOf<Int?>(null) }
     var previewTask by remember { mutableStateOf<TaskEntity?>(null) }
+    var graphSelectedTaskId by remember { mutableStateOf<Int?>(null) }
     var showEditGoalDialog by remember { mutableStateOf(false) }
     var showHomeHint by remember { mutableStateOf(isOnboarding) }
     var showStatusMenu by remember { mutableStateOf(false) }
@@ -200,16 +201,24 @@ fun GoalDetailScreen(
 
     // ── Behavioral Solar System graph sheet (user-controlled) ──
     if (showGraphSheet) {
-        val graph = (goalGraphState as? com.example.plugins.goals.ui.GraphState.Ready)?.graph
-        if (graph != null) {
+        val ready = goalGraphState as? com.example.plugins.goals.ui.GraphState.Ready
+        if (ready != null) {
         ModalBottomSheet(
             onDismissRequest = { viewModel.setGraphSheetVisible(false) },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
+            val expandedClusterId by viewModel.expandedClusterId.collectAsState()
             GoalGraphSheetContent(
-                graph = graph,
+                visibleGraph = ready.visibleGraph,
+                goalTitle = ready.goalTitle,
+                expandedClusterId = expandedClusterId,
+                onExpandedClusterChange = { viewModel.setExpandedClusterId(it) },
+                onToggleCluster = { viewModel.toggleExpandedCluster(it) },
+                onRevealMore = { viewModel.revealMoreTasks() },
+                selectedTaskId = graphSelectedTaskId,
+                onSelectedTaskChange = { graphSelectedTaskId = it },
                 autoShowEducation = showGraphEducation,
                 onEducationDismissed = { viewModel.markGraphIntroductionSeen() },
                 onTaskTap = { viewModel.requestTaskPreview(it) }
@@ -222,7 +231,10 @@ fun GoalDetailScreen(
     previewTask?.let { task ->
         TaskPreviewDialog(
             task = task,
-            onDismiss = { previewTask = null }
+            onDismiss = {
+                previewTask = null
+                graphSelectedTaskId = null
+            }
         )
     }
 

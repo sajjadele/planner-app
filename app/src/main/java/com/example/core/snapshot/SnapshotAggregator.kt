@@ -94,6 +94,16 @@ class SnapshotAggregator(
         }
     }
 
+    /**
+     * Delete all behavior and goal-progress snapshots.
+     * Used by Developer Lab cleanup to ensure stale debug data does not
+     * interfere with subsequent scenario generation.
+     */
+    suspend fun clearAllSnapshots() {
+        snapshotRepository.deleteAllBehaviors()
+        snapshotRepository.deleteAllGoalProgress()
+    }
+
     private fun BehaviorSnapshotData.toEntity() = BehaviorSnapshotEntity(
         dateEpochMs = dateEpochMs,
         completed = completed,

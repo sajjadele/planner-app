@@ -114,19 +114,23 @@ Goals of this phase:
 
 ## Phase 6 — Graph Exploration
 
-**Status:** In progress (foundation aligned — 6.1; visual language delivered — 6.2; adaptive clusters delivered — 6.3; motion & animation delivered — 6.4)
+**Status:** In progress (foundation 6.1–6.5 complete; **Phase 2A Attention Foundation complete**; **Phase 2B Visibility Resolver complete**)
 
 Goals of this phase:
 - Simple Goal→Task graph
 - Computed on demand, never stored
 - Visual understanding tool, not a complex knowledge graph
 - Behavioral Solar System: Goal = Sun, tasks = orbiting satellites
+- Attention-driven gravity and progressive visibility (2A/2B)
 
-Status (6.1): domain layer (`domain.graph`) + ViewModel pipeline + Compose Canvas renderer +
-Galaxy entry button + mandatory Help/Legend are implemented and aligned; 9 builder tests passing.
-Remaining: visual polish (6.2); V2 deadline-aware radius, drift/decay; Phase 7 (AI) depends on this.
+Status (2B): `VisibilityResolver` selects overview/expanded/insight content from AttentionScore;
+continuous orbit radius; attention-band clustering; renderer consumes `VisibleGraphModel`.
+Decision record: `docs/ADR/ADR-0014-visibility-resolver.md`
 
-Decision record: `docs/ADR/ADR-0002-graph-architecture.md`, `docs/ADR/ADR-0004-graph-solar-system.md`, `docs/ADR/ADR-0005-behavioral-solar-system.md`
+Status (6.1–6.5): domain layer + ViewModel pipeline + Compose Canvas renderer + adaptive density
+and visual polish delivered earlier.
+
+Decision records: `docs/ADR/ADR-0002-graph-architecture.md`, `docs/ADR/ADR-0004-graph-solar-system.md`, `docs/ADR/ADR-0005-behavioral-solar-system.md`, `docs/ADR/ADR-0014-visibility-resolver.md`
 
 ---
 

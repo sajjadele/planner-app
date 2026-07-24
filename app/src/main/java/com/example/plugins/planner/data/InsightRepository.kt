@@ -27,4 +27,7 @@ interface InsightRepository {
     fun observeRescheduleCountBetween(start: Long, end: Long): Flow<Int>
     suspend fun getGoalDayCounts(goalId: Int, start: Long, end: Long): GoalDayCount
     suspend fun getEarliestTaskDateEpochMs(): Long?
+
+    // ── Phase 2A: Attention — meaningful interaction timestamps ──
+    suspend fun getLastMeaningfulInteractionPerTask(goalId: Int): List<TaskLastInteraction>
 }
