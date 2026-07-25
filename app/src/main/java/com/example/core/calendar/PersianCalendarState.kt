@@ -42,6 +42,7 @@ class PersianCalendarState(
 
     fun selectDate(epochMs: Long) {
         _localSelectedEpochMs.value = epochMs
+        _monthOffset.intValue = 0
     }
 
     fun previousMonth() {

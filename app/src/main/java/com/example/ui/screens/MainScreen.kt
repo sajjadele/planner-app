@@ -79,7 +79,7 @@ fun MainScreen(
         true -> { /* fall through to the main Planner dashboard below */ }
     }
 
-    // Primary navigation tabs: Planner + Goals (Notes stays in top bar)
+    // Primary navigation tabs: Planner + Goals
     val primaryTabIds = listOf("planner", "goals")
 
     // All enabled plugins (for content rendering)
@@ -155,7 +155,6 @@ fun MainScreen(
         topBar = {
             MainTopBar(
                 onSearchClick = { showSearchDialog = true },
-                onNotesClick = { selectedTabId = "notes" },
                 onSettingsClick = { showThemeSettings = true }
             )
         },
@@ -323,9 +322,6 @@ fun MainScreen(
             onNavigateToTask = { dateEpochMs ->
                 plannerViewModel.selectDate(dateEpochMs)
                 selectedTabId = "planner"
-            },
-            onNavigateToNotes = {
-                selectedTabId = "notes"
             }
         )
     }

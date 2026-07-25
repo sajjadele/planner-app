@@ -1,6 +1,5 @@
 package com.example.plugins.planner.ui.components
 
-import android.app.TimePickerDialog
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -101,7 +100,6 @@ fun AddTaskDialog(
             cal.timeInMillis
         }
         val focusRequester = remember { FocusRequester() }
-        val context = LocalContext.current
 
         // When opened from a goal (e.g. Goal Detail empty state), preselect that goal so the
         // task is linked on creation. Reuses the existing goal picker — no new creation flow.
@@ -134,24 +132,6 @@ fun AddTaskDialog(
                 )
                 onDismiss()
             }
-        }
-
-        // Open a standard Android TimePickerDialog
-        val showTimePicker = {
-            val calendar = Calendar.getInstance()
-            val currentHour = selectedHour ?: calendar.get(Calendar.HOUR_OF_DAY)
-            val currentMinute = selectedMinute ?: calendar.get(Calendar.MINUTE)
-
-            TimePickerDialog(
-                context,
-                { _, hourOfDay, minute ->
-                    selectedHour = hourOfDay
-                    selectedMinute = minute
-                },
-                currentHour,
-                currentMinute,
-                true // 24-hour format
-            ).show()
         }
 
         Card(
@@ -426,70 +406,20 @@ fun AddTaskDialog(
                         }
 
                         // ============================================
-                        // Reminder Time — Alarm/Clock button
+                        // Reminder
                         // ============================================
-                        Column {
-                            Text(
-                                text = "زمان یادآوری",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(
-                                        border = BorderStroke(
-                                            1.dp,
-                                            if (selectedHour != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                                        ),
-                                        shape = RoundedCornerShape(12.dp)
-                                    )
-                                    .clickable { showTimePicker() }
-                                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.AccessTime,
-                                        contentDescription = null,
-                                        tint = if (selectedHour != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = if (selectedHour != null && selectedMinute != null)
-                                            "امروز، ساعت ${String.format("%02d:%02d", selectedHour, selectedMinute).isolated()}"
-                                        else
-                                            "تنظیم زمان یادآوری",
-                                        fontSize = 13.sp,
-                                        color = if (selectedHour != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
-                                if (selectedHour != null) {
-                                    IconButton(
-                                        onClick = {
-                                            selectedHour = null
-                                            selectedMinute = null
-                                        },
-                                        modifier = Modifier.size(20.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = "حذف",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
+                        ReminderSection(
+                            reminderHour = selectedHour,
+                            reminderMinute = selectedMinute,
+                            onSetReminder = { h, m ->
+                                selectedHour = h
+                                selectedMinute = m
+                            },
+                            onClearReminder = {
+                                selectedHour = null
+                                selectedMinute = null
                             }
-                        }
+                        )
 
                         // ============================================
                         // Life Area — 2×3 grid for clean layout

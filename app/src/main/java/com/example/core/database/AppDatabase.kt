@@ -18,8 +18,12 @@ import com.example.plugins.notes.data.NoteEntity
 import com.example.plugins.planner.data.InsightDao
 import com.example.plugins.planner.data.TaskDao
 import com.example.plugins.planner.data.TaskEntity
+import com.example.plugins.planner.data.ActivityEventDao
+import com.example.plugins.planner.data.ActivityEventEntity
 import com.example.plugins.planner.data.TaskEventDao
 import com.example.plugins.planner.data.TaskEventEntity
+import com.example.plugins.planner.data.TaskStepDao
+import com.example.plugins.planner.data.TaskStepEntity
 
 @Database(
     entities = [
@@ -30,9 +34,11 @@ import com.example.plugins.planner.data.TaskEventEntity
         BehaviorSnapshotEntity::class,
         TaskEntity::class,
         TaskEventEntity::class,
-        NoteEntity::class
+        NoteEntity::class,
+        ActivityEventEntity::class,
+        TaskStepEntity::class
     ],
-    version = 12,
+    version = 14,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -44,6 +50,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun taskEventDao(): TaskEventDao
     abstract fun insightDao(): InsightDao
     abstract fun noteDao(): NoteDao
+    abstract fun activityEventDao(): ActivityEventDao
+    abstract fun taskStepDao(): TaskStepDao
 
     companion object {
         @Volatile
@@ -219,6 +227,57 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v12 → v13: Phase 3.1 — ActivityEvent infrastructure.
+         *
+         * New `activity_events` table for user actions inside a task
+         * (step created/completed, note added, file uploaded).
+         * Independent from `task_events` which tracks task lifecycle only.
+         * No existing tables are modified.
+         */
+        private val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS activity_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        taskId INTEGER NOT NULL,
+                        stepId INTEGER,
+                        eventType TEXT NOT NULL,
+                        description TEXT,
+                        timestamp INTEGER NOT NULL,
+                        FOREIGN KEY(taskId) REFERENCES tasks(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_activity_events_taskId ON activity_events(taskId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_activity_events_timestamp ON activity_events(timestamp)")
+            }
+        }
+
+        /**
+         * v13 → v14: Phase 3.2 — TaskStep infrastructure.
+         *
+         * New `task_steps` table for optional step containers inside a task.
+         * Steps are optional structure — users are not forced to create them.
+         * Step completion is visual only; it does not affect task/goal completion or attention score.
+         * No existing tables are modified.
+         */
+        private val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS task_steps (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        taskId INTEGER NOT NULL,
+                        title TEXT NOT NULL,
+                        isCompleted INTEGER NOT NULL DEFAULT 0,
+                        createdAt INTEGER NOT NULL,
+                        completedAt INTEGER,
+                        FOREIGN KEY(taskId) REFERENCES tasks(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_task_steps_taskId ON task_steps(taskId)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -233,7 +292,9 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_8_9,
                     MIGRATION_9_10,
                     MIGRATION_10_11,
-                    MIGRATION_11_12
+                    MIGRATION_11_12,
+                    MIGRATION_12_13,
+                    MIGRATION_13_14
                 )
                 .fallbackToDestructiveMigration()
                 .build()

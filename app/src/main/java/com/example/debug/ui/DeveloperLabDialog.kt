@@ -1,6 +1,7 @@
 package com.example.debug.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,6 +22,8 @@ import com.example.debug.validation.ValidationCheck
 import com.example.debug.validation.ValidationResult
 import com.example.debug.validation.ValidationReportFormatter
 import com.example.domain.mirror.MirrorInsight
+import com.example.plugins.planner.data.TaskEntity
+import com.example.plugins.planner.data.TaskStepEntity
 import com.example.ui.screens.components.DebugMirrorViewModel
 import com.example.ui.screens.components.SolarSystemQaViewModel
 import com.example.ui.theme.*
@@ -30,13 +33,15 @@ fun DeveloperLabDialog(
     onDismiss: () -> Unit,
     viewModel: DeveloperLabViewModel = viewModel(),
     solarQaViewModel: SolarSystemQaViewModel = viewModel(),
-    mirrorViewModel: DebugMirrorViewModel = viewModel()
+    mirrorViewModel: DebugMirrorViewModel = viewModel(),
+    activityLabViewModel: ActivityLabViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
     val solarStatus by solarQaViewModel.status.collectAsState()
     val mirrorResult by mirrorViewModel.lastResult.collectAsState()
     val mirrorStatus by mirrorViewModel.status.collectAsState()
     val mirrorScenario by mirrorViewModel.lastScenario.collectAsState()
+    val activityLabState by activityLabViewModel.state.collectAsState()
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -106,6 +111,16 @@ fun DeveloperLabDialog(
                     result = mirrorResult,
                     status = mirrorStatus,
                     scenario = mirrorScenario
+                )
+
+                ActivityLabSection(
+                    state = activityLabState,
+                    onSelectTask = { activityLabViewModel.selectTask(it) },
+                    onStepInputChange = { activityLabViewModel.updateStepInput(it) },
+                    onAddStep = { activityLabViewModel.addStep() },
+                    onToggleStep = { activityLabViewModel.toggleStepCompletion(it) },
+                    onDeleteStep = { activityLabViewModel.deleteStep(it) },
+                    onRunVerification = { activityLabViewModel.runVerification() }
                 )
 
                 CleanupSection(
@@ -394,6 +409,257 @@ private fun MirrorTestingSection(
                         Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityLabSection(
+    state: ActivityLabUiState,
+    onSelectTask: (TaskEntity) -> Unit,
+    onStepInputChange: (String) -> Unit,
+    onAddStep: () -> Unit,
+    onToggleStep: (TaskStepEntity) -> Unit,
+    onDeleteStep: (TaskStepEntity) -> Unit,
+    onRunVerification: () -> Unit
+) {
+    SectionCard(title = "Activity Lab", subtitle = "Test steps and activity events") {
+        // Task selector
+        Text(
+            text = "Task Selector",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (LocalIsDarkTheme.current) DarkTextPrimary else TextPrimary
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+
+        var taskDropdownExpanded by remember { mutableStateOf(false) }
+        Box {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { taskDropdownExpanded = true }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = state.selectedTask?.let { "${it.title} (ID: ${it.id})" } ?: "Select a task...",
+                        fontSize = 12.sp,
+                        color = if (state.selectedTask != null)
+                            MaterialTheme.colorScheme.onSurface
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text("▼", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            DropdownMenu(
+                expanded = taskDropdownExpanded,
+                onDismissRequest = { taskDropdownExpanded = false }
+            ) {
+                state.tasks.forEach { task ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                "${task.title} (ID: ${task.id})",
+                                fontSize = 12.sp
+                            )
+                        },
+                        onClick = {
+                            onSelectTask(task)
+                            taskDropdownExpanded = false
+                        }
+                    )
+                }
+                if (state.tasks.isEmpty()) {
+                    DropdownMenuItem(
+                        text = { Text("No tasks available", fontSize = 12.sp) },
+                        onClick = { taskDropdownExpanded = false }
+                    )
+                }
+            }
+        }
+
+        if (state.selectedTask != null) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Step input
+            Text(
+                text = "Add Step",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (LocalIsDarkTheme.current) DarkTextPrimary else TextPrimary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = state.stepInput,
+                    onValueChange = onStepInputChange,
+                    placeholder = { Text("Step title...", fontSize = 12.sp) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(fontSize = 12.sp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = onAddStep,
+                    enabled = state.stepInput.isNotBlank() && !state.isRunning,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Add", color = Color.White, fontSize = 12.sp)
+                }
+            }
+
+            // Steps list
+            if (state.steps.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Steps (${state.steps.size})",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (LocalIsDarkTheme.current) DarkTextPrimary else TextPrimary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                state.steps.forEach { step ->
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = step.isCompleted,
+                                onCheckedChange = { onToggleStep(step) },
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = step.title,
+                                    fontSize = 12.sp,
+                                    color = if (LocalIsDarkTheme.current) DarkTextPrimary else TextPrimary
+                                )
+                                Text(
+                                    text = "ID: ${step.id}",
+                                    fontSize = 9.sp,
+                                    color = if (LocalIsDarkTheme.current) DarkTextTertiary else TextTertiary
+                                )
+                            }
+                            TextButton(
+                                onClick = { onDeleteStep(step) },
+                                modifier = Modifier.padding(0.dp)
+                            ) {
+                                Text("Delete", fontSize = 10.sp, color = Color(0xFFDC2626))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Activity timeline
+            if (state.activities.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Activity Timeline (${state.activities.size})",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (LocalIsDarkTheme.current) DarkTextPrimary else TextPrimary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                state.activities.take(10).forEach { event ->
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 8.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = event.eventType,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "stepId: ${event.stepId ?: "none"}",
+                                    fontSize = 9.sp,
+                                    color = if (LocalIsDarkTheme.current) DarkTextTertiary else TextTertiary
+                                )
+                            }
+                            event.description?.let {
+                                Text(
+                                    text = it,
+                                    fontSize = 11.sp,
+                                    color = if (LocalIsDarkTheme.current) DarkTextPrimary else TextPrimary
+                                )
+                            }
+                        }
+                    }
+                }
+                if (state.activities.size > 10) {
+                    Text(
+                        text = "...and ${state.activities.size - 10} more",
+                        fontSize = 10.sp,
+                        color = if (LocalIsDarkTheme.current) DarkTextTertiary else TextTertiary,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Verification button
+        Button(
+            onClick = onRunVerification,
+            enabled = state.selectedTask != null && !state.isRunning,
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Run Verification", color = Color.White, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+        }
+
+        // Status
+        state.status?.let { status ->
+            Spacer(modifier = Modifier.height(6.dp))
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = status,
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(10.dp),
+                    lineHeight = 14.sp
+                )
             }
         }
     }
