@@ -11,10 +11,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.core.util.RTL
 import com.example.plugins.planner.data.ActivityEventEntity
-import com.example.plugins.planner.data.ActivityEventType
 import com.example.plugins.planner.data.TaskEntity
 import com.example.plugins.planner.data.TaskStepEntity
 import com.example.plugins.planner.ui.components.NeumorphicSurface
@@ -68,12 +67,11 @@ fun TaskDetailScreen(
     var editableTitle by remember(task) { mutableStateOf(task?.title ?: "") }
     var showGoalDropdown by remember { mutableStateOf(false) }
     var logInput by remember { mutableStateOf("") }
-    var stepInput by remember { mutableStateOf("") }
-
     val focusManager = LocalFocusManager.current
     var selectedTab by remember { mutableIntStateOf(0) }
     val activityListState = rememberLazyListState()
     var showTimelineSheet by remember { mutableStateOf(false) }
+    var showActivityComposer by remember { mutableStateOf(false) }
 
     val currentGoalName = remember(task, allGoals) {
         task?.goalId?.let { gid -> allGoals.firstOrNull { it.id == gid }?.title }
@@ -138,15 +136,7 @@ fun TaskDetailScreen(
                         .padding(horizontal = 16.dp),
                     steps = steps,
                     activities = activities,
-                    stepInput = stepInput,
-                    onStepInputChange = { stepInput = it },
-                    onAddStep = {
-                        if (stepInput.isNotBlank()) {
-                            viewModel.addStep(stepInput)
-                            stepInput = ""
-                            focusManager.clearFocus()
-                        }
-                    },
+                    onTapComposer = { showActivityComposer = true },
                     onToggleStep = { viewModel.toggleStepCompletion(it) },
                     onDeleteStep = { viewModel.deleteStep(it) },
                     listState = activityListState,
@@ -166,6 +156,32 @@ fun TaskDetailScreen(
             onGoToToday = { viewModel.goToToday() },
             onMoveDate = { viewModel.moveActivityDate(it) }
         )
+
+        if (showActivityComposer) {
+            ActivityComposerBottomSheet(
+                onDismiss = { showActivityComposer = false },
+                onAddStep = { title ->
+                    viewModel.addStep(title)
+                    showActivityComposer = false
+                    focusManager.clearFocus()
+                },
+                onAddNote = { text ->
+                    viewModel.addNote(text)
+                    showActivityComposer = false
+                    focusManager.clearFocus()
+                },
+                onAddManualActivity = { title, durationMinutes ->
+                    viewModel.addManualActivity(title, durationMinutes)
+                    showActivityComposer = false
+                    focusManager.clearFocus()
+                },
+                onAddImage = { uri, description ->
+                    viewModel.addImage(uri, description)
+                    showActivityComposer = false
+                    focusManager.clearFocus()
+                }
+            )
+        }
     }
 }
 
@@ -395,9 +411,7 @@ private fun TaskDetailActivityContent(
     modifier: Modifier = Modifier,
     steps: List<TaskStepEntity>,
     activities: List<ActivityEventEntity>,
-    stepInput: String,
-    onStepInputChange: (String) -> Unit,
-    onAddStep: () -> Unit,
+    onTapComposer: () -> Unit,
     onToggleStep: (TaskStepEntity) -> Unit,
     onDeleteStep: (TaskStepEntity) -> Unit,
     listState: LazyListState = rememberLazyListState(),
@@ -418,67 +432,6 @@ private fun TaskDetailActivityContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             )
-        }
-
-        // ── Add Step Input ──
-        item(key = "add_step") {
-            NeumorphicSurface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 2.dp),
-                shape = RoundedCornerShape(14.dp),
-                elevation = 4
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = stepInput,
-                        onValueChange = onStepInputChange,
-                        placeholder = {
-                            Text(
-                                "${RTL}مرحله جدید...",
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            cursorColor = MaterialTheme.colorScheme.primary,
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                        ),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = {
-                            if (stepInput.isNotBlank()) {
-                                onAddStep()
-                            }
-                        })
-                    )
-
-                    IconButton(
-                        onClick = {
-                            if (stepInput.isNotBlank()) {
-                                onAddStep()
-                            }
-                        },
-                        enabled = stepInput.isNotBlank()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Send,
-                            contentDescription = "${RTL}افزودن",
-                            tint = if (stepInput.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
         }
 
         // ── Steps List or Empty State ──
@@ -518,6 +471,31 @@ private fun TaskDetailActivityContent(
                 thickness = 1.dp,
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
             )
+        }
+
+        // ── Activity Header ──
+        item(key = "activity_header") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${RTL}فعالیت‌ها",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                IconButton(onClick = onTapComposer) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "${RTL}افزودن فعالیت",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
         }
 
         // ── Timeline Preview Card ──
@@ -620,7 +598,18 @@ private fun TimelinePreviewCard(
                 )
             }
         } else {
-            val latestEvent = activities.maxByOrNull { it.timestamp }
+            val colorScheme = MaterialTheme.colorScheme
+            val uiModels = remember(activities, colorScheme) {
+                TimelineEventMapper.mapEvents(
+                    events = activities,
+                    useTimeOnly = false,
+                    primary = colorScheme.primary,
+                    error = colorScheme.error,
+                    tertiary = colorScheme.tertiary,
+                    outline = colorScheme.outline
+                )
+            }
+            val latestModel = uiModels.maxByOrNull { it.timestamp }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -637,9 +626,9 @@ private fun TimelinePreviewCard(
                     )
                 }
 
-                if (latestEvent != null) {
+                if (latestModel != null) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    TimelinePreviewLatestEvent(event = latestEvent)
+                    TimelinePreviewLatestEvent(uiModel = latestModel)
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -655,57 +644,54 @@ private fun TimelinePreviewCard(
 }
 
 @Composable
-private fun TimelinePreviewLatestEvent(event: ActivityEventEntity) {
-    val eventType = try {
-        ActivityEventType.valueOf(event.eventType)
-    } catch (_: Exception) {
-        null
-    }
-
-    val title = when (eventType) {
-        ActivityEventType.STEP_CREATED -> "${RTL}مرحله ایجاد شد"
-        ActivityEventType.STEP_COMPLETED -> "${RTL}مرحله تکمیل شد"
-        ActivityEventType.STEP_REOPENED -> "${RTL}مرحله بازگشایی شد"
-        ActivityEventType.STEP_DELETED -> "${RTL}مرحله حذف شد"
-        ActivityEventType.NOTE_ADDED -> "${RTL}یادداشت اضافه شد"
-        ActivityEventType.FILE_ADDED -> "${RTL}فایل اضافه شد"
-        null -> "${RTL}${event.eventType}"
-    }
-
-    val icon = when (eventType) {
-        ActivityEventType.STEP_CREATED -> "＋"
-        ActivityEventType.STEP_COMPLETED -> "✓"
-        ActivityEventType.STEP_REOPENED -> "↻"
-        ActivityEventType.STEP_DELETED -> "✕"
-        ActivityEventType.NOTE_ADDED -> "📝"
-        ActivityEventType.FILE_ADDED -> "📎"
-        null -> "•"
-    }
-
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = icon,
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(
-            text = title,
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-
-    event.description?.let { desc ->
-        if (desc.isNotBlank()) {
-            Spacer(modifier = Modifier.height(2.dp))
+private fun TimelinePreviewLatestEvent(uiModel: TimelineEventUiModel) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "${RTL}$desc",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.padding(start = 16.dp)
+                text = uiModel.icon,
+                fontSize = 12.sp,
+                color = uiModel.color
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = uiModel.actionText,
+                fontSize = 12.sp,
+                color = uiModel.color,
+                fontWeight = FontWeight.Medium
             )
         }
+
+        uiModel.objectText?.let { obj ->
+            if (obj.isNotBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "${RTL}$obj",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(start = 16.dp)
+                )
+            }
+        }
+
+        uiModel.supportingText?.let { support ->
+            if (support.isNotBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = support,
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    modifier = Modifier.padding(start = 16.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = uiModel.timeText,
+            fontSize = 10.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            modifier = Modifier.padding(start = 16.dp)
+        )
     }
 }
 

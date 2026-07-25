@@ -25,10 +25,16 @@ fun PersianCalendarDialog(
     showIndicator: (Long) -> Boolean = { false },
     confirmButtonText: String = "تأیید",
     showConfirmButton: Boolean = true,
-    dayContextContent: (@Composable androidx.compose.foundation.layout.ColumnScope.(DayContext) -> Unit)? = null
+    dayContextContent: (@Composable androidx.compose.foundation.layout.ColumnScope.(DayContext) -> Unit)? = null,
+    minSelectableDate: Long? = null,
+    maxSelectableDate: Long? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val state = rememberPersianCalendarState(selectedDateEpochMs)
+    val state = rememberPersianCalendarState(
+        initialDateEpochMs = selectedDateEpochMs,
+        minSelectableDate = minSelectableDate,
+        maxSelectableDate = maxSelectableDate
+    )
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -47,7 +53,9 @@ fun PersianCalendarDialog(
             showIndicator = showIndicator,
             confirmButtonText = confirmButtonText,
             showConfirmButton = showConfirmButton,
-            dayContextContent = dayContextContent
+            dayContextContent = dayContextContent,
+            minSelectableDate = minSelectableDate,
+            maxSelectableDate = maxSelectableDate
         )
     }
 }

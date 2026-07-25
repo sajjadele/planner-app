@@ -5,13 +5,17 @@ import com.example.core.util.JalaliDate
 
 @Composable
 fun rememberPersianCalendarState(
-    initialDateEpochMs: Long = System.currentTimeMillis()
+    initialDateEpochMs: Long = System.currentTimeMillis(),
+    minSelectableDate: Long? = null,
+    maxSelectableDate: Long? = null
 ): PersianCalendarState {
-    return remember { PersianCalendarState(initialDateEpochMs) }
+    return remember { PersianCalendarState(initialDateEpochMs, minSelectableDate, maxSelectableDate) }
 }
 
 class PersianCalendarState(
-    initialDateEpochMs: Long
+    initialDateEpochMs: Long,
+    private val minSelectableDate: Long? = null,
+    private val maxSelectableDate: Long? = null
 ) {
     private val _localSelectedEpochMs = mutableStateOf(initialDateEpochMs)
     val localSelectedEpochMs: State<Long> = _localSelectedEpochMs
@@ -40,7 +44,14 @@ class PersianCalendarState(
         }
     }
 
+    fun isSelectable(dateEpochMs: Long): Boolean {
+        if (minSelectableDate != null && dateEpochMs < minSelectableDate) return false
+        if (maxSelectableDate != null && dateEpochMs > maxSelectableDate) return false
+        return true
+    }
+
     fun selectDate(epochMs: Long) {
+        if (!isSelectable(epochMs)) return
         _localSelectedEpochMs.value = epochMs
         _monthOffset.intValue = 0
     }

@@ -32,7 +32,7 @@ class ActivityLabViewModel(application: Application) : AndroidViewModel(applicat
 
     private val database = AppDatabase.getDatabase(application)
     private val taskDao = database.taskDao()
-    private val taskStepRepository = TaskStepRepository(database.taskStepDao())
+    private val taskStepRepository = TaskStepRepository(database.taskStepDao(), database.activityEventDao())
     private val activityEventRepository = ActivityEventRepository(database.activityEventDao())
 
     private val _state = MutableStateFlow(ActivityLabUiState())
@@ -75,14 +75,6 @@ class ActivityLabViewModel(application: Application) : AndroidViewModel(applicat
             try {
                 val stepId = taskStepRepository.addStep(
                     TaskStepEntity(taskId = task.id, title = title)
-                )
-                activityEventRepository.addEvent(
-                    ActivityEventEntity(
-                        taskId = task.id,
-                        stepId = stepId,
-                        eventType = ActivityEventType.STEP_CREATED.name,
-                        description = title
-                    )
                 )
                 _state.value = _state.value.copy(
                     stepInput = "",

@@ -6,5 +6,7 @@ enum class ActivityEventType {
     STEP_REOPENED,
     STEP_DELETED,
     NOTE_ADDED,
-    FILE_ADDED
+    FILE_ADDED,
+    MANUAL_ACTIVITY,
+    IMAGE_ADDED
 }

@@ -1,5 +1,6 @@
 package com.example.plugins.planner.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -7,6 +8,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,17 +16,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.core.util.formatPersianTime
+import com.example.core.calendar.PersianCalendarDialog
 import com.example.core.util.JalaliDate
 import com.example.core.util.RTL
 import com.example.plugins.planner.data.ActivityEventEntity
-import com.example.plugins.planner.data.ActivityEventType
 import com.example.plugins.planner.ui.components.NeumorphicSurface
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+
+private const val DAY_MILLIS = 86_400_000L
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,7 +56,8 @@ fun TimelineBottomSheet(
             timelineEndDate = timelineEndDate,
             activities = activities,
             onGoToToday = onGoToToday,
-            onMoveDate = onMoveDate
+            onMoveDate = onMoveDate,
+            onSelectDate = onSelectDate
         )
     }
 }
@@ -67,17 +69,31 @@ private fun TimelineSheetContent(
     timelineEndDate: Long,
     activities: List<ActivityEventEntity>,
     onGoToToday: () -> Unit,
-    onMoveDate: (Int) -> Unit
+    onMoveDate: (Int) -> Unit,
+    onSelectDate: (Long) -> Unit
 ) {
-    val activityGroups = remember(activities) { groupActivitiesByDay(activities) }
+    val colorScheme = MaterialTheme.colorScheme
+    val uiModels = remember(activities, colorScheme) {
+        TimelineEventMapper.mapEvents(
+            events = activities,
+            useTimeOnly = true,
+            primary = colorScheme.primary,
+            error = colorScheme.error,
+            tertiary = colorScheme.tertiary,
+            outline = colorScheme.outline
+        )
+    }
+    val activityGroups = remember(uiModels) { groupActivitiesByDay(uiModels) }
     val listState = rememberLazyListState()
 
     val canMovePrevious = selectedDate > timelineStartDate
     val canMoveNext = selectedDate < timelineEndDate
 
-    val rangeDays = ((timelineEndDate - timelineStartDate) / 86_400_000L).toInt() + 1
-    val currentDay = ((selectedDate - timelineStartDate) / 86_400_000L).toInt() + 1
+    val rangeDays = maxOf(1, ((timelineEndDate - timelineStartDate) / DAY_MILLIS).toInt() + 1)
+    val currentDay = maxOf(1, ((selectedDate - timelineStartDate) / DAY_MILLIS).toInt() + 1)
     val showProgress = rangeDays > 7
+
+    var showCalendarDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(selectedDate) {
         listState.animateScrollToItem(0)
@@ -104,7 +120,8 @@ private fun TimelineSheetContent(
             onPreviousDay = { onMoveDate(-1) },
             onNextDay = { onMoveDate(1) },
             canMovePrevious = canMovePrevious,
-            canMoveNext = canMoveNext
+            canMoveNext = canMoveNext,
+            onOpenCalendar = { showCalendarDialog = true }
         )
 
         // ── Progress Indicator ──
@@ -157,7 +174,7 @@ private fun TimelineSheetContent(
         } else {
             LazyColumn(
                 state = listState,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(bottom = 24.dp),
                 modifier = Modifier.heightIn(max = 500.dp)
             ) {
@@ -168,14 +185,29 @@ private fun TimelineSheetContent(
                     items(
                         items = group.events,
                         key = { it.id }
-                    ) { event ->
-                        ActivityEventItem(event = event, useTimeOnly = true)
+                    ) { uiModel ->
+                        ActivityEventItem(uiModel = uiModel)
                     }
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+    }
+
+    if (showCalendarDialog) {
+        PersianCalendarDialog(
+            selectedDateEpochMs = selectedDate,
+            onDateSelected = { date ->
+                onSelectDate(date)
+                showCalendarDialog = false
+            },
+            onDismiss = { showCalendarDialog = false },
+            minSelectableDate = timelineStartDate,
+            maxSelectableDate = timelineEndDate,
+            confirmButtonText = "${RTL}انتخاب",
+            showConfirmButton = true
+        )
     }
 }
 
@@ -190,7 +222,8 @@ private fun ActivityDateNavigation(
     onPreviousDay: () -> Unit,
     onNextDay: () -> Unit,
     canMovePrevious: Boolean,
-    canMoveNext: Boolean
+    canMoveNext: Boolean,
+    onOpenCalendar: () -> Unit
 ) {
     val jalali = remember(selectedDate) { JalaliDate.fromEpochMs(selectedDate) }
     val dateText = remember(jalali) {
@@ -216,12 +249,24 @@ private fun ActivityDateNavigation(
             shape = RoundedCornerShape(10.dp)
         )
 
-        Text(
-            text = dateText,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Row(
+            modifier = Modifier.clickable(onClick = onOpenCalendar),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.DateRange,
+                contentDescription = "${RTL}انتخاب تاریخ",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = dateText,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
 
         Row {
             IconButton(
@@ -268,10 +313,10 @@ private fun ActivityDateNavigation(
 
 private data class ActivityGroup(
     val dateKey: Long,
-    val events: List<ActivityEventEntity>
+    val events: List<TimelineEventUiModel>
 )
 
-private fun groupActivitiesByDay(activities: List<ActivityEventEntity>): List<ActivityGroup> {
+private fun groupActivitiesByDay(activities: List<TimelineEventUiModel>): List<ActivityGroup> {
     val grouped = activities.groupBy {
         JalaliDate.toEpochMs(JalaliDate.fromEpochMs(it.timestamp))
     }
@@ -311,41 +356,7 @@ private fun ActivityDayHeader(dateKey: Long) {
 // ════════════════════════════════════════════════════════════════
 
 @Composable
-private fun ActivityEventItem(event: ActivityEventEntity, useTimeOnly: Boolean = false) {
-    val eventType = try {
-        ActivityEventType.valueOf(event.eventType)
-    } catch (_: Exception) {
-        null
-    }
-
-    val title = when (eventType) {
-        ActivityEventType.STEP_CREATED -> "${RTL}مرحله ایجاد شد"
-        ActivityEventType.STEP_COMPLETED -> "${RTL}مرحله تکمیل شد"
-        ActivityEventType.STEP_REOPENED -> "${RTL}مرحله بازگشایی شد"
-        ActivityEventType.STEP_DELETED -> "${RTL}مرحله حذف شد"
-        ActivityEventType.NOTE_ADDED -> "${RTL}یادداشت اضافه شد"
-        ActivityEventType.FILE_ADDED -> "${RTL}فایل اضافه شد"
-        null -> "${RTL}${event.eventType}"
-    }
-
-    val icon = when (eventType) {
-        ActivityEventType.STEP_CREATED -> "＋"
-        ActivityEventType.STEP_COMPLETED -> "✓"
-        ActivityEventType.STEP_REOPENED -> "↻"
-        ActivityEventType.STEP_DELETED -> "✕"
-        ActivityEventType.NOTE_ADDED -> "📝"
-        ActivityEventType.FILE_ADDED -> "📎"
-        null -> "•"
-    }
-
-    val timeText = remember(event.timestamp) {
-        if (useTimeOnly) {
-            SimpleDateFormat("HH:mm", Locale.US).format(Date(event.timestamp))
-        } else {
-            formatPersianTime(event.timestamp)
-        }
-    }
-
+private fun ActivityEventItem(uiModel: TimelineEventUiModel) {
     NeumorphicSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -356,36 +367,52 @@ private fun ActivityEventItem(event: ActivityEventEntity, useTimeOnly: Boolean =
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
+            // Layer 1: icon + action header
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = icon,
+                    text = uiModel.icon,
                     fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = uiModel.color
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = title,
+                    text = uiModel.actionText,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = uiModel.color
                 )
             }
 
-            event.description?.let { desc ->
-                if (desc.isNotBlank()) {
+            // Layer 2: object/context
+            uiModel.objectText?.let { obj ->
+                if (obj.isNotBlank()) {
                     Spacer(modifier = Modifier.height(3.dp))
                     Text(
-                        text = "${RTL}$desc",
+                        text = "${RTL}$obj",
                         fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(start = 22.dp)
+                    )
+                }
+            }
+
+            // Layer 3: supporting context
+            uiModel.supportingText?.let { support ->
+                if (support.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = support,
+                        fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 22.dp)
                     )
                 }
             }
 
+            // Layer 4: timestamp
             Spacer(modifier = Modifier.height(3.dp))
             Text(
-                text = timeText,
+                text = uiModel.timeText,
                 fontSize = 10.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier.padding(start = 22.dp)

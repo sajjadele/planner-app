@@ -15,6 +15,7 @@ import com.example.plugins.notes.data.NoteRepository
 import com.example.plugins.planner.data.ActivityEventEntity
 import com.example.plugins.planner.data.ActivityEventRepository
 import com.example.plugins.planner.data.ActivityEventType
+import com.example.plugins.planner.data.ImageEventParser
 import com.example.plugins.planner.data.TaskDao
 import com.example.plugins.planner.data.TaskEntity
 import com.example.plugins.planner.data.TaskStepEntity
@@ -43,7 +44,7 @@ class TaskDetailViewModel(
         taskDao = database.taskDao()
         goalRepository = RoomGoalRepository(database.goalDao(), database.goalEventDao())
         noteRepository = NoteRepository(database.noteDao())
-        taskStepRepository = TaskStepRepository(database.taskStepDao())
+        taskStepRepository = TaskStepRepository(database.taskStepDao(), database.activityEventDao())
         activityEventRepository = ActivityEventRepository(database.activityEventDao())
     }
 
@@ -184,18 +185,57 @@ class TaskDetailViewModel(
         }
     }
 
-    /** Create a step and log the activity event */
+    /** Create a step — STEP_CREATED event is handled by the repository */
     fun addStep(title: String) {
         viewModelScope.launch {
-            val stepId = taskStepRepository.addStep(
+            taskStepRepository.addStep(
                 TaskStepEntity(taskId = taskId, title = title)
             )
+        }
+    }
+
+    /** Create a note — NOTE_ADDED event, independent of any step */
+    fun addNote(text: String) {
+        viewModelScope.launch {
             activityEventRepository.addEvent(
                 ActivityEventEntity(
                     taskId = taskId,
-                    stepId = stepId,
-                    eventType = ActivityEventType.STEP_CREATED.name,
-                    description = title
+                    stepId = null,
+                    eventType = ActivityEventType.NOTE_ADDED.name,
+                    description = text
+                )
+            )
+        }
+    }
+
+    /** Create a manual activity — MANUAL_ACTIVITY event, independent of any step */
+    fun addManualActivity(title: String, durationMinutes: Int?) {
+        viewModelScope.launch {
+            val description = if (durationMinutes != null) {
+                "$title|$durationMinutes"
+            } else {
+                title
+            }
+            activityEventRepository.addEvent(
+                ActivityEventEntity(
+                    taskId = taskId,
+                    stepId = null,
+                    eventType = ActivityEventType.MANUAL_ACTIVITY.name,
+                    description = description
+                )
+            )
+        }
+    }
+
+    /** Create an image activity — IMAGE_ADDED event, independent of any step */
+    fun addImage(uri: String, description: String?) {
+        viewModelScope.launch {
+            activityEventRepository.addEvent(
+                ActivityEventEntity(
+                    taskId = taskId,
+                    stepId = null,
+                    eventType = ActivityEventType.IMAGE_ADDED.name,
+                    description = ImageEventParser.encode(uri, description)
                 )
             )
         }

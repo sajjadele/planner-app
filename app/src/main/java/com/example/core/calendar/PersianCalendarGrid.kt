@@ -1,8 +1,5 @@
 package com.example.core.calendar
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -42,7 +39,9 @@ fun PersianCalendarGrid(
     confirmButtonText: String = "تأیید",
     showConfirmButton: Boolean = true,
     headerContent: (@Composable ColumnScope.() -> Unit)? = null,
-    dayContextContent: (@Composable ColumnScope.(DayContext) -> Unit)? = null
+    dayContextContent: (@Composable ColumnScope.(DayContext) -> Unit)? = null,
+    minSelectableDate: Long? = null,
+    maxSelectableDate: Long? = null
 ) {
     val (jYear, jMonth) = state.targetMonth()
     val selectedJalali = state.selectedJalali
@@ -186,6 +185,9 @@ fun PersianCalendarGrid(
                             val isDayToday = isTodayMonth && cellDate.isToday
                             val isHoliday = hasDay && thisDay in holidayDays
                             val showDayIndicator = hasDay && showIndicator(cellDate.epochMs)
+                            val isSelectable = state.isSelectable(cellDate.epochMs)
+
+                            val cellAlpha = if (isSelectable || isDaySelected || isDayToday) 1f else 0.35f
 
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -198,10 +200,14 @@ fun PersianCalendarGrid(
                                             isDaySelected -> Modifier.background(MaterialTheme.colorScheme.primary)
                                             isDayToday -> Modifier
                                                 .border(1.5.dp, MaterialTheme.colorScheme.onSurfaceVariant, cellShape)
-                                            else -> Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                            else -> Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f * cellAlpha))
                                         }
                                     )
-                                    .clickable { state.selectDate(cellDate.epochMs) }
+                                    .then(
+                                        if (isSelectable)
+                                            Modifier.clickable { state.selectDate(cellDate.epochMs) }
+                                        else Modifier
+                                    )
                             ) {
                                 Text(
                                     text = cellDate.jalaliDay.toString(),
@@ -210,8 +216,8 @@ fun PersianCalendarGrid(
                                     fontWeight = if (isDaySelected || isDayToday) FontWeight.Bold else FontWeight.Medium,
                                     color = when {
                                         isDaySelected -> MaterialTheme.colorScheme.onPrimary
-                                        isHoliday -> HolidayRed
-                                        else -> MaterialTheme.colorScheme.onSurface
+                                        isHoliday -> HolidayRed.copy(alpha = cellAlpha)
+                                        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = cellAlpha)
                                     }
                                 )
                                 if ((isHoliday || showDayIndicator) && !isDaySelected) {

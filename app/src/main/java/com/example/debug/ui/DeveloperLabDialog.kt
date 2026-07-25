@@ -34,7 +34,8 @@ fun DeveloperLabDialog(
     viewModel: DeveloperLabViewModel = viewModel(),
     solarQaViewModel: SolarSystemQaViewModel = viewModel(),
     mirrorViewModel: DebugMirrorViewModel = viewModel(),
-    activityLabViewModel: ActivityLabViewModel = viewModel()
+    activityLabViewModel: ActivityLabViewModel = viewModel(),
+    activityScenarioViewModel: ActivityScenarioViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
     val solarStatus by solarQaViewModel.status.collectAsState()
@@ -42,6 +43,7 @@ fun DeveloperLabDialog(
     val mirrorStatus by mirrorViewModel.status.collectAsState()
     val mirrorScenario by mirrorViewModel.lastScenario.collectAsState()
     val activityLabState by activityLabViewModel.state.collectAsState()
+    val activityScenarioState by activityScenarioViewModel.state.collectAsState()
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -121,6 +123,12 @@ fun DeveloperLabDialog(
                     onToggleStep = { activityLabViewModel.toggleStepCompletion(it) },
                     onDeleteStep = { activityLabViewModel.deleteStep(it) },
                     onRunVerification = { activityLabViewModel.runVerification() }
+                )
+
+                ActivityScenarioSection(
+                    state = activityScenarioState,
+                    onRunScenario = { activityScenarioViewModel.runScenario(it) },
+                    onClearResults = { activityScenarioViewModel.clearResults() }
                 )
 
                 CleanupSection(
@@ -646,6 +654,131 @@ private fun ActivityLabSection(
         }
 
         // Status
+        state.status?.let { status ->
+            Spacer(modifier = Modifier.height(6.dp))
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = status,
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(10.dp),
+                    lineHeight = 14.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityScenarioSection(
+    state: ActivityScenarioUiState,
+    onRunScenario: (ActivityScenario) -> Unit,
+    onClearResults: () -> Unit
+) {
+    SectionCard(title = "Activity Scenarios", subtitle = "Automated data layer scenario testing") {
+        val buttons = listOf(
+            ActivityScenario.TASK_LIFECYCLE to Color(0xFF16A34A),
+            ActivityScenario.TIMELINE_MULTI_DAY to Color(0xFF2563EB),
+            ActivityScenario.PERSISTENCE to Color(0xFF7C3AED),
+            ActivityScenario.TIMELINE_RANGE to Color(0xFFEA580C),
+            ActivityScenario.NOTE_LIFECYCLE to Color(0xFF0891B2),
+            ActivityScenario.MANUAL_ACTIVITY_LIFECYCLE to Color(0xFFD97706),
+            ActivityScenario.IMAGE_LIFECYCLE to Color(0xFF1565C0)
+        )
+        buttons.forEach { (scenario, color) ->
+            Button(
+                onClick = { onRunScenario(scenario) },
+                enabled = !state.isRunning,
+                colors = ButtonDefaults.buttonColors(containerColor = color),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+            ) {
+                Text(scenario.label, color = Color.White, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+            }
+        }
+
+        if (state.results.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = onClearResults,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF97316)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+            ) {
+                Text("Clear Results", color = Color.White, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+            }
+
+            state.results.forEach { result ->
+                Spacer(modifier = Modifier.height(6.dp))
+                val passColor = if (result.passed) Color(0xFF16A34A) else Color(0xFFDC2626)
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = passColor.copy(alpha = 0.1f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (result.passed) "PASS" else "FAIL",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = passColor
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = result.name,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (LocalIsDarkTheme.current) DarkTextPrimary else TextPrimary
+                            )
+                            Spacer(modifier = Modifier.weight(1f))
+                            Text(
+                                text = "${result.durationMs}ms",
+                                fontSize = 10.sp,
+                                color = if (LocalIsDarkTheme.current) DarkTextTertiary else TextTertiary
+                            )
+                        }
+
+                        var expanded by remember { mutableStateOf(false) }
+                        TextButton(
+                            onClick = { expanded = !expanded },
+                            modifier = Modifier.padding(top = 4.dp)
+                        ) {
+                            Text(
+                                if (expanded) "Hide details" else "Show ${result.details.size} checks",
+                                fontSize = 11.sp,
+                                color = AccentPurple
+                            )
+                        }
+
+                        AnimatedVisibility(visible = expanded) {
+                            Column(modifier = Modifier.padding(top = 4.dp)) {
+                                result.details.forEach { detail ->
+                                    val detailColor = when {
+                                        detail.startsWith("PASS:") -> Color(0xFF16A34A)
+                                        detail.startsWith("FAIL:") -> Color(0xFFDC2626)
+                                        detail.startsWith("Cleanup:") -> if (LocalIsDarkTheme.current) DarkTextTertiary else TextTertiary
+                                        else -> if (LocalIsDarkTheme.current) DarkTextPrimary else TextPrimary
+                                    }
+                                    Text(
+                                        text = detail,
+                                        fontSize = 10.sp,
+                                        color = detailColor,
+                                        lineHeight = 14.sp,
+                                        modifier = Modifier.padding(vertical = 1.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         state.status?.let { status ->
             Spacer(modifier = Modifier.height(6.dp))
             Surface(
