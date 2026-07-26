@@ -32,7 +32,6 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.core.util.RTL
 import com.example.plugins.planner.data.ActivityDraft
-import com.example.plugins.planner.data.ActivityDraftType
 import com.example.plugins.planner.data.ActivityPayloadParser
 
 enum class ComposerMode {

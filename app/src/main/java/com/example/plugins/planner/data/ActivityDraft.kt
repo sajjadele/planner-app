@@ -1,37 +1,34 @@
 package com.example.plugins.planner.data
 
 /**
- * ActivityDraft — Unified model for creating a new activity event.
+ * ActivityDraft — Rich content container for creating a new activity.
  *
- * This model abstracts the activity creation process from the UI layer.
- * In the future, this will be the base for the Telegram-style Unified Composer.
+ * Architecture (Phase 4.7.1):
+ * - Generic model: supports text + attachments + duration + intent
+ * - Decouples content from event types
+ * - Future-ready for Telegram-style unified composer
  *
- * Current usage:
- * - STEP → STEP_CREATED event
- * - NOTE → NOTE_ADDED event
- * - MANUAL_ACTIVITY → MANUAL_ACTIVITY event
- * - IMAGE → IMAGE_ADDED event
+ * Example:
+ * ```
+ * ActivityDraft(
+ *     text = "جلسه طراحی UI",
+ *     attachments = [ImageAttachment(uri)],
+ *     durationMinutes = 60,
+ *     intent = ACTIVITY
+ * )
+ * ```
  *
- * Future usage:
- * - Will support multiple attachments (images, files)
- * - Will support combining text + image + duration in one event
- * - Will be the input for ActivityDraft.toEntity()
+ * Mapping to ActivityEventType:
+ * - intent == STEP → STEP_CREATED
+ * - durationMinutes != null → MANUAL_ACTIVITY
+ * - else → NOTE_ADDED
+ *
+ * Attachments are NOT separate events.
+ * They belong to the activity payload.
  */
 data class ActivityDraft(
-    val type: ActivityDraftType,
     val text: String? = null,
-    val imageUri: String? = null,
-    val imageDescription: String? = null,
-    val durationMinutes: Int? = null
+    val attachments: List<ActivityAttachment> = emptyList(),
+    val durationMinutes: Int? = null,
+    val intent: ActivityIntent = ActivityIntent.ACTIVITY
 )
-
-/**
- * Types of activities that can be created.
- * Currently maps 1:1 to ActivityEventType, but will evolve.
- */
-enum class ActivityDraftType {
-    STEP,
-    NOTE,
-    MANUAL_ACTIVITY,
-    IMAGE
-}

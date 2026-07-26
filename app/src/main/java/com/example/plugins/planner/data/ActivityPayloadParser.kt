@@ -3,10 +3,10 @@ package com.example.plugins.planner.data
 /**
  * ActivityPayloadParser — Factory for creating ActivityDraft instances.
  *
- * This abstraction:
- * - Decouples UI from activity creation logic
- * - Provides a single entry point for creating drafts
- * - Will evolve to handle unified composer drafts in the future
+ * Architecture (Phase 4.7.1):
+ * - Creates rich drafts with attachments and intent
+ * - Decoupled from UI and ViewModel
+ * - Future-ready for unified composer
  *
  * Usage:
  * val draft = ActivityPayloadParser.step("My step title")
@@ -20,8 +20,8 @@ object ActivityPayloadParser {
      * Maps to: STEP_CREATED event
      */
     fun step(title: String): ActivityDraft = ActivityDraft(
-        type = ActivityDraftType.STEP,
-        text = title
+        text = title,
+        intent = ActivityIntent.STEP
     )
 
     /**
@@ -29,8 +29,8 @@ object ActivityPayloadParser {
      * Maps to: NOTE_ADDED event
      */
     fun note(text: String): ActivityDraft = ActivityDraft(
-        type = ActivityDraftType.NOTE,
-        text = text
+        text = text,
+        intent = ActivityIntent.ACTIVITY
     )
 
     /**
@@ -41,21 +41,22 @@ object ActivityPayloadParser {
         title: String,
         durationMinutes: Int? = null
     ): ActivityDraft = ActivityDraft(
-        type = ActivityDraftType.MANUAL_ACTIVITY,
         text = title,
-        durationMinutes = durationMinutes
+        durationMinutes = durationMinutes,
+        intent = ActivityIntent.ACTIVITY
     )
 
     /**
      * Create an IMAGE draft.
-     * Maps to: IMAGE_ADDED event
+     * Maps to: NOTE_ADDED or MANUAL_ACTIVITY (depending on metadata)
+     * Attachments are part of the activity payload, not separate events.
      */
     fun image(
         uri: String,
         description: String? = null
     ): ActivityDraft = ActivityDraft(
-        type = ActivityDraftType.IMAGE,
-        imageUri = uri,
-        imageDescription = description
+        text = description,
+        attachments = listOf(ActivityAttachment.Image(uri)),
+        intent = ActivityIntent.ACTIVITY
     )
 }

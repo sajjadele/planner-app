@@ -13,7 +13,7 @@ import com.example.core.util.JalaliDate
 import com.example.plugins.notes.data.NoteEntity
 import com.example.plugins.notes.data.NoteRepository
 import com.example.plugins.planner.data.ActivityDraft
-import com.example.plugins.planner.data.ActivityDraftType
+import com.example.plugins.planner.data.ActivityDraftResolver
 import com.example.plugins.planner.data.ActivityEventEntity
 import com.example.plugins.planner.data.ActivityEventRepository
 import com.example.plugins.planner.data.ActivityEventType
@@ -188,63 +188,35 @@ class TaskDetailViewModel(
     }
 
     // ════════════════════════════════════════════════════════════════
-    // NEW: Unified Activity Creation (Phase 4.6)
+    // NEW: Unified Activity Creation (Phase 4.7.1)
     // ════════════════════════════════════════════════════════════════
 
     /**
      * Create an activity from an ActivityDraft.
      *
-     * This is the new unified entry point for activity creation.
-     * It maps the draft to the appropriate ActivityEventType and storage format.
-     *
-     * Future: This will handle ActivityDraft with multiple attachments.
+     * Uses ActivityDraftResolver to map draft → ActivityEventType + description.
+     * Maintains backward compatibility with current storage format.
      */
     fun createActivity(draft: ActivityDraft) {
         viewModelScope.launch {
-            when (draft.type) {
-                ActivityDraftType.STEP -> {
-                    // Create step entity + STEP_CREATED event
-                    val step = TaskStepEntity(taskId = taskId, title = draft.text ?: return@launch)
+            val eventType = ActivityDraftResolver.resolveEventType(draft)
+
+            when (eventType) {
+                ActivityEventType.STEP_CREATED -> {
+                    // Create step entity
+                    val stepTitle = ActivityDraftResolver.getStepTitle(draft) ?: return@launch
+                    val step = TaskStepEntity(taskId = taskId, title = stepTitle)
                     taskStepRepository.addStep(step)
                 }
-                ActivityDraftType.NOTE -> {
-                    // Create NOTE_ADDED event
+                else -> {
+                    // Create activity event with encoded description
+                    val description = ActivityDraftResolver.encodeDescription(draft)
                     activityEventRepository.addEvent(
                         ActivityEventEntity(
                             taskId = taskId,
                             stepId = null,
-                            eventType = ActivityEventType.NOTE_ADDED.name,
-                            description = draft.text
-                        )
-                    )
-                }
-                ActivityDraftType.MANUAL_ACTIVITY -> {
-                    // Create MANUAL_ACTIVITY event with title|duration format
-                    val description = if (draft.durationMinutes != null) {
-                        "${draft.text}|${draft.durationMinutes}"
-                    } else {
-                        draft.text
-                    }
-                    activityEventRepository.addEvent(
-                        ActivityEventEntity(
-                            taskId = taskId,
-                            stepId = null,
-                            eventType = ActivityEventType.MANUAL_ACTIVITY.name,
+                            eventType = eventType.name,
                             description = description
-                        )
-                    )
-                }
-                ActivityDraftType.IMAGE -> {
-                    // Create IMAGE_ADDED event with encoded uri|description
-                    activityEventRepository.addEvent(
-                        ActivityEventEntity(
-                            taskId = taskId,
-                            stepId = null,
-                            eventType = ActivityEventType.IMAGE_ADDED.name,
-                            description = ImageEventParser.encode(
-                                draft.imageUri ?: return@launch,
-                                draft.imageDescription
-                            )
                         )
                     )
                 }
