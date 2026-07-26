@@ -39,7 +39,8 @@ enum class ActivityScenario(val label: String) {
     TIMELINE_RANGE("Timeline Range"),
     NOTE_LIFECYCLE("Note Lifecycle"),
     MANUAL_ACTIVITY_LIFECYCLE("Manual Activity Lifecycle"),
-    IMAGE_LIFECYCLE("Image Lifecycle")
+    IMAGE_LIFECYCLE("Image Lifecycle"),
+    IMAGE_PERSISTENCE_LIFECYCLE("Image Persistence Lifecycle")
 }
 
 class ActivityScenarioViewModel(application: Application) : AndroidViewModel(application) {
@@ -65,6 +66,7 @@ class ActivityScenarioViewModel(application: Application) : AndroidViewModel(app
                         ActivityScenario.NOTE_LIFECYCLE -> runNoteLifecycle()
                         ActivityScenario.MANUAL_ACTIVITY_LIFECYCLE -> runManualActivityLifecycle()
                         ActivityScenario.IMAGE_LIFECYCLE -> runImageLifecycle()
+                        ActivityScenario.IMAGE_PERSISTENCE_LIFECYCLE -> runImagePersistenceLifecycle()
                     }
                 }
                 val current = _state.value
@@ -594,10 +596,10 @@ class ActivityScenarioViewModel(application: Application) : AndroidViewModel(app
                 }
 
                 val decodedData = ImageEventParser.decode(event.description)
-                if (decodedData.uri == testUri) {
-                    details.add("PASS: IMAGE_ADDED URI preserved")
+                if (decodedData.uri.isNotBlank() && decodedData.uri == testUri) {
+                    details.add("PASS: IMAGE_ADDED URI extracted and preserved")
                 } else {
-                    details.add("FAIL: IMAGE_ADDED URI mismatch. Expected $testUri, got ${decodedData.uri}")
+                    details.add("FAIL: IMAGE_ADDED URI extraction failed or mismatch")
                     passed = false
                 }
 
@@ -622,5 +624,88 @@ class ActivityScenarioViewModel(application: Application) : AndroidViewModel(app
         }
 
         return ScenarioResult("Image Lifecycle", passed, details, System.currentTimeMillis() - start)
+    }
+
+    // ── Scenario: Image Persistence Lifecycle ──────────────────────
+
+    private suspend fun runImagePersistenceLifecycle(): ScenarioResult {
+        val start = System.currentTimeMillis()
+        val details = mutableListOf<String>()
+        var passed = true
+        val tag = start % 100000
+
+        val task = TaskEntity(title = "[Sc] Image Persistence $tag", dateEpochMs = JalaliDate.toEpochMs(JalaliDate.today()))
+        val taskId = taskDao.insertTask(task).toInt()
+        details.add("Created task id=$taskId")
+
+        try {
+            val testUri = "content://test/image.jpg"
+            val testDescription = "Persistence test"
+            val encodedDescription = ImageEventParser.encode(testUri, testDescription)
+
+            activityRepo.addEvent(
+                ActivityEventEntity(
+                    taskId = taskId,
+                    stepId = null,
+                    eventType = ActivityEventType.IMAGE_ADDED.name,
+                    description = encodedDescription
+                )
+            )
+            details.add("Added IMAGE_ADDED event with URI and description")
+
+            // Reload from repository (simulates app restart / fresh read)
+            val imageEvent = activityRepo.findLatestEvent(taskId, ActivityEventType.IMAGE_ADDED.name)
+
+            if (imageEvent != null) {
+                details.add("PASS: IMAGE_ADDED event found after reload")
+            } else {
+                details.add("FAIL: IMAGE_ADDED event not found after reload")
+                passed = false
+            }
+
+            imageEvent?.let { event ->
+                if (event.eventType == ActivityEventType.IMAGE_ADDED.name) {
+                    details.add("PASS: IMAGE_ADDED eventType preserved")
+                } else {
+                    details.add("FAIL: IMAGE_ADDED eventType mismatch")
+                    passed = false
+                }
+
+                if (event.stepId == null) {
+                    details.add("PASS: IMAGE_ADDED event has stepId=null")
+                } else {
+                    details.add("FAIL: IMAGE_ADDED event has non-null stepId")
+                    passed = false
+                }
+
+                val decodedData = ImageEventParser.decode(event.description)
+                if (decodedData.uri == testUri) {
+                    details.add("PASS: URI preserved after reload")
+                } else {
+                    details.add("FAIL: URI mismatch after reload. Expected $testUri, got ${decodedData.uri}")
+                    passed = false
+                }
+
+                if (decodedData.description == testDescription) {
+                    details.add("PASS: description preserved after reload")
+                } else {
+                    details.add("FAIL: description mismatch after reload. Expected $testDescription, got ${decodedData.description}")
+                    passed = false
+                }
+
+                if (event.timestamp != null && event.timestamp > 0) {
+                    details.add("PASS: timestamp exists after reload")
+                } else {
+                    details.add("FAIL: missing timestamp after reload")
+                    passed = false
+                }
+            }
+
+        } finally {
+            taskDao.deleteTask(task)
+            details.add("Cleanup: task $taskId deleted")
+        }
+
+        return ScenarioResult("Image Persistence Lifecycle", passed, details, System.currentTimeMillis() - start)
     }
 }

@@ -18,7 +18,8 @@ data class TimelineEventUiModel(
     val supportingText: String?,
     val timeText: String,
     val color: Color,
-    val timestamp: Long
+    val timestamp: Long,
+    val imageUri: String? = null
 )
 
 object TimelineEventMapper {
@@ -112,6 +113,7 @@ object TimelineEventMapper {
             val objectText: String?
             val supportingText: String?
             val color: Color
+            var imageUri: String? = null
 
             when (eventType) {
                 ActivityEventType.STEP_CREATED,
@@ -156,6 +158,7 @@ object TimelineEventMapper {
                     val imageData = ImageEventParser.decode(event.description)
                     objectText = imageData.description
                     supportingText = null
+                    imageUri = imageData.uri.takeIf { it.isNotBlank() }
                     color = resolveColor(eventType, primary, error, tertiary, outline)
                 }
 
@@ -182,7 +185,8 @@ object TimelineEventMapper {
                 supportingText = supportingText,
                 timeText = timeText,
                 color = color,
-                timestamp = event.timestamp
+                timestamp = event.timestamp,
+                imageUri = imageUri
             )
         }
     }

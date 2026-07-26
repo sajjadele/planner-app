@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -29,6 +30,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.core.util.RTL
 import com.example.plugins.planner.data.ActivityEventEntity
 import com.example.plugins.planner.data.TaskEntity
@@ -645,6 +648,8 @@ private fun TimelinePreviewCard(
 
 @Composable
 private fun TimelinePreviewLatestEvent(uiModel: TimelineEventUiModel) {
+    var showImageViewer by remember { mutableStateOf(false) }
+
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -659,6 +664,31 @@ private fun TimelinePreviewLatestEvent(uiModel: TimelineEventUiModel) {
                 color = uiModel.color,
                 fontWeight = FontWeight.Medium
             )
+        }
+
+        if (uiModel.imageUri != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { showImageViewer = true },
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(uiModel.imageUri)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            }
         }
 
         uiModel.objectText?.let { obj ->
@@ -691,6 +721,13 @@ private fun TimelinePreviewLatestEvent(uiModel: TimelineEventUiModel) {
             fontSize = 10.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             modifier = Modifier.padding(start = 16.dp)
+        )
+    }
+
+    if (showImageViewer) {
+        ImageViewerDialog(
+            imageUri = uiModel.imageUri!!,
+            onDismiss = { showImageViewer = false }
         )
     }
 }

@@ -6,14 +6,15 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +32,14 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.core.util.RTL
 
+enum class ComposerMode {
+    NONE,
+    STEP,
+    NOTE,
+    MANUAL_ACTIVITY,
+    IMAGE
+}
+
 @Composable
 fun ActivityComposerBottomSheet(
     onDismiss: () -> Unit,
@@ -40,22 +49,20 @@ fun ActivityComposerBottomSheet(
     onAddImage: (String, String?) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var isStepExpanded by remember { mutableStateOf(false) }
-    var isNoteExpanded by remember { mutableStateOf(false) }
-    var isManualExpanded by remember { mutableStateOf(false) }
+    var composerMode by remember { mutableStateOf(ComposerMode.NONE) }
     var stepTitle by remember { mutableStateOf("") }
     var noteText by remember { mutableStateOf("") }
     var manualTitle by remember { mutableStateOf("") }
     var manualDuration by remember { mutableStateOf("") }
-    var isImageExpanded by remember { mutableStateOf(false) }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var imageDescription by remember { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
-    val context = LocalContext.current
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
-        onResult = { uri -> selectedImageUri = uri }
+        onResult = { uri: Uri? ->
+            selectedImageUri = uri
+        }
     )
 
     ModalBottomSheet(
@@ -76,107 +83,131 @@ fun ActivityComposerBottomSheet(
                 modifier = Modifier.padding(bottom = 12.dp)
             )
 
-            if (!isStepExpanded && !isNoteExpanded && !isManualExpanded) {
-                ComposerOption(
-                    icon = "✓",
-                    label = "${RTL}مرحله جدید",
-                    enabled = true,
-                    onClick = { isStepExpanded = true }
-                )
-                ComposerOption(
-                    icon = "📝",
-                    label = "${RTL}یادداشت",
-                    subtitle = "${RTL}افزودن توضیح یا ثبت یک فکر",
-                    enabled = true,
-                    onClick = { isNoteExpanded = true }
-                )
-                ComposerOption(
-                    icon = "📎",
-                    label = "${RTL}فایل",
-                    subtitle = "(${RTL}به زودی)",
-                    enabled = false,
-                    onClick = {}
-                )
-                ComposerOption(
-                    icon = "📷",
-                    label = "${RTL}تصویر",
-                    subtitle = "${RTL}افزودن یک تصویر به فعالیتها",
-                    enabled = true,
-                    onClick = { isImageExpanded = true }
-                )
-                ComposerOption(
-                    icon = "📌",
-                    label = "${RTL}فعالیت دستی",
-                    subtitle = "${RTL}ثبت کاری که انجام دادی",
-                    enabled = true,
-                    onClick = { isManualExpanded = true }
-                )
-            } else if (isStepExpanded) {
-                StepExpansion(
-                    stepTitle = stepTitle,
-                    onStepTitleChange = { stepTitle = it },
-                    onDismiss = { isStepExpanded = false; stepTitle = "" },
-                    onSubmit = {
-                        if (stepTitle.isNotBlank()) {
-                            focusManager.clearFocus()
-                            onAddStep(stepTitle)
+            when (composerMode) {
+                ComposerMode.NONE -> {
+                    ComposerOption(
+                        icon = "✓",
+                        label = "${RTL}مرحله جدید",
+                        enabled = true,
+                        onClick = { composerMode = ComposerMode.STEP }
+                    )
+                    ComposerOption(
+                        icon = "📝",
+                        label = "${RTL}یادداشت",
+                        subtitle = "${RTL}افزودن توضیح یا ثبت یک فکر",
+                        enabled = true,
+                        onClick = { composerMode = ComposerMode.NOTE }
+                    )
+                    ComposerOption(
+                        icon = "📎",
+                        label = "${RTL}فایل",
+                        subtitle = "(${RTL}به زودی)",
+                        enabled = false,
+                        onClick = {}
+                    )
+                    ComposerOption(
+                        icon = "📷",
+                        label = "${RTL}تصویر",
+                        subtitle = "${RTL}افزودن یک تصویر به فعالیتها",
+                        enabled = true,
+                        onClick = { composerMode = ComposerMode.IMAGE }
+                    )
+                    ComposerOption(
+                        icon = "📌",
+                        label = "${RTL}فعالیت دستی",
+                        subtitle = "${RTL}ثبت کاری که انجام دادی",
+                        enabled = true,
+                        onClick = { composerMode = ComposerMode.MANUAL_ACTIVITY }
+                    )
+                }
+                ComposerMode.STEP -> {
+                    StepExpansion(
+                        stepTitle = stepTitle,
+                        onStepTitleChange = { stepTitle = it },
+                        onDismiss = {
+                            composerMode = ComposerMode.NONE
+                            stepTitle = ""
+                        },
+                        onSubmit = {
+                            if (stepTitle.isNotBlank()) {
+                                focusManager.clearFocus()
+                                onAddStep(stepTitle)
+                                composerMode = ComposerMode.NONE
+                                stepTitle = ""
+                            }
                         }
-                    }
-                )
-            } else if (isNoteExpanded) {
-                NoteExpansion(
-                    noteText = noteText,
-                    onNoteTextChange = { noteText = it },
-                    onDismiss = { isNoteExpanded = false; noteText = "" },
-                    onSubmit = {
-                        if (noteText.isNotBlank()) {
-                            focusManager.clearFocus()
-                            onAddNote(noteText)
+                    )
+                }
+                ComposerMode.NOTE -> {
+                    NoteExpansion(
+                        noteText = noteText,
+                        onNoteTextChange = { noteText = it },
+                        onDismiss = {
+                            composerMode = ComposerMode.NONE
+                            noteText = ""
+                        },
+                        onSubmit = {
+                            if (noteText.isNotBlank()) {
+                                focusManager.clearFocus()
+                                onAddNote(noteText)
+                                composerMode = ComposerMode.NONE
+                                noteText = ""
+                            }
                         }
-                    }
-                )
-            } else if (isImageExpanded) {
-                ImageExpansion(
-                    selectedImageUri = selectedImageUri,
-                    imageDescription = imageDescription,
-                    onImageDescriptionChange = { imageDescription = it },
-                    onSelectImage = {
-                        imagePickerLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
-                    },
-                    onDismiss = {
-                        isImageExpanded = false
-                        selectedImageUri = null
-                        imageDescription = ""
-                    },
-                    onSubmit = {
-                        if (selectedImageUri != null) {
-                            onAddImage(
-                                selectedImageUri.toString(),
-                                imageDescription.ifBlank { null }
+                    )
+                }
+                ComposerMode.IMAGE -> {
+                    ImageExpansion(
+                        selectedImageUri = selectedImageUri,
+                        imageDescription = imageDescription,
+                        onImageDescriptionChange = { imageDescription = it },
+                        onSelectImage = {
+                            imagePickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                             )
-                            isImageExpanded = false
+                        },
+                        onRemoveImage = { selectedImageUri = null },
+                        onDismiss = {
+                            composerMode = ComposerMode.NONE
                             selectedImageUri = null
                             imageDescription = ""
-                            focusManager.clearFocus()
+                        },
+                        onSubmit = {
+                            if (selectedImageUri != null) {
+                                onAddImage(
+                                    selectedImageUri.toString(),
+                                    imageDescription.ifBlank { null }
+                                )
+                                composerMode = ComposerMode.NONE
+                                selectedImageUri = null
+                                imageDescription = ""
+                                focusManager.clearFocus()
+                            }
                         }
-                    }
-                )
-            } else if (isManualExpanded) {
-                ManualActivityExpansion(
-                    manualTitle = manualTitle,
-                    manualDuration = manualDuration,
-                    onManualTitleChange = { manualTitle = it },
-                    onManualDurationChange = { manualDuration = it },
-                    onDismiss = { isManualExpanded = false; manualTitle = ""; manualDuration = "" },
-                    onSubmit = {
-                        if (manualTitle.isNotBlank() && manualDuration.isValidDuration()) {
-                            focusManager.clearFocus()
-                            onAddManualActivity(manualTitle, manualDuration.toIntOrNull())
+                    )
+                }
+                ComposerMode.MANUAL_ACTIVITY -> {
+                    ManualActivityExpansion(
+                        manualTitle = manualTitle,
+                        manualDuration = manualDuration,
+                        onManualTitleChange = { manualTitle = it },
+                        onManualDurationChange = { manualDuration = it },
+                        onDismiss = {
+                            composerMode = ComposerMode.NONE
+                            manualTitle = ""
+                            manualDuration = ""
+                        },
+                        onSubmit = {
+                            if (manualTitle.isNotBlank() && manualDuration.isValidDuration()) {
+                                focusManager.clearFocus()
+                                onAddManualActivity(manualTitle, manualDuration.toIntOrNull())
+                                composerMode = ComposerMode.NONE
+                                manualTitle = ""
+                                manualDuration = ""
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
     }
@@ -417,6 +448,7 @@ private fun ImageExpansion(
     imageDescription: String,
     onImageDescriptionChange: (String) -> Unit,
     onSelectImage: () -> Unit,
+    onRemoveImage: () -> Unit,
     onDismiss: () -> Unit,
     onSubmit: () -> Unit
 ) {
@@ -463,18 +495,39 @@ private fun ImageExpansion(
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
                 )
 
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(selectedImageUri)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "Selected image preview",
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(120.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
-                )
+                        .clip(RoundedCornerShape(8.dp))
+                ) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(selectedImageUri)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "Selected image preview",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(4.dp),
+                        shape = CircleShape,
+                        color = Color.Red.copy(alpha = 0.8f)
+                    ) {
+                        IconButton(onClick = onRemoveImage) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "${RTL}حذف تصویر",
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
                 HorizontalDivider(

@@ -13,12 +13,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.core.calendar.PersianCalendarDialog
 import com.example.core.util.JalaliDate
 import com.example.core.util.RTL
@@ -357,6 +362,8 @@ private fun ActivityDayHeader(dateKey: Long) {
 
 @Composable
 private fun ActivityEventItem(uiModel: TimelineEventUiModel) {
+    var showImageViewer by remember { mutableStateOf(false) }
+
     NeumorphicSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -383,7 +390,34 @@ private fun ActivityEventItem(uiModel: TimelineEventUiModel) {
                 )
             }
 
-            // Layer 2: object/context
+            if (uiModel.imageUri != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { showImageViewer = true },
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(uiModel.imageUri)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                }
+            }
+
+            // Layer 3: object/context
             uiModel.objectText?.let { obj ->
                 if (obj.isNotBlank()) {
                     Spacer(modifier = Modifier.height(3.dp))
@@ -396,7 +430,7 @@ private fun ActivityEventItem(uiModel: TimelineEventUiModel) {
                 }
             }
 
-            // Layer 3: supporting context
+            // Layer 3b: supporting context
             uiModel.supportingText?.let { support ->
                 if (support.isNotBlank()) {
                     Spacer(modifier = Modifier.height(2.dp))
@@ -418,5 +452,12 @@ private fun ActivityEventItem(uiModel: TimelineEventUiModel) {
                 modifier = Modifier.padding(start = 22.dp)
             )
         }
+    }
+
+    if (showImageViewer) {
+        ImageViewerDialog(
+            imageUri = uiModel.imageUri!!,
+            onDismiss = { showImageViewer = false }
+        )
     }
 }

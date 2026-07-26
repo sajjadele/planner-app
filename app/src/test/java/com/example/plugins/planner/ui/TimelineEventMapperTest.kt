@@ -4,7 +4,9 @@ import androidx.compose.ui.graphics.Color
 import com.example.core.util.RTL
 import com.example.plugins.planner.data.ActivityEventEntity
 import com.example.plugins.planner.data.ActivityEventType
+import com.example.plugins.planner.data.ImageEventParser
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -188,6 +190,31 @@ class TimelineEventMapperTest {
             outline = Color.Red
         )
         assertEquals(Color(0xFF1565C0), result[0].color)
+    }
+
+    @Test
+    fun `image event with description has imageUri extracted from URI`() {
+        val uri = "content://test/image.jpg"
+        val desc = "Architecture screenshot"
+        val encoded = ImageEventParser.encode(uri, desc)
+        val result = map(listOf(event(1, eventType = ActivityEventType.IMAGE_ADDED, description = encoded)))
+        assertEquals(uri, result[0].imageUri)
+    }
+
+    @Test
+    fun `image event imageUri null when decoded URI is empty`() {
+        val result = map(listOf(event(1, eventType = ActivityEventType.IMAGE_ADDED, description = ImageEventParser.encode("", null))))
+        assertNull(result[0].imageUri)
+    }
+
+    @Test
+    fun `image event objectText does not contain URI`() {
+        val uri = "content://test/image.jpg"
+        val desc = "Architecture screenshot"
+        val encoded = ImageEventParser.encode(uri, desc)
+        val result = map(listOf(event(1, eventType = ActivityEventType.IMAGE_ADDED, description = encoded)))
+        assertEquals(desc, result[0].objectText)
+        assertFalse(result[0].objectText.orEmpty().contains(uri))
     }
 
     // ── Color assignment ────────────────────────────────────────────────

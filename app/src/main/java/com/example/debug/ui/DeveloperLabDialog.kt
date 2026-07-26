@@ -687,7 +687,8 @@ private fun ActivityScenarioSection(
             ActivityScenario.TIMELINE_RANGE to Color(0xFFEA580C),
             ActivityScenario.NOTE_LIFECYCLE to Color(0xFF0891B2),
             ActivityScenario.MANUAL_ACTIVITY_LIFECYCLE to Color(0xFFD97706),
-            ActivityScenario.IMAGE_LIFECYCLE to Color(0xFF1565C0)
+            ActivityScenario.IMAGE_LIFECYCLE to Color(0xFF1565C0),
+            ActivityScenario.IMAGE_PERSISTENCE_LIFECYCLE to Color(0xFF2196F3)
         )
         buttons.forEach { (scenario, color) ->
             Button(
