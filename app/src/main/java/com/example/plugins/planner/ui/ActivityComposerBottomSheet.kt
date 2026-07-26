@@ -31,23 +31,19 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.core.util.RTL
+import com.example.plugins.planner.data.ActivityAttachment
 import com.example.plugins.planner.data.ActivityDraft
-import com.example.plugins.planner.data.ActivityPayloadParser
-
-enum class ComposerMode {
-    NONE,
-    STEP,
-    NOTE,
-    MANUAL_ACTIVITY,
-    IMAGE
-}
+import com.example.plugins.planner.ui.composer.ActivityComposerAction
+import com.example.plugins.planner.ui.composer.ActivityComposerReducer
+import com.example.plugins.planner.ui.composer.ActivityComposerState
 
 /**
  * ActivityComposerBottomSheet — Unified activity creation UI.
  *
- * Architecture (Phase 4.6):
- * - Uses a single callback: onCreateActivity(ActivityDraft)
- * - Internally uses ActivityPayloadParser to create drafts
+ * Architecture (Phase 4.7.3):
+ * - State-driven: single ActivityComposerState source of truth
+ * - Actions dispatched to reducer for state transitions
+ * - Generates ActivityDraft on submit
  * - UI behavior unchanged from previous version
  *
  * Future (Phase B):
@@ -61,19 +57,26 @@ fun ActivityComposerBottomSheet(
     onCreateActivity: (ActivityDraft) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // ── State-driven composer (Phase 4.7.3) ──
+    var composerState by remember { mutableStateOf(ActivityComposerState()) }
     var composerMode by remember { mutableStateOf(ComposerMode.NONE) }
-    var stepTitle by remember { mutableStateOf("") }
-    var noteText by remember { mutableStateOf("") }
-    var manualTitle by remember { mutableStateOf("") }
-    var manualDuration by remember { mutableStateOf("") }
-    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
-    var imageDescription by remember { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
 
+    // ── Dispatch helper ──
+    val dispatch = remember(composerState) {
+        { action: ActivityComposerAction ->
+            composerState = ActivityComposerReducer.reduce(composerState, action)
+        }
+    }
+
+    // ── Image picker launcher ──
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri: Uri? ->
-            selectedImageUri = uri
+            if (uri != null) {
+                dispatch(ActivityComposerAction.AddAttachment(ActivityAttachment.Image(uri.toString())))
+            }
         }
     )
 
@@ -122,7 +125,12 @@ fun ActivityComposerBottomSheet(
                         label = "${RTL}تصویر",
                         subtitle = "${RTL}افزودن یک تصویر به فعالیتها",
                         enabled = true,
-                        onClick = { composerMode = ComposerMode.IMAGE }
+                        onClick = {
+                            composerMode = ComposerMode.IMAGE
+                            imagePickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        }
                     )
                     ComposerOption(
                         icon = "📌",
@@ -134,95 +142,97 @@ fun ActivityComposerBottomSheet(
                 }
                 ComposerMode.STEP -> {
                     StepExpansion(
-                        stepTitle = stepTitle,
-                        onStepTitleChange = { stepTitle = it },
+                        text = composerState.text,
+                        onTextChange = { dispatch(ActivityComposerAction.TextChanged(it)) },
                         onDismiss = {
                             composerMode = ComposerMode.NONE
-                            stepTitle = ""
+                            dispatch(ActivityComposerAction.Reset)
                         },
                         onSubmit = {
-                            if (stepTitle.isNotBlank()) {
+                            if (composerState.text.isNotBlank()) {
                                 focusManager.clearFocus()
-                                onCreateActivity(ActivityPayloadParser.step(stepTitle))
+                                // Convert to step intent
+                                val stepState = ActivityComposerReducer.reduce(
+                                    composerState,
+                                    ActivityComposerAction.ConvertToStep
+                                )
+                                onCreateActivity(stepState.toDraft())
                                 composerMode = ComposerMode.NONE
-                                stepTitle = ""
+                                dispatch(ActivityComposerAction.Reset)
                             }
                         }
                     )
                 }
                 ComposerMode.NOTE -> {
                     NoteExpansion(
-                        noteText = noteText,
-                        onNoteTextChange = { noteText = it },
+                        text = composerState.text,
+                        onTextChange = { dispatch(ActivityComposerAction.TextChanged(it)) },
                         onDismiss = {
                             composerMode = ComposerMode.NONE
-                            noteText = ""
+                            dispatch(ActivityComposerAction.Reset)
                         },
                         onSubmit = {
-                            if (noteText.isNotBlank()) {
+                            if (composerState.text.isNotBlank()) {
                                 focusManager.clearFocus()
-                                onCreateActivity(ActivityPayloadParser.note(noteText))
+                                onCreateActivity(composerState.toDraft())
                                 composerMode = ComposerMode.NONE
-                                noteText = ""
+                                dispatch(ActivityComposerAction.Reset)
                             }
                         }
                     )
                 }
                 ComposerMode.IMAGE -> {
+                    // Image mode: show selected image if any
+                    val imageAttachment = composerState.attachments
+                        .filterIsInstance<ActivityAttachment.Image>()
+                        .firstOrNull()
+
                     ImageExpansion(
-                        selectedImageUri = selectedImageUri,
-                        imageDescription = imageDescription,
-                        onImageDescriptionChange = { imageDescription = it },
+                        selectedImageUri = imageAttachment?.uri?.let { Uri.parse(it) },
+                        imageDescription = composerState.text,
+                        onImageDescriptionChange = { dispatch(ActivityComposerAction.TextChanged(it)) },
                         onSelectImage = {
                             imagePickerLauncher.launch(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                             )
                         },
-                        onRemoveImage = { selectedImageUri = null },
+                        onRemoveImage = {
+                            imageAttachment?.let {
+                                dispatch(ActivityComposerAction.RemoveAttachment(it))
+                            }
+                        },
                         onDismiss = {
                             composerMode = ComposerMode.NONE
-                            selectedImageUri = null
-                            imageDescription = ""
+                            dispatch(ActivityComposerAction.Reset)
                         },
                         onSubmit = {
-                            if (selectedImageUri != null) {
-                                onCreateActivity(
-                                    ActivityPayloadParser.image(
-                                        uri = selectedImageUri.toString(),
-                                        description = imageDescription.ifBlank { null }
-                                    )
-                                )
-                                composerMode = ComposerMode.NONE
-                                selectedImageUri = null
-                                imageDescription = ""
+                            if (imageAttachment != null) {
                                 focusManager.clearFocus()
+                                onCreateActivity(composerState.toDraft())
+                                composerMode = ComposerMode.NONE
+                                dispatch(ActivityComposerAction.Reset)
                             }
                         }
                     )
                 }
                 ComposerMode.MANUAL_ACTIVITY -> {
                     ManualActivityExpansion(
-                        manualTitle = manualTitle,
-                        manualDuration = manualDuration,
-                        onManualTitleChange = { manualTitle = it },
-                        onManualDurationChange = { manualDuration = it },
+                        title = composerState.text,
+                        duration = composerState.durationMinutes?.toString() ?: "",
+                        onTitleChange = { dispatch(ActivityComposerAction.TextChanged(it)) },
+                        onDurationChange = { minutes ->
+                            dispatch(ActivityComposerAction.DurationChanged(minutes?.toIntOrNull()))
+                        },
                         onDismiss = {
                             composerMode = ComposerMode.NONE
-                            manualTitle = ""
-                            manualDuration = ""
+                            dispatch(ActivityComposerAction.Reset)
                         },
                         onSubmit = {
-                            if (manualTitle.isNotBlank() && manualDuration.isValidDuration()) {
+                            if (composerState.text.isNotBlank()) {
                                 focusManager.clearFocus()
-                                onCreateActivity(
-                                    ActivityPayloadParser.manualActivity(
-                                        title = manualTitle,
-                                        durationMinutes = manualDuration.toIntOrNull()
-                                    )
-                                )
+                                onCreateActivity(composerState.toDraft())
                                 composerMode = ComposerMode.NONE
-                                manualTitle = ""
-                                manualDuration = ""
+                                dispatch(ActivityComposerAction.Reset)
                             }
                         }
                     )
@@ -234,8 +244,8 @@ fun ActivityComposerBottomSheet(
 
 @Composable
 private fun StepExpansion(
-    stepTitle: String,
-    onStepTitleChange: (String) -> Unit,
+    text: String,
+    onTextChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onSubmit: () -> Unit
 ) {
@@ -259,8 +269,8 @@ private fun StepExpansion(
                 )
             }
             OutlinedTextField(
-                value = stepTitle,
-                onValueChange = onStepTitleChange,
+                value = text,
+                onValueChange = onTextChange,
                 placeholder = { Text("${RTL}عنوان مرحله", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                 singleLine = true,
@@ -271,15 +281,15 @@ private fun StepExpansion(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { onSubmit() })
             )
-            FooterButtons(onDismiss = onDismiss, onSubmit = onSubmit, enabled = stepTitle.isNotBlank())
+            FooterButtons(onDismiss = onDismiss, onSubmit = onSubmit, enabled = text.isNotBlank())
         }
     }
 }
 
 @Composable
 private fun NoteExpansion(
-    noteText: String,
-    onNoteTextChange: (String) -> Unit,
+    text: String,
+    onTextChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onSubmit: () -> Unit
 ) {
@@ -303,8 +313,8 @@ private fun NoteExpansion(
                 )
             }
             OutlinedTextField(
-                value = noteText,
-                onValueChange = onNoteTextChange,
+                value = text,
+                onValueChange = onTextChange,
                 placeholder = { Text("${RTL}افزودن توضیح یا ثبت یک فکر", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                 maxLines = 4,
@@ -315,17 +325,17 @@ private fun NoteExpansion(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { onSubmit() })
             )
-            FooterButtons(onDismiss = onDismiss, onSubmit = onSubmit, enabled = noteText.isNotBlank())
+            FooterButtons(onDismiss = onDismiss, onSubmit = onSubmit, enabled = text.isNotBlank())
         }
     }
 }
 
 @Composable
 private fun ManualActivityExpansion(
-    manualTitle: String,
-    manualDuration: String,
-    onManualTitleChange: (String) -> Unit,
-    onManualDurationChange: (String) -> Unit,
+    title: String,
+    duration: String,
+    onTitleChange: (String) -> Unit,
+    onDurationChange: (String?) -> Unit,
     onDismiss: () -> Unit,
     onSubmit: () -> Unit
 ) {
@@ -349,8 +359,8 @@ private fun ManualActivityExpansion(
                 )
             }
             OutlinedTextField(
-                value = manualTitle,
-                onValueChange = onManualTitleChange,
+                value = title,
+                onValueChange = onTitleChange,
                 placeholder = { Text("${RTL}عنوان فعالیت", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                 singleLine = true,
@@ -362,8 +372,8 @@ private fun ManualActivityExpansion(
                 keyboardActions = KeyboardActions(onDone = { onSubmit() })
             )
             OutlinedTextField(
-                value = manualDuration,
-                onValueChange = onManualDurationChange,
+                value = duration,
+                onValueChange = { onDurationChange(it.ifBlank { null }) },
                 placeholder = { Text("${RTL}مدت زمان (دقیقه، اختیاری)", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                 singleLine = true,
@@ -374,7 +384,11 @@ private fun ManualActivityExpansion(
                     cursorColor = MaterialTheme.colorScheme.primary
                 )
             )
-            FooterButtons(onDismiss = onDismiss, onSubmit = onSubmit, enabled = manualTitle.isNotBlank() && manualDuration.isValidDuration())
+            FooterButtons(
+                onDismiss = onDismiss,
+                onSubmit = onSubmit,
+                enabled = title.isNotBlank() && duration.isValidDuration()
+            )
         }
     }
 }
