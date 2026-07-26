@@ -1,7 +1,6 @@
-package com.example
+package com.example.plugins.planner.ui
 
-import android.util.Log.plugins.planner.ui
-
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
