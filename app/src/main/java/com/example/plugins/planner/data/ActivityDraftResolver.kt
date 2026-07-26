@@ -3,18 +3,19 @@ package com.example.plugins.planner.data
 /**
  * ActivityDraftResolver — Converts ActivityDraft to existing ActivityEvent representation.
  *
- * Architecture (Phase 4.7.1):
+ * Architecture (Phase 4.7.2):
  * - Pure Kotlin, no Android/Room dependencies
  * - Maps draft intent + metadata to ActivityEventType
+ * - Uses ActivityPayloadCodec for encoding description
  * - Maintains backward compatibility with current storage format
  *
  * Rules:
  * - intent == STEP → STEP_CREATED
- * - durationMinutes != null → MANUAL_ACTIVITY
- * - else → NOTE_ADDED
+ * - else → NOTE_ADDED / MANUAL_ACTIVITY (based on duration)
  *
- * Attachments are NOT separate events.
- * They are encoded in the description field for backward compatibility.
+ * Attachments are part of the activity payload.
+ * For now, we preserve existing event types for backward compatibility.
+ * Future migration will simplify to single ACTIVITY_CREATED event.
  */
 object ActivityDraftResolver {
 
@@ -31,33 +32,51 @@ object ActivityDraftResolver {
 
     /**
      * Encode draft content into the description field.
-     * Maintains backward compatibility with current storage format.
+     * Uses ActivityPayloadCodec for rich payloads.
+     * Falls back to legacy format for simple cases.
      *
-     * Format:
-     * - IMAGE_ADDED: ImageEventParser.encode(uri, description)
-     * - MANUAL_ACTIVITY: "title|durationMinutes"
-     * - NOTE_ADDED / STEP_CREATED: plain text
+     * Encoding strategy:
+     * - If draft has attachments → use JSON format
+     * - If draft has duration → use legacy "title|duration" format
+     * - Otherwise → use plain text
      */
     fun encodeDescription(draft: ActivityDraft): String? {
-        return when (resolveEventType(draft)) {
-            ActivityEventType.IMAGE_ADDED -> {
-                // Should not happen with new model, but handle gracefully
-                val image = draft.attachments.filterIsInstance<ActivityAttachment.Image>().firstOrNull()
-                if (image != null) {
-                    ImageEventParser.encode(image.uri, draft.text)
-                } else {
-                    draft.text
-                }
-            }
-            ActivityEventType.MANUAL_ACTIVITY -> {
-                if (draft.durationMinutes != null) {
-                    "${draft.text}|${draft.durationMinutes}"
-                } else {
-                    draft.text
-                }
-            }
-            else -> draft.text
+        // For drafts with attachments, use JSON format
+        if (draft.attachments.isNotEmpty()) {
+            val payload = draftToPayload(draft)
+            return ActivityPayloadCodec.encode(payload)
         }
+
+        // For manual activity with duration, use legacy format
+        if (draft.durationMinutes != null) {
+            return if (draft.text != null) {
+                "${draft.text}|${draft.durationMinutes}"
+            } else {
+                null
+            }
+        }
+
+        // For plain text (note), use legacy format
+        return draft.text
+    }
+
+    /**
+     * Convert ActivityDraft to ActivityPayload for codec encoding.
+     */
+    private fun draftToPayload(draft: ActivityDraft): ActivityPayload {
+        return ActivityPayload(
+            text = draft.text,
+            attachments = draft.attachments,
+            durationMinutes = draft.durationMinutes
+        )
+    }
+
+    /**
+     * Decode a stored description back to ActivityPayload.
+     * Handles both JSON and legacy formats.
+     */
+    fun decodeDescription(description: String?): ActivityPayload? {
+        return ActivityPayloadCodec.decode(description)
     }
 
     /**

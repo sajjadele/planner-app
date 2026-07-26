@@ -1,6 +1,7 @@
 package com.example.plugins.planner.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -134,5 +135,80 @@ class ActivityDraftResolverTest {
     fun `getImageUri returns null when no images`() {
         val draft = ActivityDraft(text = "No images")
         assertNull(ActivityDraftResolver.getImageUri(draft))
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // encodeDescription tests (Phase 4.7.2)
+    // ════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `encodeDescription with attachments uses JSON format`() {
+        val draft = ActivityDraft(
+            text = "Screenshot",
+            attachments = listOf(ActivityAttachment.Image("content://media/1"))
+        )
+        val description = ActivityDraftResolver.encodeDescription(draft)
+        assertNotNull(description)
+        assertTrue(description!!.trimStart().startsWith("{"))
+        assertTrue(description.contains("Screenshot"))
+        assertTrue(description.contains("content://media/1"))
+    }
+
+    @Test
+    fun `encodeDescription with duration uses legacy format`() {
+        val draft = ActivityDraft(text = "Code review", durationMinutes = 45)
+        val description = ActivityDraftResolver.encodeDescription(draft)
+        assertEquals("Code review|45", description)
+    }
+
+    @Test
+    fun `encodeDescription with plain text uses legacy format`() {
+        val draft = ActivityDraft(text = "Simple note")
+        val description = ActivityDraftResolver.encodeDescription(draft)
+        assertEquals("Simple note", description)
+    }
+
+    @Test
+    fun `encodeDescription with null text and no attachments returns null`() {
+        val draft = ActivityDraft()
+        val description = ActivityDraftResolver.encodeDescription(draft)
+        assertNull(description)
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // decodeDescription tests (Phase 4.7.2)
+    // ════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `decodeDescription with JSON format`() {
+        val json = """{"text":"hello","attachments":[{"type":"IMAGE","uri":"content://img/1"}]}"""
+        val payload = ActivityDraftResolver.decodeDescription(json)
+        assertNotNull(payload)
+        assertEquals("hello", payload!!.text)
+        assertEquals(1, payload.attachments.size)
+    }
+
+    @Test
+    fun `decodeDescription with legacy image format`() {
+        val legacy = "content://img/1:::Description"
+        val payload = ActivityDraftResolver.decodeDescription(legacy)
+        assertNotNull(payload)
+        assertEquals(1, payload!!.attachments.size)
+        assertEquals("Description", payload.text)
+    }
+
+    @Test
+    fun `decodeDescription with legacy manual format`() {
+        val legacy = "Task|30"
+        val payload = ActivityDraftResolver.decodeDescription(legacy)
+        assertNotNull(payload)
+        assertEquals("Task", payload!!.text)
+        assertEquals(30, payload.durationMinutes)
+    }
+
+    @Test
+    fun `decodeDescription with null returns null`() {
+        val payload = ActivityDraftResolver.decodeDescription(null)
+        assertNull(payload)
     }
 }
