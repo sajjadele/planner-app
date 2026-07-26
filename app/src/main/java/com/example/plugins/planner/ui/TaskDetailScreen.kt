@@ -447,23 +447,20 @@ private fun TaskDetailActivityContent(
                 }
             }
         } else {
-            // Convert steps to StepCardModels with activities
-            val stepCardModels = remember(steps, activities) {
-                val activitiesByStep = StepCardMapper.groupActivitiesByStep(activities)
-                StepCardMapper.toCardModels(steps, activitiesByStep)
-            }
+            items(steps, key = { it.id }) { step ->
+                // Convert step to StepCardModel with its activities
+                val stepActivities = remember(activities, step.id) {
+                    activities.filter { it.stepId == step.id }
+                        .map { ActivityMessageMapper.toMessage(it) }
+                }
+                val stepCard = remember(step, stepActivities) {
+                    StepCardMapper.toCardModel(step, stepActivities)
+                }
 
-            items(stepCardModels, key = { it.id }) { stepCard ->
                 StepCard(
                     model = stepCard,
-                    onToggle = {
-                        val originalStep = steps.find { it.id == stepCard.id.toInt() }
-                        originalStep?.let { onToggleStep(it) }
-                    },
-                    onDelete = {
-                        val originalStep = steps.find { it.id == stepCard.id.toInt() }
-                        originalStep?.let { onDeleteStep(it) }
-                    }
+                    onToggle = { onToggleStep(step) },
+                    onDelete = { onDeleteStep(step) }
                 )
             }
         }

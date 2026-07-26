@@ -48,8 +48,7 @@ object StepCardMapper {
             messages = sortedActivities,
             attachmentCount = attachmentCount,
             totalDurationMinutes = totalDurationMinutes,
-            createdAt = System.currentTimeMillis(), // Step doesn't have timestamp, use current
-            order = step.order
+            createdAt = step.createdAt
         )
     }
 

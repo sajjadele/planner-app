@@ -64,12 +64,7 @@ data class StepCardModel(
     /**
      * Timestamp when the step was created.
      */
-    val createdAt: Long,
-
-    /**
-     * Order index of the step within the task.
-     */
-    val order: Int = 0
+    val createdAt: Long
 ) {
     /**
      * Get a summary of the step's activity.
