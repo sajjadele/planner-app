@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -63,6 +64,7 @@ fun ActivityComposerBottomSheet(
     // ── State-driven composer ──
     var composerState by remember { mutableStateOf(ActivityComposerState()) }
     var showDurationPicker by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     // ── Dispatch helper (use rememberUpdatedState to avoid stale closure) ──
     val currentState by rememberUpdatedState(composerState)
@@ -78,6 +80,17 @@ fun ActivityComposerBottomSheet(
         onResult = { uri: Uri? ->
             Log.d("COMPOSER_DEBUG", "📸 Image picker returned: uri=$uri")
             if (uri != null) {
+                // Take persistable permission so Coil can load the image
+                try {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                    Log.d("COMPOSER_DEBUG", "📸 Took persistable URI permission")
+                } catch (e: Exception) {
+                    Log.w("COMPOSER_DEBUG", "📸 Could not take persistable permission: ${e.message}")
+                }
+                
                 Log.d("COMPOSER_DEBUG", "📸 Dispatching AddAttachment action")
                 dispatch(ActivityComposerAction.AddAttachment(ActivityAttachment.Image(uri.toString())))
                 Log.d("COMPOSER_DEBUG", "📸 After dispatch, composerState.attachments.size=${composerState.attachments.size}")

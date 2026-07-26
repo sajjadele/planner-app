@@ -78,6 +78,7 @@ private fun ImageAttachmentPreview(
     uri: String,
     onRemove: () -> Unit
 ) {
+    Log.d("COMPOSER_DEBUG", "🖼 ImageAttachmentPreview: loading uri=$uri")
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -88,6 +89,14 @@ private fun ImageAttachmentPreview(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(Uri.parse(uri))
                 .crossfade(true)
+                .listener(
+                    onError = { _, errorResult ->
+                        Log.e("COMPOSER_DEBUG", "🖼 Coil error: ${errorResult.throwable?.message}", errorResult.throwable)
+                    },
+                    onSuccess = { _, _ ->
+                        Log.d("COMPOSER_DEBUG", "🖼 Coil success: image loaded")
+                    }
+                )
                 .build(),
             contentDescription = "${RTL}پیش‌نمایش تصویر",
             modifier = Modifier.fillMaxSize(),
