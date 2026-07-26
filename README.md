@@ -1,269 +1,211 @@
-# Vision Planner
+<p align="center">
+  <img src="assets/readme/hero.svg" alt="Vision Planner Hero" width="100%">
+</p>
 
-Vision Planner is **not** a task-management app. It is a **goal-oriented progress system** that helps users understand their progress, identify behavioral patterns, and improve their path toward meaningful goals.
+<h1 align="center">Vision Planner</h1>
+
+<p align="center">
+  <strong>Goal-oriented progress system</strong> that helps you understand your progress,<br>
+  identify behavioral patterns, and improve your path toward meaningful goals.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Android-24%2B-brightgreen?style=flat-square&logo=android" alt="Min SDK">
+  <img src="https://img.shields.io/badge/Kotlin-1.9-blue?style=flat-square&logo=kotlin" alt="Kotlin">
+  <img src="https://img.shields.io/badge/Jetpack%20Compose-Material3-purple?style=flat-square" alt="Compose">
+  <img src="https://img.shields.io/badge/Offline-100%25-orange?style=flat-square" alt="Offline">
+  <img src="https://img.shields.io/badge/Database-v14-red?style=flat-square" alt="Database">
+</p>
 
 ---
 
-## Product Philosophy
+## 💡 Product Philosophy
 
-> "Creating a task should feel like capturing a thought, not filling a form."
+> *"Creating a task should feel like capturing a thought, not filling a form."*
 
 **Non-negotiable principles:**
 
-1. **The Goal is more important than the Task.** A task is merely a unit of execution under a goal.
-2. **Low friction, high signal.** Task creation must be rapid and optional in structure; the system builds deep context over time.
-3. **Feedback, not judgment.** Insights describe behavior and patterns. They do not criticize performance or create guilt.
-4. **Invisible data collection.** Insights are derived from natural behavior. No forced journals, daily reflections, or mandatory check-ins.
-5. **Offline-first.** Everything stays on-device. No network dependency.
+| # | Principle | Description |
+|---|-----------|-------------|
+| 1 | **Goal > Task** | A task is merely a unit of execution under a goal |
+| 2 | **Low friction, high signal** | Task creation must be rapid and optional in structure |
+| 3 | **Feedback, not judgment** | Insights describe behavior — they don't criticize |
+| 4 | **Invisible data collection** | No forced journals, daily reflections, or mandatory check-ins |
+| 5 | **Offline-first** | Everything stays on-device. Zero network dependency |
 
-### Core Mental Model
+---
+
+## 🧠 Core Mental Model
 
 ```
 Goal → Task → Event → Snapshot → Mirror → Feedback
 ```
 
-- **Goal** — meaningful direction
-- **Task** — smallest execution unit, ideally linked to a goal
-- **Event** — state transitions: created, completed, rescheduled, deleted
-- **Snapshot** — daily progress/behavior projections
-- **Mirror** — pattern detection + feedback inside Goal Dashboard
+| Component | Role |
+|-----------|------|
+| **Goal** | Meaningful direction |
+| **Task** | Smallest execution unit |
+| **Event** | State transitions: created, completed, rescheduled |
+| **Snapshot** | Daily progress & behavior projections |
+| **Mirror** | Pattern detection + feedback inside Goal Dashboard |
 
 ---
 
-## Feature Status
+## ✨ Features
 
-### Implemented (Phase 1–6 Complete)
+### Implemented (Phase 1–6)
 
-| Feature | Status | Description |
-|---|---|---|
-| Goal Dashboard | ✅ | Create, complete, pause, resume, abandon, delete goals |
-| Goal Detail Screen | ✅ | View goal stats, linked tasks, completion rate |
-| Planner (Task System) | ✅ | Day-based task creation, completion, undo, delete |
-| Task Detail & Editing | ✅ | Edit title, reassign goal, add progress logs |
-| Goal–Task Linking | ✅ | FK relationship, goal picker in task creation |
-| Task Logs (Notes) | ✅ | Attach progress notes to tasks with timestamps |
-| Behavior Insights | ✅ | Streak, velocity, procrastination alerts |
-| Task Priority | ✅ | HIGH / MEDIUM / LOW priority set in AddTaskDialog, shown on tasks |
-| Reminder System | ✅ | AlarmManager-based task reminders with boot restore |
-| Cross-Module Search | ✅ | Search across tasks and notes |
-| Persian/Farsi UI | ✅ | RTL layout, Persian digits, Persian week (Saturday start) |
-| Neumorphic Design | ✅ | Custom NeumorphicSurface, consistent elevation system |
-| Plugin Architecture | ✅ | AppPlugin interface, PluginRegistry, Module Settings |
-| Offline-First | ✅ | 100% local, zero network dependency |
-| First-Run Onboarding | ✅ | Guided 2-step value-discovery flow |
-| Light / Dark / System Theme | ✅ | DataStore-backed ThemeRepository |
-| Jalali Calendar Picker | ✅ | True Jalali month grid in a bottom sheet |
-| Holiday Awareness | ✅ | Bundled holiday data; Iranian holidays in calendar/day context |
-| Infinite Week Navigation | ✅ | Snap-scrolling horizontal week row |
-| Real-Time Search | ✅ | Instant search across tasks + notes |
-| Quick Notes | ✅ | Standalone notes screen |
-| Weekly Insight Card | ✅ | Compact insight summary with expandable detail sheet |
-| Mirror Engine (V1) | ✅ | `domain.mirror` + `core.mirror`; patterns Boulder, Initiator/Finisher, Goal Attention, Consistency Decay |
-| Mirror Feedback UI | ✅ | `MirrorFeedbackCard` inside Goal Detail; neutral language, no separate screen |
-| Behavioral Solar System | ✅ | Goal-centered graph view with attention-driven positioning |
-| Adaptive Cluster Visualization | ✅ | Automatic clustering for goals with >8 tasks |
-| Solar System Motion | ✅ | Staged entrance animation, breathing shimmer, cluster expand/collapse |
+<table>
+<tr>
+<td width="50%">
 
-### Planned
+**🎯 Goal Management**
+- Create, complete, pause, resume, abandon, delete goals
+- Goal Detail Screen with stats & linked tasks
+- Goal–Task linking with FK relationship
+- Completion rate tracking
+
+**📝 Task System**
+- Day-based task creation & completion
+- Task editing & goal reassignment
+- HIGH / MEDIUM / LOW priority
+- AlarmManager-based reminders
+- Jalali Calendar Picker
+
+**📊 Insights**
+- Streak, velocity, procrastination alerts
+- Weekly Insight Card
+- Cross-module search
+- Real-time search across tasks + notes
+
+</td>
+<td width="50%">
+
+**🪞 Mirror Engine (V1)**
+- Boulder detection (avoided tasks)
+- Initiator vs Finisher patterns
+- Goal Attention tracking
+- Consistency Decay analysis
+- Neutral feedback language
+
+**🌌 Behavioral Solar System**
+- Goal-centered graph visualization
+- Attention-driven task positioning
+- Adaptive clusters for >8 tasks
+- Staged entrance animation
+- Breathing shimmer effects
+
+**🎨 Design System**
+- Neumorphic components
+- Light / Dark / System theme
+- RTL Persian/Farsi UI
+- Persian digits & week
+- Plugin architecture
+
+</td>
+</tr>
+</table>
+
+### Coming Soon
 
 | Feature | Status | Notes |
-|---|---|---|
-| AI Insight Layer | 🔜 | Phase 7: Uses structured events, snapshots, and Mirror outputs |
-| Task Inbox behavior | 🔜 | Task creation without a goal remains allowed as quick capture |
-| Goal-first main layout | 🔜 | Preserve daily task flow while emphasizing goal context |
-
-### Deferred / Out of Scope
-
-- ❌ AI Chat Interface
-- ❌ Social/Community Features
-- ❌ Complex Note-Taking System
-- ❌ User-Facing Plugin/Extension System
-- ❌ Life Area as a first-class entity
-- ❌ Network sync or remote AI
+|---------|--------|-------|
+| AI Insight Layer | 🔜 | Phase 7: Uses structured events & Mirror outputs |
+| Task Inbox behavior | 🔜 | Quick capture without goal assignment |
+| Goal-first main layout | 🔜 | Preserve daily flow while emphasizing goals |
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
 ### Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Language | Kotlin |
-| UI | Jetpack Compose + Material3 |
-| Database | Room |
-| Async | Coroutines + Flow |
-| Architecture | MVVM |
-| Persistence | Offline-first local storage |
-| Build System | Gradle |
-| Min SDK | 24 |
-| Target SDK | 36 |
+<table>
+<tr><td><strong>Language</strong></td><td>Kotlin</td><td><strong>UI</strong></td><td>Jetpack Compose + Material3</td></tr>
+<tr><td><strong>Database</strong></td><td>Room (v14)</td><td><strong>Async</strong></td><td>Coroutines + Flow</td></tr>
+<tr><td><strong>Architecture</strong></td><td>MVVM</td><td><strong>Persistence</strong></td><td>Offline-first local</td></tr>
+<tr><td><strong>Build</strong></td><td>Gradle</td><td><strong>Min SDK</strong></td><td>24 / Target 36</td></tr>
+</table>
+
+### Data Flow
+
+```
+Room DAO (Flow) → Repository → ViewModel StateFlow → Compose collectAsState
+```
+
+- All reads are reactive via Room `Flow`
+- Writes use `suspend` functions in ViewModels
+- Insight/mirror math lives in pure-Kotlin domain calculators
 
 ### Database Schema (v14)
 
 ```
-goals          → GoalEntity (id, title, description, status, createdAt, completedAt)
-goal_events    → GoalEventEntity (id, goalId FK, eventType, timestamp)
-goal_progress_snapshot → GoalProgressSnapshotEntity (dateEpochMs, goalId FK, completed, total, rate)
-behavior_snapshot → BehaviorSnapshotEntity (dateEpochMs PK, completed, created, streak, velocity, rescheduleRate)
-tasks          → TaskEntity (id, title, priority, isCompleted, dateEpochMs, timestamp, reminderHour, reminderMinute, goalId FK, valueTag)
-task_events    → TaskEventEntity (id, taskId, eventType, timestamp)
-notes          → NoteEntity (id, content, timestamp, goalId?, taskId?)
-module_settings → ModuleSettingsEntity (moduleId, isEnabled)
-activity_events → ActivityEventEntity (id, taskId, eventType, timestamp)
-task_steps     → TaskStepEntity (id, taskId FK, title, isCompleted, order)
-```
-
-**Key relationships:**
-- `tasks.goalId` → `goals.id` (ForeignKey, SET NULL on delete)
-- `notes.taskId` → `tasks.id` (indexed, nullable)
-- `notes.goalId` → `goals.id` (indexed, nullable)
-- `task_events.taskId` → `tasks.id` (indexed)
-- `goal_progress_snapshot` / `behavior_snapshot` are **rebuildable projections** of `tasks` + `task_events`
-
-### Project Structure
-
-```
-app/src/main/java/com/example/
-│
-├── core/
-│   ├── database/           # AppDatabase (v14), migrations
-│   ├── goal/               # GoalEntity, GoalDao, GoalRepository
-│   ├── snapshot/           # GoalProgressSnapshotEntity, BehaviorSnapshotEntity,
-│   │                        # SnapshotDao, SnapshotRepository, SnapshotAggregator
-│   ├── mirror/             # MirrorRepository, RoomMirrorRepository
-│   ├── onboarding/         # OnboardingStep, OnboardingViewModel, OnboardingRepository
-│   ├── plugin/             # AppPlugin, PluginRegistry, ModuleSettingsViewModel
-│   ├── preferences/        # ThemeRepository (DataStore)
-│   ├── receiver/           # BootReceiver, ReminderReceiver, ReminderScheduler
-│   ├── search/             # SearchDialog, SearchViewModel
-│   └── util/               # DateTimeUtils, PersianDigits, JalaliDate
-│
-├── domain/
-│   ├── attention/          # AttentionCalculator, AttentionResult (Behavioral Solar System)
-│   ├── goal/               # Goal domain logic
-│   ├── graph/              # GoalGraphBuilder, GoalGraphModels, GraphGeometry
-│   ├── insight/            # Streak, rate, velocity, procrastination calculators
-│   ├── mirror/             # MirrorEngine, MirrorHeuristics, MirrorSignal, MirrorInsight
-│   └── snapshot/           # Daily goal progress + behavior projection math
-│
-├── plugins/
-│   ├── goals/              # GoalsPlugin, GoalDashboardScreen, GoalDetailScreen
-│   │   └── ui/             # GoalViewModel, GoalDetailViewModel, GoalCard
-│   ├── notes/              # NotesPlugin
-│   │   ├── data/           # NoteEntity, NoteDao, NoteRepository
-│   │   └── ui/             # NotesScreen, NotesViewModel
-│   │   └── ui/components/  # Neumorphic components, dialogs, insight card
-│   └── planner/            # PlannerPlugin
-│       ├── data/           # TaskEntity, TaskEventEntity, TaskDao, TaskEventDao,
-│       │                   # InsightDao, TaskRepository, ActivityEventDao, TaskStepDao
-│       └── ui/             # PlannerScreen, PlannerViewModel, TaskDetailScreen,
-│           │               # TaskDetailViewModel, WeeklyInsightViewModel
-│           └── components/ # AddTaskDialog, TaskCard, DaySelector,
-│                           # DayContextPanel, WeeklyInsightCard, PlannerEmptyState
-│
-├── ui/
-│   ├── onboarding/         # OnboardingHost, OnboardingGoalScreen, OnboardingTaskScreen
-│   ├── screens/            # MainScreen, VisionBottomBar, MainTopBar
-│   └── theme/              # Color, Theme, Type
-│
-└── MainActivity.kt
+goals              → GoalEntity (id, title, description, status)
+goal_events        → GoalEventEntity (id, goalId FK, eventType)
+tasks              → TaskEntity (id, title, priority, goalId FK)
+activity_events    → ActivityEventEntity (id, taskId, eventType)
+task_steps         → TaskStepEntity (id, taskId FK, title, isCompleted)
+behavior_snapshot  → BehaviorSnapshotEntity (dateEpochMs, streak, velocity)
 ```
 
 ### Plugin System
-
-Each feature module implements `AppPlugin`:
 
 ```kotlin
 interface AppPlugin {
     val id: String
     val name: String
-    val description: String
     val icon: ImageVector
-
+    
     @Composable
     fun Content(modifier: Modifier, onNavigateToSettings: () -> Unit, onBack: () -> Unit)
 }
 ```
 
-Registered plugins: **Planner**, **Goals**, **Notes**
-
-Navigation:
-- **Bottom bar:** Planner + Goals
-- **Top bar:** Search + Notes + Settings
-
-### Data Flow
-
-```
-Room DAO (Flow) → Repository interface → ViewModel StateFlow → Compose collectAsState
-```
-
-- All reads are reactive via Room `Flow`
-- Writes use `suspend` functions in ViewModels
-- No manual refresh needed — Room re-emits on data changes
-- Insight/mirror math lives in pure-Kotlin domain calculators, not ViewModels
-
-### One-Shot UI Events
-
-State that must trigger a side-effect exactly once is never exposed as sticky `StateFlow`.
-
-One-shot side-effects are delivered through a replay-free `Channel` exposed as a `Flow`, keyed on `Unit`, not on the event value.
+**Registered plugins:** Planner • Goals • Notes
 
 ---
 
-## Behavioral Insights & Mirror
+## 🪞 Behavioral Insights & Mirror
 
 ### Mirror V1 Patterns
 
-| Pattern | Description |
-|---|---|
-| Boulder | Tasks being avoided (rescheduled ≥ 2x) |
-| Initiator vs Finisher | User starts many tasks but completes few |
-| Goal Attention | Goals receiving less attention recently |
-| Consistency Decay | Declining activity over time |
-
-### Mirror Architecture
-
-- `domain.mirror` — pure-Kotlin: `MirrorEngine` (signal → feedback rendering), `MirrorHeuristics` (four detectors), `MirrorSignal` / `MirrorSignalType` / `MirrorInsight`
-- `core.mirror` — `MirrorRepository` interface + `RoomMirrorRepository` (wires Insight / Goal / Snapshot repositories)
-- UI — `MirrorFeedbackCard` rendered inside the **Goal Detail** screen, driven by `GoalDetailViewModel.mirrorInsights`
+| Pattern | Icon | Description |
+|---------|------|-------------|
+| **Boulder** | 🪨 | Tasks being avoided (rescheduled ≥ 2x) |
+| **Initiator vs Finisher** | ⚡ | Starts many tasks but completes few |
+| **Goal Attention** | 👁️ | Goals receiving less attention recently |
+| **Consistency Decay** | 📉 | Declining activity over time |
 
 ### Mirror Constraints
 
 - No separate Mirror screen in V1
-- Feedback appears inside the Goal experience (currently Goal Detail)
+- Feedback appears inside Goal Detail
 - No forced input, no judgmental language
-- Real analysis matures after roughly 7 days of usage
+- Real analysis matures after ~7 days of usage
 
 ---
 
-## Behavioral Solar System (Graph)
+## 🌌 Behavioral Solar System
 
 The graph is a **Behavioral Understanding Tool**, not a generic data visualization.
 
+```
+         ☀️ Goal (Sun)
+        / | \
+       /  |  \
+      🪐  🪐  🪐  Tasks (Orbiting satellites)
+     / |  |  | \
+    •  •  •  •  •  Positioned by attention score
+```
+
 - **Goal = Sun** (center, with progress ring + glow)
-- **Task = Orbiting satellite** (positioned by attention score)
-- **Attention-based positioning** (date pressure, staleness, avoidance)
+- **Task = Orbiting satellite** (positioned by attention)
 - **Adaptive clusters** for goals with >8 tasks
-- **Motion language:** staged entrance, breathing shimmer, cluster expand/collapse
-
-Decision records: `docs/ADR/ADR-0005-behavioral-solar-system.md`, `docs/ADR/ADR-0008-solar-system-motion.md`
+- **Motion language:** staged entrance, breathing shimmer
 
 ---
 
-## UI Design System
-
-**Neumorphic components:**
-- `NeumorphicSurface` — elevated card with light/dark shadow simulation
-- `NeumorphicCircle` — circular variant for interactive elements
-
-**Color system:** Purple accent (`#8B5CF6`), gradient backgrounds, consistent surface whites.
-
-**RTL support:** All Persian text uses RTL mark characters to prevent BiDi reordering.
-
----
-
-## Build Instructions
+## 🚀 Build & Develop
 
 ### Requirements
 
@@ -288,37 +230,49 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ### Development Environment
 
-VS Code + Android SDK CLI + Gradle CLI + Real Android Device  
+```
+VS Code + Android SDK CLI + Gradle CLI + Real Android Device
+```
+
 Android Studio is not required.
 
 ---
 
-## Development Phases
+## 📋 Development Phases
 
 | Phase | Status | Description |
-|---|---|---|
-| Phase 1 | ✅ | Schema stabilization, Goal→Task FK, InsightDao extraction |
-| Phase 2 | ✅ | Architecture stabilization, domain layer, `goal_events` |
-| Phase 3 | ✅ | Progress & behavior snapshots, backfill engine |
-| Phase 4 | ✅ | Mirror Engine Foundation: heuristics, feedback engine, Goal Detail integration |
-| Phase 5 | ✅ | Goal Experience Evolution: goal-first UX, performance optimizations, stability audit |
-| Phase 6 | ✅ | Behavioral Solar System: graph view, adaptive clusters, motion |
-| Phase 7 | 🔜 | AI Insight Generator: consumes structured data and Mirror outputs |
+|-------|--------|-------------|
+| Phase 1 | ✅ | Schema stabilization, Goal→Task FK |
+| Phase 2 | ✅ | Architecture stabilization, domain layer |
+| Phase 3 | ✅ | Progress & behavior snapshots |
+| Phase 4 | ✅ | Mirror Engine Foundation |
+| Phase 5 | ✅ | Goal Experience Evolution |
+| Phase 6 | ✅ | Behavioral Solar System |
+| Phase 7 | 🔜 | AI Insight Generator |
 
 ---
 
-## Constraints
+## ⚠️ Constraints
 
-The project intentionally avoids:
-- Premature architecture expansion
-- Framework-first development
-- Feature accumulation without validation
-- AI-first workflows before product validation
-- Network dependencies
-- Mandatory organization
+This project intentionally avoids:
+
+- ❌ Premature architecture expansion
+- ❌ Framework-first development
+- ❌ Feature accumulation without validation
+- ❌ AI-first workflows before product validation
+- ❌ Network dependencies
+- ❌ Mandatory organization
 
 ---
 
-*For the latest product decisions, see `PRODUCT_DIRECTION_DECISION_DOCUMENT.md`.*  
-*For current architecture status, see `docs/ARCHITECTURE_STATE.md`.*  
-*For implementation roadmap, see `docs/ROADMAP.md`.*
+## 📚 Documentation
+
+- [`PRODUCT_DIRECTION_DECISION_DOCUMENT.md`](PRODUCT_DIRECTION_DECISION_DOCUMENT.md) — Latest product decisions
+- [`docs/ARCHITECTURE_STATE.md`](docs/ARCHITECTURE_STATE.md) — Current architecture status
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — Implementation roadmap
+
+---
+
+<p align="center">
+  <img src="assets/readme/hero.svg" alt="Vision Planner" width="100%" opacity="0.5">
+</p>
