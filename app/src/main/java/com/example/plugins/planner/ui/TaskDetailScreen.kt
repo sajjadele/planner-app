@@ -80,6 +80,7 @@ fun TaskDetailScreen(
     val activityListState = rememberLazyListState()
     var showTimelineSheet by remember { mutableStateOf(false) }
     var showActivityComposer by remember { mutableStateOf(false) }
+    var selectedStepIdForActivity by remember { mutableIntStateOf(-1) }
 
     val currentGoalName = remember(task, allGoals) {
         task?.goalId?.let { gid -> allGoals.firstOrNull { it.id == gid }?.title }
@@ -147,6 +148,10 @@ fun TaskDetailScreen(
                     onTapComposer = { showActivityComposer = true },
                     onToggleStep = { viewModel.toggleStepCompletion(it) },
                     onDeleteStep = { viewModel.deleteStep(it) },
+                    onAddActivityToStep = { stepId ->
+                        selectedStepIdForActivity = stepId
+                        showActivityComposer = true
+                    },
                     listState = activityListState,
                     onOpenTimeline = { showTimelineSheet = true }
                 )
@@ -167,10 +172,19 @@ fun TaskDetailScreen(
 
         if (showActivityComposer) {
             ActivityComposerBottomSheet(
-                onDismiss = { showActivityComposer = false },
-                onCreateActivity = { draft ->
-                    viewModel.createActivity(draft)
+                onDismiss = { 
                     showActivityComposer = false
+                    selectedStepIdForActivity = -1
+                },
+                onCreateActivity = { draft ->
+                    val draftWithStepId = if (selectedStepIdForActivity != -1) {
+                        draft.copy(stepId = selectedStepIdForActivity)
+                    } else {
+                        draft
+                    }
+                    viewModel.createActivity(draftWithStepId)
+                    showActivityComposer = false
+                    selectedStepIdForActivity = -1
                     focusManager.clearFocus()
                 }
             )
@@ -407,6 +421,7 @@ private fun TaskDetailActivityContent(
     onTapComposer: () -> Unit,
     onToggleStep: (TaskStepEntity) -> Unit,
     onDeleteStep: (TaskStepEntity) -> Unit,
+    onAddActivityToStep: (Int) -> Unit,
     listState: LazyListState = rememberLazyListState(),
     onOpenTimeline: () -> Unit
 ) {
@@ -468,7 +483,8 @@ private fun TaskDetailActivityContent(
                 StepCard(
                     model = stepCard,
                     onToggle = { onToggleStep(step) },
-                    onDelete = { onDeleteStep(step) }
+                    onDelete = { onDeleteStep(step) },
+                    onAddActivity = onAddActivityToStep
                 )
             }
         }

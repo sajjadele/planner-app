@@ -214,7 +214,7 @@ class TaskDetailViewModel(
                     activityEventRepository.addEvent(
                         ActivityEventEntity(
                             taskId = taskId,
-                            stepId = null,
+                            stepId = draft.stepId,
                             eventType = eventType.name,
                             description = description
                         )

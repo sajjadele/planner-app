@@ -30,5 +30,6 @@ data class ActivityDraft(
     val text: String? = null,
     val attachments: List<ActivityAttachment> = emptyList(),
     val durationMinutes: Int? = null,
-    val intent: ActivityIntent = ActivityIntent.ACTIVITY
+    val intent: ActivityIntent = ActivityIntent.ACTIVITY,
+    val stepId: Int? = null
 )

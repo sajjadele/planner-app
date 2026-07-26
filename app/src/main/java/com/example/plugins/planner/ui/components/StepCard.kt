@@ -46,6 +46,7 @@ fun StepCard(
     model: StepCardModel,
     onToggle: () -> Unit,
     onDelete: () -> Unit,
+    onAddActivity: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isExpanded by remember { mutableStateOf(false) }
@@ -149,7 +150,7 @@ fun StepCard(
 
             // ── Expanded Content: Activity Messages ──
             AnimatedVisibility(
-                visible = isExpanded && model.messages.isNotEmpty(),
+                visible = isExpanded,
                 enter = expandVertically(),
                 exit = shrinkVertically()
             ) {
@@ -171,6 +172,36 @@ fun StepCard(
                     // Activity messages
                     model.messages.forEach { message ->
                         ActivityMessageCard(message = message)
+                    }
+
+                    // Add activity button
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onAddActivity(model.id.toInt()) },
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "+",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "افزودن فعالیت",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
