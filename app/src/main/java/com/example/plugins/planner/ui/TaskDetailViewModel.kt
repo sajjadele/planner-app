@@ -19,6 +19,7 @@ import com.example.plugins.planner.data.ActivityEventEntity
 import com.example.plugins.planner.data.ActivityEventRepository
 import com.example.plugins.planner.data.ActivityEventType
 import com.example.plugins.planner.data.ImageEventParser
+import com.example.plugins.planner.data.CreateStepWithActivitiesUseCase
 import com.example.plugins.planner.data.StepDraft
 import com.example.plugins.planner.data.StepDraftResolver
 import com.example.plugins.planner.data.TaskDao
@@ -43,6 +44,7 @@ class TaskDetailViewModel(
     private val noteRepository: NoteRepository
     private val taskStepRepository: TaskStepRepository
     private val activityEventRepository: ActivityEventRepository
+    private val createStepWithActivitiesUseCase: CreateStepWithActivitiesUseCase
 
     init {
         val database = AppDatabase.getDatabase(application)
@@ -51,6 +53,7 @@ class TaskDetailViewModel(
         noteRepository = NoteRepository(database.noteDao())
         taskStepRepository = TaskStepRepository(database.taskStepDao(), database.activityEventDao())
         activityEventRepository = ActivityEventRepository(database.activityEventDao())
+        createStepWithActivitiesUseCase = CreateStepWithActivitiesUseCase(database)
     }
 
     /** Loading gate: true once the first Room emission arrives for this task. */
@@ -221,33 +224,14 @@ class TaskDetailViewModel(
     /**
      * Create a Step from a StepDraft.
      *
-     * Phase 4.10.1: Domain Separation
-     * - StepDraft is a separate domain model
-     * - Handles step creation + initial activities
+     * Phase 4.10.2: Transaction Pipeline
+     * - Uses CreateStepWithActivitiesUseCase for atomic creation
      * - Ensures stepId is always assigned to child activities
+     * - Rolls back on failure (no partial data)
      */
     fun createStep(draft: StepDraft) {
         viewModelScope.launch {
-            // 1. Create step entity
-            val stepTitle = StepDraftResolver.getStepTitle(draft)
-            val step = TaskStepEntity(taskId = taskId, title = stepTitle)
-            val stepId = taskStepRepository.addStep(step)
-
-            // 2. Create initial activities with stepId
-            val initialActivities = StepDraftResolver.getInitialActivities(draft)
-            for (activity in initialActivities) {
-                val eventType = StepDraftResolver.resolveActivityEventType(activity)
-                val description = StepDraftResolver.encodeActivityDescription(activity)
-
-                activityEventRepository.addEvent(
-                    ActivityEventEntity(
-                        taskId = taskId,
-                        stepId = stepId,
-                        eventType = eventType.name,
-                        description = description
-                    )
-                )
-            }
+            createStepWithActivitiesUseCase.execute(taskId, draft)
         }
     }
 
