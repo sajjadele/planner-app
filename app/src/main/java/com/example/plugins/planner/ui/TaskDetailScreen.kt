@@ -34,10 +34,14 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.core.util.RTL
 import com.example.plugins.planner.data.ActivityEventEntity
+import com.example.plugins.planner.data.ActivityMessageMapper
+import com.example.plugins.planner.data.StepCardMapper
+import com.example.plugins.planner.data.StepCardModel
 import com.example.plugins.planner.data.TaskEntity
 import com.example.plugins.planner.data.TaskStepEntity
 import com.example.plugins.planner.ui.components.NeumorphicSurface
 import com.example.plugins.planner.ui.components.ReminderSection
+import com.example.plugins.planner.ui.components.StepCard
 import com.example.plugins.planner.ui.components.skeletonShimmerBrush
 import com.example.ui.theme.*
 import kotlinx.coroutines.delay
@@ -443,11 +447,23 @@ private fun TaskDetailActivityContent(
                 }
             }
         } else {
-            items(steps, key = { it.id }) { step ->
-                TaskStepItem(
-                    step = step,
-                    onToggle = onToggleStep,
-                    onDelete = onDeleteStep
+            // Convert steps to StepCardModels with activities
+            val stepCardModels = remember(steps, activities) {
+                val activitiesByStep = StepCardMapper.groupActivitiesByStep(activities)
+                StepCardMapper.toCardModels(steps, activitiesByStep)
+            }
+
+            items(stepCardModels, key = { it.id }) { stepCard ->
+                StepCard(
+                    model = stepCard,
+                    onToggle = {
+                        val originalStep = steps.find { it.id == stepCard.id.toInt() }
+                        originalStep?.let { onToggleStep(it) }
+                    },
+                    onDelete = {
+                        val originalStep = steps.find { it.id == stepCard.id.toInt() }
+                        originalStep?.let { onDeleteStep(it) }
+                    }
                 )
             }
         }
