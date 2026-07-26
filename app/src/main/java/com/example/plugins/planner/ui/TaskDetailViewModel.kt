@@ -211,6 +211,7 @@ class TaskDetailViewModel(
                 else -> {
                     // Create activity event with encoded description
                     val description = ActivityDraftResolver.encodeDescription(draft)
+                    Log.d("STEP_IMAGE_DEBUG", "➕ Creating activity: stepId=${draft.stepId}, eventType=${eventType.name}")
                     activityEventRepository.addEvent(
                         ActivityEventEntity(
                             taskId = taskId,

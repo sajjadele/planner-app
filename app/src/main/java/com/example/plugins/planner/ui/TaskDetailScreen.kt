@@ -178,8 +178,10 @@ fun TaskDetailScreen(
                 },
                 onCreateActivity = { draft ->
                     val draftWithStepId = if (selectedStepIdForActivity != -1) {
+                        Log.d("STEP_IMAGE_DEBUG", "📤 Adding stepId=$selectedStepIdForActivity to draft")
                         draft.copy(stepId = selectedStepIdForActivity)
                     } else {
+                        Log.d("STEP_IMAGE_DEBUG", "📤 No stepId, creating task-level activity")
                         draft
                     }
                     viewModel.createActivity(draftWithStepId)
