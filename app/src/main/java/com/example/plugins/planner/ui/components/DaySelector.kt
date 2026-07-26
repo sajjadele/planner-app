@@ -1,10 +1,6 @@
 package com.example.plugins.planner.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,9 +10,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,18 +18,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
+import com.example.core.calendar.PersianCalendarDialog
+import com.example.core.calendar.PersianCalendarGrid
+import com.example.core.calendar.PersianCalendarState
+import com.example.core.calendar.rememberPersianCalendarState
 import com.example.core.data.HolidayRepository
 import com.example.core.domain.CalendarDate
 import com.example.core.domain.DayContext
 import com.example.core.util.JalaliDate
 import com.example.core.util.isolated
+import com.example.ui.theme.AccentGreen
 import com.example.ui.theme.HolidayRed
 import java.util.Calendar
-import java.util.Locale
 
 // ────────────────────────────────────────────────────────────
 // Public utilities — delegate to JalaliDate
@@ -65,12 +60,7 @@ private fun saturdayAtWeekOffset(offsetWeeks: Int): Long {
     return thisSaturday + offsetWeeks * 7L * 86400000L
 }
 
-private const val WEEK_WINDOW = 1000 // ±19 years — more than enough
-
-private val GREGORIAN_MONTHS = arrayOf(
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-)
+private const val WEEK_WINDOW = 1000
 
 // ────────────────────────────────────────────────────────────
 // Infinite Horizontal Week Row
@@ -81,6 +71,7 @@ private val GREGORIAN_MONTHS = arrayOf(
 fun InfiniteWeekRow(
     selectedDateEpochMs: Long,
     onDateSelected: (Long) -> Unit,
+    daysWithTasks: Set<Long> = emptySet(),
     modifier: Modifier = Modifier,
     listState: androidx.compose.foundation.lazy.LazyListState = rememberLazyListState()
 ) {
@@ -111,6 +102,7 @@ fun InfiniteWeekRow(
                 saturdayEpoch = saturdayEpoch,
                 selectedDateEpochMs = selectedDateEpochMs,
                 todayEpochMs = todayEpochMs,
+                daysWithTasks = daysWithTasks,
                 onDateSelected = onDateSelected
             )
         })
@@ -122,6 +114,7 @@ private fun WeekRow(
     saturdayEpoch: Long,
     selectedDateEpochMs: Long,
     todayEpochMs: Long,
+    daysWithTasks: Set<Long> = emptySet(),
     onDateSelected: (Long) -> Unit
 ) {
     Row(
@@ -137,6 +130,7 @@ private fun WeekRow(
                 dayEpochMs = dayEpochMs,
                 isSelected = dayEpochMs == selectedDateEpochMs,
                 isToday = dayEpochMs == todayEpochMs,
+                hasTasks = dayEpochMs in daysWithTasks,
                 onClick = { onDateSelected(dayEpochMs) }
             )
         }
@@ -149,6 +143,7 @@ private fun DayCell(
     dayEpochMs: Long,
     isSelected: Boolean,
     isToday: Boolean,
+    hasTasks: Boolean = false,
     onClick: () -> Unit
 ) {
     val jalali = remember(dayEpochMs) { JalaliDate.fromEpochMs(dayEpochMs) }
@@ -156,7 +151,6 @@ private fun DayCell(
     val dayLetter = JalaliDate.DAY_LETTERS[dayIndex]
 
     val circleSize = 40.dp
-    val borderColor = MaterialTheme.colorScheme.primary
     val selectedColor = MaterialTheme.colorScheme.primary
     val todayBorderColor = MaterialTheme.colorScheme.onSurfaceVariant
 
@@ -207,373 +201,64 @@ private fun DayCell(
                 else -> MaterialTheme.colorScheme.onSurfaceVariant
             }
         )
+        Spacer(modifier = Modifier.height(3.dp))
+        Box(
+            modifier = Modifier
+                .size(5.dp)
+                .clip(CircleShape)
+                .background(if (hasTasks && !isSelected) AccentGreen else Color.Transparent)
+        )
     }
 }
 
 // ────────────────────────────────────────────────────────────
-// Calendar Popup — True Jalali Grid
+// Calendar Popup — uses core PersianCalendarGrid
 // ────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarPopup(
     selectedDateEpochMs: Long,
+    daysWithTasks: Set<Long> = emptySet(),
     onDateSelected: (Long) -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
     val holidayRepo = remember { HolidayRepository(context) }
+    val state = rememberPersianCalendarState(selectedDateEpochMs)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
-        CalendarGrid(
-            selectedDateEpochMs = selectedDateEpochMs,
+        PersianCalendarGrid(
+            state = state,
             onDateSelected = onDateSelected,
-            onDone = onDismiss,
-            holidayRepo = holidayRepo
+            onDismiss = onDismiss,
+            holidayRepository = holidayRepo,
+            daysWithIndicators = daysWithTasks,
+            indicatorColor = AccentGreen,
+            showIndicator = { it in daysWithTasks },
+            confirmButtonText = "مشاهده برنامه‌های این روز",
+            showConfirmButton = true,
+            dayContextContent = { dayContext ->
+                var showDetails by remember { mutableStateOf(false) }
+                DayContextHeader(
+                    calendarDate = dayContext.date,
+                    isExpanded = showDetails,
+                    onToggle = { showDetails = !showDetails }
+                )
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showDetails,
+                    enter = androidx.compose.animation.expandVertically(),
+                    exit = androidx.compose.animation.shrinkVertically()
+                ) {
+                    DayContextDetails(context = dayContext)
+                }
+            }
         )
     }
 }
-
-@Composable
-private fun CalendarGrid(
-    selectedDateEpochMs: Long,
-    onDateSelected: (Long) -> Unit,
-    onDone: () -> Unit,
-    holidayRepo: HolidayRepository? = null
-) {
-    // Local preview selection — does not apply globally until user confirms.
-    val localSelectedEpochMs = remember { mutableStateOf(selectedDateEpochMs) }
-    val selectedJalali = remember(localSelectedEpochMs.value) { JalaliDate.fromEpochMs(localSelectedEpochMs.value) }
-    val todayJalali = remember { JalaliDate.today() }
-    var monthOffset by remember { mutableIntStateOf(0) }
-
-    val targetMonth = remember(monthOffset) {
-        var m = selectedJalali.month + monthOffset
-        var y = selectedJalali.year
-        while (m > 12) { m -= 12; y++ }
-        while (m < 1) { m += 12; y-- }
-        y to m
-    }
-    val (jYear, jMonth) = targetMonth
-
-    val gregorianMonthRange = remember(jYear, jMonth) {
-        JalaliDate.getGregorianMonthRange(jYear, jMonth)
-    }
-
-    val daysInJalaliMonth = remember(jYear, jMonth) { JalaliDate.monthLength(jYear, jMonth) }
-
-    // First day of month → day-of-week (0=Sat)
-    val firstDayEpochMs = remember(jYear, jMonth) {
-        JalaliDate.toEpochMs(JalaliDate(jYear, jMonth, 1))
-    }
-    val startDow = remember(firstDayEpochMs) { JalaliDate.dayOfWeekIndex(firstDayEpochMs) }
-
-    // Precompute which day numbers in this month are holidays
-    val holidayDays = remember(jYear, jMonth, holidayRepo) {
-        if (holidayRepo == null) emptySet()
-        else {
-            (1..daysInJalaliMonth).mapNotNull { d ->
-                val date = CalendarDate.fromEpochMs(
-                    JalaliDate.toEpochMs(JalaliDate(jYear, jMonth, d))
-                )
-                if (holidayRepo.isHoliday(date)) d else null
-            }.toSet()
-        }
-    }
-
-    // Is the selected date in this month?
-    val isSelectedMonth = jYear == selectedJalali.year && jMonth == selectedJalali.month
-    val isTodayMonth = jYear == todayJalali.year && jMonth == todayJalali.month
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp)
-            .padding(bottom = 32.dp)
-    ) {
-        // ── Month / Year header ──
-        var monthPickerVisible by remember { mutableStateOf(false) }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextButton(onClick = { monthOffset-- }) {
-                Text("‹", fontSize = 22.sp, color = MaterialTheme.colorScheme.primary)
-            }
-
-            Box(contentAlignment = Alignment.Center) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clickable { monthPickerVisible = true }
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "${JalaliDate.MONTH_NAMES[jMonth - 1]} ${jYear.isolated()}",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.width(2.dp))
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowDown,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    Text(
-                        text = gregorianMonthRange,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            TextButton(onClick = { monthOffset++ }) {
-                Text("›", fontSize = 22.sp, color = MaterialTheme.colorScheme.primary)
-            }
-        }
-
-        if (monthPickerVisible) {
-            Dialog(onDismissRequest = { monthPickerVisible = false }) {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(24.dp))
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "انتخاب ماه",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-
-                        val months = (0..11).chunked(3)
-                        months.forEach { row ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                row.forEach { idx ->
-                                    val monthNum = idx + 1
-                                    val isActive = monthNum == jMonth
-                                    val gReg = remember(jYear, monthNum) {
-                                        JalaliDate.getGregorianMonthRange(jYear, monthNum)
-                                            .split(" ").first()
-                                    }
-                                    Card(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .aspectRatio(1.3f)
-                                            .clickable {
-                                                monthOffset += (monthNum - jMonth)
-                                                monthPickerVisible = false
-                                            },
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = if (isActive)
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                            else
-                                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                        ),
-                                        border = if (isActive) BorderStroke(
-                                            1.5.dp, MaterialTheme.colorScheme.primary
-                                        ) else null
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.fillMaxSize(),
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.Center
-                                        ) {
-                                            Text(
-                                                text = JalaliDate.MONTH_NAMES[idx],
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isActive)
-                                                    MaterialTheme.colorScheme.primary
-                                                else
-                                                    MaterialTheme.colorScheme.onSurface
-                                            )
-                                            Text(
-                                                text = gReg,
-                                                fontSize = 10.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // ── Weekday header row (Sat → Fri) ──
-        Row(modifier = Modifier.fillMaxWidth()) {
-            JalaliDate.DAY_NAMES.forEach { name ->
-                Text(
-                    text = name,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // ── Calendar grid ──
-        val totalCells = startDow + daysInJalaliMonth
-        val rows = (totalCells + 6) / 7
-        var dayNum = 1
-        val cellShape = RoundedCornerShape(12.dp)
-
-        for (row in 0 until rows) {
-            Row(modifier = Modifier.fillMaxWidth()) {
-                for (col in 0..6) {
-                    val cellIndex = row * 7 + col
-                    val hasDay = cellIndex >= startDow && dayNum <= daysInJalaliMonth
-                    val thisDay = if (hasDay) dayNum else 0
-                    if (hasDay) dayNum++
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .aspectRatio(1f)
-                            .padding(2.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (hasDay) {
-                            val cellDate = remember(jYear, jMonth, thisDay) {
-                                val epochMs = JalaliDate.toEpochMs(JalaliDate(jYear, jMonth, thisDay))
-                                CalendarDate.fromEpochMs(epochMs)
-                            }
-                            val isDaySelected = isSelectedMonth && cellDate.jalaliDay == selectedJalali.day
-                            val isDayToday = isTodayMonth && cellDate.isToday
-                            val isHoliday = hasDay && thisDay in holidayDays
-
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .aspectRatio(1f)
-                                    .padding(4.dp)
-                                    .clip(cellShape)
-                                    .then(
-                                        when {
-                                            isDaySelected -> Modifier.background(MaterialTheme.colorScheme.primary)
-                                            isDayToday -> Modifier
-                                                .border(1.5.dp, MaterialTheme.colorScheme.onSurfaceVariant, cellShape)
-                                            else -> Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                        }
-                                    )
-                                    .clickable {
-                                        localSelectedEpochMs.value = cellDate.epochMs
-                                    }
-                            ) {
-                                Text(
-                                    text = cellDate.jalaliDay.toString(),
-                                    fontSize = 15.sp,
-                                    lineHeight = 18.sp,
-                                    fontWeight = if (isDaySelected || isDayToday) FontWeight.Bold else FontWeight.Medium,
-                                    color = when {
-                                        isDaySelected -> MaterialTheme.colorScheme.onPrimary
-                                        isHoliday -> HolidayRed
-                                        else -> MaterialTheme.colorScheme.onSurface
-                                    }
-                                )
-                                if (isHoliday && !isDaySelected) {
-                                    Spacer(modifier = Modifier.height(1.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .size(4.dp)
-                                            .clip(CircleShape)
-                                            .background(HolidayRed)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-                }
-
-            // ── Day Context panel (progressive disclosure) ──
-            Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-
-            var showDetails by remember { mutableStateOf(false) }
-            val panelDate = remember(localSelectedEpochMs.value) {
-                CalendarDate.fromEpochMs(localSelectedEpochMs.value)
-            }
-            val panelContext = remember(panelDate, holidayRepo) {
-                val holidays = if (holidayRepo != null) {
-                    holidayRepo.getHolidays(panelDate)
-                } else emptyList()
-                DayContext(date = panelDate, holidays = holidays)
-            }
-
-            DayContextHeader(
-                calendarDate = panelDate,
-                isExpanded = showDetails,
-                onToggle = { showDetails = !showDetails }
-            )
-
-            AnimatedVisibility(
-                visible = showDetails,
-                enter = expandVertically(),
-                exit = shrinkVertically()
-            ) {
-                DayContextDetails(context = panelContext)
-            }
-
-            // ── Confirm button ──
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = {
-                    onDateSelected(localSelectedEpochMs.value)
-                    onDone()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("مشاهده برنامه‌های این روز")
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-        }
-    }

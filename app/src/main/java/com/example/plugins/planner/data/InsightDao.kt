@@ -102,13 +102,22 @@ interface InsightDao {
     // ──────────────────────────────────────────────
 
     @Query("""
-        SELECT te.taskId AS taskId, t.title AS taskTitle, COUNT(*) AS rescheduleCount
+        SELECT te.taskId AS taskId, t.title AS taskTitle, t.timestamp AS taskCreatedAt, COUNT(*) AS rescheduleCount
         FROM task_events te
         JOIN tasks t ON t.id = te.taskId
         WHERE te.eventType = 'rescheduled'
         GROUP BY te.taskId
     """)
     fun observeRescheduleCounts(): Flow<List<TaskRescheduleWithTitle>>
+
+    @Query("""
+        SELECT te.taskId AS taskId, t.title AS taskTitle, t.timestamp AS taskCreatedAt, COUNT(*) AS rescheduleCount
+        FROM task_events te
+        JOIN tasks t ON t.id = te.taskId
+        WHERE te.eventType = 'rescheduled' AND t.goalId = :goalId
+        GROUP BY te.taskId
+    """)
+    fun observeRescheduleCountsByGoal(goalId: Int): Flow<List<TaskRescheduleWithTitle>>
 
     // ──────────────────────────────────────────────
     // Phase 3: Goal Completion Rates
@@ -208,7 +217,29 @@ interface InsightDao {
     /** Earliest scheduled task day — backfill start anchor (null when no tasks exist). */
     @Query("SELECT MIN(dateEpochMs) FROM tasks")
     suspend fun getEarliestTaskDateEpochMs(): Long?
+
+    // ──────────────────────────────────────────────
+    // Phase 2A: Attention — meaningful interaction timestamps
+    //
+    // Sources: notes (user-authored logs linked to tasks).
+    // Future expansion: UNION ALL with subtask_events, photo timestamps, etc.
+    // The Attention algorithm receives a single (taskId → timestamp) map and
+    // does not know the source — this query is the only place that decides
+    // which events count as "meaningful".
+    // ──────────────────────────────────────────────
+
+    @Query("""
+        SELECT taskId, MAX(timestamp) AS lastMeaningfulMs
+        FROM notes
+        WHERE taskId IS NOT NULL
+        AND taskId IN (SELECT id FROM tasks WHERE goalId = :goalId)
+        GROUP BY taskId
+    """)
+    suspend fun getLastMeaningfulInteractionPerTask(goalId: Int): List<TaskLastInteraction>
 }
+
+/** Result of the meaningful-interaction aggregation query. */
+data class TaskLastInteraction(val taskId: Int, val lastMeaningfulMs: Long)
 
 /** Per-goal task counts for a day, returned by [getGoalDayCounts]. */
 data class GoalDayCount(val total: Int, val completed: Int)
@@ -220,7 +251,7 @@ data class GoalDayCount(val total: Int, val completed: Int)
 data class LifeAreaCompletion(val lifeAreaId: Int, val count: Int)
 data class DayCompletion(val dayIndex: Int, val count: Int)
 
-data class TaskRescheduleWithTitle(val taskId: Int, val taskTitle: String?, val rescheduleCount: Int)
+data class TaskRescheduleWithTitle(val taskId: Int, val taskTitle: String?, val taskCreatedAt: Long, val rescheduleCount: Int)
 
 data class GoalRateResult(
     val goalId: Int,

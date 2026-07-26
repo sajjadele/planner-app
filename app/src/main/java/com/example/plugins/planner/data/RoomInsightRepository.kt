@@ -28,6 +28,9 @@ class RoomInsightRepository(private val insightDao: InsightDao) : InsightReposit
     override fun observeRescheduleCounts(): Flow<List<TaskRescheduleWithTitle>> =
         insightDao.observeRescheduleCounts()
 
+    override fun observeRescheduleCountsByGoal(goalId: Int): Flow<List<TaskRescheduleWithTitle>> =
+        insightDao.observeRescheduleCountsByGoal(goalId)
+
     override fun observeGoalCompletionRates(): Flow<List<GoalRateResult>> =
         insightDao.observeGoalCompletionRates()
 
@@ -48,4 +51,7 @@ class RoomInsightRepository(private val insightDao: InsightDao) : InsightReposit
 
     override suspend fun getEarliestTaskDateEpochMs(): Long? =
         insightDao.getEarliestTaskDateEpochMs()
+
+    override suspend fun getLastMeaningfulInteractionPerTask(goalId: Int): List<TaskLastInteraction> =
+        insightDao.getLastMeaningfulInteractionPerTask(goalId)
 }

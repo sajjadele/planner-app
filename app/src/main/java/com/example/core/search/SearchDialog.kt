@@ -10,7 +10,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -39,7 +38,6 @@ import java.util.Locale
 fun SearchDialog(
     onDismissRequest: () -> Unit,
     onNavigateToTask: (dateEpochMs: Long) -> Unit,
-    onNavigateToNotes: () -> Unit,
     viewModel: SearchViewModel = viewModel()
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -104,7 +102,7 @@ fun SearchDialog(
                         onValueChange = { viewModel.updateQuery(it) },
                         placeholder = {
                             Text(
-                                "جستجو در برنامه‌ها و یادداشت‌ها...",
+                                "جستجو در برنامه‌ها...",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
@@ -164,7 +162,7 @@ fun SearchDialog(
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "جستجوی آنی در بین تمامی برنامه‌ها و یادداشت‌ها",
+                                    text = "جستجوی آنی در بین تمامی برنامه‌ها",
                                     fontSize = 11.sp,
                                     color = Color(0xFF938F99)
                                 )
@@ -203,22 +201,20 @@ fun SearchDialog(
                                 .testTag("search_results_list"),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            items(searchResults) { result ->
+                            items(
+                                searchResults,
+                                key = {
+                                    when (it) {
+                                        is SearchResult.TaskResult -> "task:${it.id}"
+                                    }
+                                }
+                            ) { result ->
                                 when (result) {
                                     is SearchResult.TaskResult -> {
                                         SearchTaskItem(
                                             task = result,
                                             onClick = {
                                                 onNavigateToTask(result.dateEpochMs)
-                                                onDismissRequest()
-                                            }
-                                        )
-                                    }
-                                    is SearchResult.NoteResult -> {
-                                        SearchNoteItem(
-                                            note = result,
-                                            onClick = {
-                                                onNavigateToNotes()
                                                 onDismissRequest()
                                             }
                                         )
@@ -355,80 +351,6 @@ fun SearchTaskItem(
                 color = priorityColor,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
-
-@Composable
-fun SearchNoteItem(
-    note: SearchResult.NoteResult,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.White, RoundedCornerShape(16.dp))
-            .border(1.dp, Color(0xFFCAC4D0), RoundedCornerShape(16.dp))
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .background(Color(0xFFF3EDF7), RoundedCornerShape(12.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.EditNote,
-                contentDescription = "یادداشت",
-                tint = Color(0xFF49454F),
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.width(14.dp))
-
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Type Badge
-                Box(
-                    modifier = Modifier
-                        .background(Color(0xFFF3EDF7), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "یادداشت",
-                        color = Color(0xFF49454F),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Text(
-                    text = formatPersianTime(note.timestamp, fallbackFormat = "yyyy/MM/dd"),
-                    fontSize = 9.sp,
-                    color = Color(0xFF6750A4),
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = note.content,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF1C1B1F),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
             )
         }
     }

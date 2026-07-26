@@ -1,7 +1,6 @@
 package com.example.core.plugin
 
 import com.example.plugins.goals.GoalsPlugin
-import com.example.plugins.notes.NotesPlugin
 import com.example.plugins.planner.PlannerPlugin
 
 object PluginRegistry {
@@ -11,7 +10,6 @@ object PluginRegistry {
      */
     val allPlugins: List<AppPlugin> = listOf(
         PlannerPlugin(),
-        GoalsPlugin(),
-        NotesPlugin()
+        GoalsPlugin()
     )
 }

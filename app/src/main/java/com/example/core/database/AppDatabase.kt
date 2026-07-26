@@ -18,8 +18,12 @@ import com.example.plugins.notes.data.NoteEntity
 import com.example.plugins.planner.data.InsightDao
 import com.example.plugins.planner.data.TaskDao
 import com.example.plugins.planner.data.TaskEntity
+import com.example.plugins.planner.data.ActivityEventDao
+import com.example.plugins.planner.data.ActivityEventEntity
 import com.example.plugins.planner.data.TaskEventDao
 import com.example.plugins.planner.data.TaskEventEntity
+import com.example.plugins.planner.data.TaskStepDao
+import com.example.plugins.planner.data.TaskStepEntity
 
 @Database(
     entities = [
@@ -30,9 +34,11 @@ import com.example.plugins.planner.data.TaskEventEntity
         BehaviorSnapshotEntity::class,
         TaskEntity::class,
         TaskEventEntity::class,
-        NoteEntity::class
+        NoteEntity::class,
+        ActivityEventEntity::class,
+        TaskStepEntity::class
     ],
-    version = 9,
+    version = 14,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -44,6 +50,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun taskEventDao(): TaskEventDao
     abstract fun insightDao(): InsightDao
     abstract fun noteDao(): NoteDao
+    abstract fun activityEventDao(): ActivityEventDao
+    abstract fun taskStepDao(): TaskStepDao
 
     companion object {
         @Volatile
@@ -167,6 +175,109 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v9 → v10: Phase 5.1 Goal Foundation.
+         *
+         * Additive, non-destructive columns on `goals`:
+         * - `why TEXT`        (optional motivation; nullable)
+         * - `deadlineEpochMs INTEGER` (optional deadline; nullable)
+         *
+         * `archived` is introduced as a new status *value* but does not require a schema change:
+         * `status` is already a free-form TEXT column, so no enum/column migration is needed.
+         * No tables are created or dropped. `fallbackToDestructiveMigration()` remains the safety net.
+         */
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE goals ADD COLUMN why TEXT")
+                db.execSQL("ALTER TABLE goals ADD COLUMN deadlineEpochMs INTEGER")
+            }
+        }
+
+        /**
+         * v10 → v11: Phase 5.4 performance indexes (see ADR-0009).
+         *
+         * Purely additive secondary indexes — no schema/column change, fully non-destructive:
+         * - `tasks(dateEpochMs)`      → speeds day-scoped + insight queries (BETWEEN on scheduled day)
+         * - `task_events(eventType)`  → speeds reschedule/completion aggregations (WHERE eventType)
+         * - `goals(status)`           → speeds status-filtered goal/list loads
+         *
+         * `CREATE INDEX IF NOT EXISTS` is idempotent so a re-run is safe. `fallbackToDestructiveMigration()`
+         * remains the safety net for any unhandled jump.
+         */
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_tasks_dateEpochMs ON tasks(dateEpochMs)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_task_events_eventType ON task_events(eventType)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_goals_status ON goals(status)")
+            }
+        }
+
+        /**
+         * v11 → v12: Phase 6.5.6 task deadline.
+         *
+         * Additive, non-destructive column on `tasks`:
+         * - `deadlineEpochMs INTEGER` (optional due date; nullable)
+         *
+         * Mirrors `goals.deadlineEpochMs` (added in v9→v10). Nullable so no default is required and
+         * existing rows are preserved untouched. `fallbackToDestructiveMigration()` remains the safety net.
+         */
+        private val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tasks ADD COLUMN deadlineEpochMs INTEGER")
+            }
+        }
+
+        /**
+         * v12 → v13: Phase 3.1 — ActivityEvent infrastructure.
+         *
+         * New `activity_events` table for user actions inside a task
+         * (step created/completed, note added, file uploaded).
+         * Independent from `task_events` which tracks task lifecycle only.
+         * No existing tables are modified.
+         */
+        private val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS activity_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        taskId INTEGER NOT NULL,
+                        stepId INTEGER,
+                        eventType TEXT NOT NULL,
+                        description TEXT,
+                        timestamp INTEGER NOT NULL,
+                        FOREIGN KEY(taskId) REFERENCES tasks(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_activity_events_taskId ON activity_events(taskId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_activity_events_timestamp ON activity_events(timestamp)")
+            }
+        }
+
+        /**
+         * v13 → v14: Phase 3.2 — TaskStep infrastructure.
+         *
+         * New `task_steps` table for optional step containers inside a task.
+         * Steps are optional structure — users are not forced to create them.
+         * Step completion is visual only; it does not affect task/goal completion or attention score.
+         * No existing tables are modified.
+         */
+        private val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS task_steps (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        taskId INTEGER NOT NULL,
+                        title TEXT NOT NULL,
+                        isCompleted INTEGER NOT NULL DEFAULT 0,
+                        createdAt INTEGER NOT NULL,
+                        completedAt INTEGER,
+                        FOREIGN KEY(taskId) REFERENCES tasks(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_task_steps_taskId ON task_steps(taskId)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -174,7 +285,17 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "vision_planner_database"
                 )
-                .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                .addMigrations(
+                    MIGRATION_5_6,
+                    MIGRATION_6_7,
+                    MIGRATION_7_8,
+                    MIGRATION_8_9,
+                    MIGRATION_9_10,
+                    MIGRATION_10_11,
+                    MIGRATION_11_12,
+                    MIGRATION_12_13,
+                    MIGRATION_13_14
+                )
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance

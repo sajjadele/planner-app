@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.core.preferences.ThemeMode
 import com.example.ui.theme.*
+import com.example.BuildConfig
+import com.example.debug.ui.DeveloperLabDialog
 
 @Composable
 fun ThemeSettingsDialog(
@@ -27,6 +29,11 @@ fun ThemeSettingsDialog(
     onSelectTheme: (ThemeMode) -> Unit,
     onDismiss: () -> Unit
 ) {
+    var showDeveloperLab by remember { mutableStateOf(false) }
+    if (BuildConfig.DEBUG && showDeveloperLab) {
+        DeveloperLabDialog(onDismiss = { showDeveloperLab = false })
+    }
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             colors = CardDefaults.cardColors(
@@ -172,6 +179,19 @@ fun ThemeSettingsDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Developer-only: Developer Lab (DEBUG builds only)
+                if (BuildConfig.DEBUG) {
+                    Button(
+                        onClick = { showDeveloperLab = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6D28D9)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Developer Lab", color = Color.White, fontWeight = FontWeight.Medium)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
                 // Close button
                 Button(
                     onClick = onDismiss,
@@ -185,6 +205,7 @@ fun ThemeSettingsDialog(
         }
     }
 }
+
 
 private enum class ThemeOption(val title: String, val subtitle: String) {
     LIGHT("حالت روشن", "پس‌زمینه روشن با رنگ‌های بنفش"),

@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,15 +22,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.core.goal.GoalEntity
+import com.example.plugins.planner.ui.GoalTaskGroup
 import com.example.core.util.isolated
 import com.example.plugins.planner.ui.components.CalendarPopup
 import com.example.plugins.planner.ui.components.InfiniteWeekRow
 import com.example.plugins.planner.ui.components.InsightDetailsSheetContent
 import com.example.plugins.planner.ui.components.PlannerEmptyState
 import com.example.plugins.planner.ui.components.TaskCard
+import com.example.plugins.planner.ui.components.TaskCardSkeleton
 import com.example.plugins.planner.ui.components.WeeklyInsightCard
 import com.example.plugins.planner.ui.components.persianDayIndex
 import com.example.core.util.JalaliDate
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,11 +43,36 @@ import kotlinx.coroutines.launch
 fun PlannerScreen(
     modifier: Modifier = Modifier,
     viewModel: PlannerViewModel = viewModel(),
-    insightViewModel: WeeklyInsightViewModel = viewModel()
+    insightViewModel: WeeklyInsightViewModel? = null
 ) {
     val selectedDateEpochMs by viewModel.selectedDateEpochMs.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
-    val insightState by insightViewModel.insightState.collectAsState()
+    val goalTaskGroups by viewModel.goalTaskGroups.collectAsState()
+    val daysWithTasks by viewModel.daysWithTasks.collectAsState()
+
+    // Sprint 6 (skeleton): show TaskCard skeletons ONLY while the task list is actually loading.
+    // Loading readiness comes from the explicit ViewModel flag `isTasksLoaded` (flipped once after the
+    // first genuine Room emission, empty OR non-empty) — NOT from `tasks.isEmpty()`/drop(1).first(),
+    // which is replay-unsafe on re-entry and would strand the skeleton forever on an empty day.
+    // After loading: empty day -> PlannerEmptyState, non-empty -> task list. Three states are independent.
+    // `isTasksLoaded` (from the ViewModel) is TRUE once the first Room emission arrives (empty OR
+    // non-empty). It is a *loaded* flag, NOT a loading flag — so the skeleton must show while it is
+    // FALSE. The previous alias `isTaskListLoading` was semantically inverted and checked
+    // `if (isTaskListLoading) showSkeleton`, which showed the skeleton exactly when data had
+    // actually loaded (and showed content only while still loading) — i.e. stuck-on-skeleton.
+    val tasksLoaded by viewModel.isTasksLoaded.collectAsState()
+
+    // Sprint 5.1 (lazy Weekly Insight): the WeeklyInsightViewModel triggers 10 Room-backed flows in
+    // its init, which previously competed with task loading on cold start. We defer its creation to
+    // after the first frame so today's tasks / goal groups / navigation render first, then the
+    // insight card populates. Before that, the card shows its existing empty (hasData = false) state.
+    var insightRequested by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { insightRequested = true }
+    val resolvedInsightVm = if (insightRequested) (insightViewModel ?: viewModel<WeeklyInsightViewModel>()) else null
+    val insightState by (resolvedInsightVm?.insightState
+        ?: MutableStateFlow(WeeklyInsightState(hasData = false)).asStateFlow())
+        .collectAsState()
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     var showInsightSheet by remember { mutableStateOf(false) }
@@ -77,22 +109,23 @@ fun PlannerScreen(
 
     // ── Calendar Popup ──
     if (showCalendarPopup) {
-        CalendarPopup(
-            selectedDateEpochMs = selectedDateEpochMs,
-            onDateSelected = { dateMs ->
-                viewModel.selectDate(dateMs)
-                // Scroll the week row to the selected date's week
-                scope.launch {
-                    val todaySat = com.example.plugins.planner.ui.components.getSaturdayOfWeek(
-                        com.example.plugins.planner.ui.components.todayDateEpochMs()
-                    )
-                    val targetSat = com.example.plugins.planner.ui.components.getSaturdayOfWeek(dateMs)
-                    val offset = ((targetSat - todaySat) / (7L * 86400000L)).toInt() + 1000
-                    weekRowListState.animateScrollToItem(index = offset)
-                }
-            },
-            onDismiss = { showCalendarPopup = false }
-        )
+            CalendarPopup(
+                selectedDateEpochMs = selectedDateEpochMs,
+                daysWithTasks = daysWithTasks,
+                onDateSelected = { dateMs ->
+                    viewModel.selectDate(dateMs)
+                    // Scroll the week row to the selected date's week
+                    scope.launch {
+                        val todaySat = com.example.plugins.planner.ui.components.getSaturdayOfWeek(
+                            com.example.plugins.planner.ui.components.todayDateEpochMs()
+                        )
+                        val targetSat = com.example.plugins.planner.ui.components.getSaturdayOfWeek(dateMs)
+                        val offset = ((targetSat - todaySat) / (7L * 86400000L)).toInt() + 1000
+                        weekRowListState.animateScrollToItem(index = offset)
+                    }
+                },
+                onDismiss = { showCalendarPopup = false }
+            )
     }
 
     // ── Modal Bottom Sheet for insight details ──
@@ -135,6 +168,7 @@ fun PlannerScreen(
                 InfiniteWeekRow(
                     selectedDateEpochMs = selectedDateEpochMs,
                     onDateSelected = { viewModel.selectDate(it) },
+                    daysWithTasks = daysWithTasks,
                     listState = weekRowListState,
                     modifier = Modifier.weight(1f)
                 )
@@ -203,7 +237,18 @@ fun PlannerScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (tasks.isEmpty()) {
+            if (!tasksLoaded) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("planner_task_skeleton"),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    repeat(3) {
+                        TaskCardSkeleton()
+                    }
+                }
+            } else if (tasks.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -220,13 +265,18 @@ fun PlannerScreen(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
-                    items(tasks, key = { it.id }) { task ->
-                        TaskCard(
-                            task = task,
-                            onToggleCompletion = { viewModel.toggleTaskCompletion(task) },
-                            onDelete = { viewModel.deleteTask(task) },
-                            onEdit = { selectedTaskId = task.id }
-                        )
+                    goalTaskGroups.forEach { group ->
+                        item(key = "header_${group.goal?.id ?: "none"}") {
+                            GoalSectionHeader(goal = group.goal)
+                        }
+                        items(group.tasks, key = { it.id }) { task ->
+                            TaskCard(
+                                task = task,
+                                onToggleCompletion = { viewModel.toggleTaskCompletion(task) },
+                                onDelete = { viewModel.deleteTask(task) },
+                                onEdit = { selectedTaskId = task.id }
+                            )
+                        }
                     }
                 }
             }
@@ -239,5 +289,33 @@ fun PlannerScreen(
                 .padding(bottom = 80.dp)
         )
 
+    }
+}
+
+/**
+ * Small goal header for the goal-centric Home list. Shows the goal title (or "بدون هدف" when the
+ * group has no goal). Home stays execution-focused — no progress, mirror, or extra metadata.
+ */
+@Composable
+private fun GoalSectionHeader(goal: GoalEntity?) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Icon(
+            imageVector = if (goal != null) Icons.Default.Flag else Icons.Default.PushPin,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(16.dp)
+        )
+        Text(
+            text = goal?.title ?: "بدون هدف",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
     }
 }

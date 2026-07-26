@@ -6,7 +6,7 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "task_events",
-    indices = [Index("taskId")]
+    indices = [Index("taskId"), Index("eventType")]
 )
 data class TaskEventEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

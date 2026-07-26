@@ -44,9 +44,9 @@ class InsightCalculatorTest {
     @Test
     fun findProcrastinationAlerts_filtersAndSortsAndFallsBackTitle() {
         val input = listOf(
-            TaskRescheduleWithTitle(1, "A", 2),
-            TaskRescheduleWithTitle(2, null, 5),
-            TaskRescheduleWithTitle(3, "C", 4)
+            TaskRescheduleWithTitle(1, "A", 0L, 2),
+            TaskRescheduleWithTitle(2, null, 0L, 5),
+            TaskRescheduleWithTitle(3, "C", 0L, 4)
         )
         val result = InsightCalculator.findProcrastinationAlerts(input)
         assertEquals(2, result.size)

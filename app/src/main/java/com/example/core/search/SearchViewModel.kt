@@ -21,18 +21,11 @@ sealed class SearchResult {
         val dateEpochMs: Long,
         val dayName: String
     ) : SearchResult()
-
-    data class NoteResult(
-        val id: Int,
-        val content: String,
-        val timestamp: Long
-    ) : SearchResult()
 }
 
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getDatabase(application)
     private val taskDao = database.taskDao()
-    private val noteDao = database.noteDao()
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
@@ -40,15 +33,14 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
 
     val searchResults: StateFlow<List<SearchResult>> = combine(
         _searchQuery,
-        taskDao.getAllTasks(),
-        noteDao.getAllNotes()
-    ) { query, tasks, notes ->
+        taskDao.getAllTasks()
+    ) { query, tasks ->
         if (query.isBlank()) {
             emptyList()
         } else {
             val normalizedQuery = query.trim().lowercase()
             
-            val filteredTasks = tasks.filter { 
+            tasks.filter { 
                 it.title.lowercase().contains(normalizedQuery)
             }.map { task ->
                 val dayIdx = persianDayIndex(task.dateEpochMs)
@@ -64,19 +56,6 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                     dayName = dayName
                 )
             }
-
-            val filteredNotes = notes.filter {
-                it.content.lowercase().contains(normalizedQuery)
-            }.map { note ->
-                SearchResult.NoteResult(
-                    id = note.id,
-                    content = note.content,
-                    timestamp = note.timestamp
-                )
-            }
-
-            // Combine list, prioritizing tasks first then notes
-            filteredTasks + filteredNotes
         }
     }.stateIn(
         scope = viewModelScope,
