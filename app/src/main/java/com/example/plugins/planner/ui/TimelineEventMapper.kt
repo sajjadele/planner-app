@@ -5,6 +5,8 @@ import com.example.core.util.RTL
 import com.example.core.util.formatPersianTime
 import com.example.plugins.planner.data.ActivityEventEntity
 import com.example.plugins.planner.data.ActivityEventType
+import com.example.plugins.planner.data.ActivityPayload
+import com.example.plugins.planner.data.ActivityPayloadCodec
 import com.example.plugins.planner.data.ImageEventParser
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -50,145 +52,145 @@ object TimelineEventMapper {
         ActivityEventType.STEP_DELETED to StepState("حذف شده", ActivityEventType.STEP_DELETED)
     )
 
-    private fun formatStateTransition(from: String, to: String): String =
-        "$from \u200E\u2192\u200E $to"
-
-    private fun resolveSupportingText(
-        currentEventType: ActivityEventType?,
-        previousEventType: ActivityEventType?
-    ): String? {
-        if (currentEventType == null) return null
-        val currentState = stateFromEvent[currentEventType] ?: return null
-        val previousState = previousEventType?.let { stateFromEvent[it] }
-        if (previousState == null) return null
-        return formatStateTransition(previousState.label, currentState.label)
-    }
-
-    fun resolveColor(
-        eventType: ActivityEventType?,
+    fun mapToUiModel(
+        event: ActivityEventEntity,
         primary: Color,
         error: Color,
         tertiary: Color,
-        outline: Color
-    ): Color = when (eventType) {
-        ActivityEventType.STEP_CREATED -> primary
-        ActivityEventType.STEP_COMPLETED -> Color(0xFF2E7D32)
-        ActivityEventType.STEP_REOPENED -> Color(0xFFE65100)
-        ActivityEventType.STEP_DELETED -> error
-        ActivityEventType.NOTE_ADDED -> tertiary
-        ActivityEventType.FILE_ADDED -> outline
-        ActivityEventType.MANUAL_ACTIVITY -> Color(0xFF6A1B9A)
-        ActivityEventType.IMAGE_ADDED -> Color(0xFF1565C0)
-        null -> Color.Gray
-    }
+        outline: Color,
+        useTimeOnly: Boolean = false
+    ): TimelineEventUiModel {
+        val eventType = parseEventType(event.eventType)
+        var icon = "•"
+        var actionText = event.eventType
+        var objectText: String? = event.description
+        var supportingText: String? = null
+        var imageUri: String? = null
 
-    fun mapEvents(
-        events: List<ActivityEventEntity>,
-        useTimeOnly: Boolean = false,
-        primary: Color = Color.Transparent,
-        error: Color = Color.Transparent,
-        tertiary: Color = Color.Transparent,
-        outline: Color = Color.Transparent
-    ): List<TimelineEventUiModel> {
-        val stepEvents = events
-            .filter { it.stepId != null }
-            .groupBy { it.stepId!! }
-            .mapValues { (_, events) -> events.sortedBy { it.timestamp } }
+        when (eventType) {
+            ActivityEventType.STEP_CREATED,
+            ActivityEventType.STEP_COMPLETED,
+            ActivityEventType.STEP_REOPENED,
+            ActivityEventType.STEP_DELETED -> {
+                icon = stepIconMap[eventType] ?: "•"
+                actionText = stepActionMap[eventType] ?: event.eventType
 
-        val supportMap = mutableMapOf<Int, String?>()
-        for ((_, sorted) in stepEvents) {
-            var previousType: ActivityEventType? = null
-            for (event in sorted) {
-                val currentType = parseEventType(event.eventType)
-                val supportingText = resolveSupportingText(currentType, previousType)
-                supportMap[event.id] = supportingText
-                previousType = currentType
+                // Decode JSON payload if present (Phase 4.7.4)
+                val decoded = decodeDescription(event.description)
+                objectText = decoded.text ?: event.description
+
+                supportingText = supportMap[event.id]
+                color = resolveColor(eventType, primary, error, tertiary, outline)
             }
-        }
 
-        return events.map { event ->
-            val eventType = parseEventType(event.eventType)
-            val icon: String
-            val actionText: String
-            val objectText: String?
-            val supportingText: String?
-            val color: Color
-            var imageUri: String? = null
+            ActivityEventType.NOTE_ADDED -> {
+                icon = "📝"
+                actionText = "${RTL}یادداشت اضافه شد"
 
-            when (eventType) {
-                ActivityEventType.STEP_CREATED,
-                ActivityEventType.STEP_COMPLETED,
-                ActivityEventType.STEP_REOPENED,
-                ActivityEventType.STEP_DELETED -> {
-                    icon = stepIconMap[eventType] ?: "•"
-                    actionText = stepActionMap[eventType] ?: event.eventType
-                    objectText = event.description
-                    supportingText = supportMap[event.id]
-                    color = resolveColor(eventType, primary, error, tertiary, outline)
-                }
+                // Decode JSON payload if present (Phase 4.7.4)
+                val decoded = decodeDescription(event.description)
+                objectText = decoded.text ?: event.description
 
-                ActivityEventType.NOTE_ADDED -> {
-                    icon = "📝"
-                    actionText = "${RTL}یادداشت اضافه شد"
-                    objectText = event.description
-                    supportingText = null
-                    color = resolveColor(eventType, primary, error, tertiary, outline)
-                }
+                supportingText = null
+                color = resolveColor(eventType, primary, error, tertiary, outline)
+            }
 
-                ActivityEventType.FILE_ADDED -> {
-                    icon = "📎"
-                    actionText = "${RTL}فایل اضافه شد"
-                    objectText = event.description
-                    supportingText = null
-                    color = resolveColor(eventType, primary, error, tertiary, outline)
-                }
+            ActivityEventType.FILE_ADDED -> {
+                icon = "📎"
+                actionText = "${RTL}فایل اضافه شد"
 
-                ActivityEventType.MANUAL_ACTIVITY -> {
-                    icon = "📌"
-                    actionText = "${RTL}فعالیت ثبت شد"
+                // Decode JSON payload if present (Phase 4.7.4)
+                val decoded = decodeDescription(event.description)
+                objectText = decoded.text ?: event.description
+
+                supportingText = null
+                color = resolveColor(eventType, primary, error, tertiary, outline)
+            }
+
+            ActivityEventType.MANUAL_ACTIVITY -> {
+                icon = "📌"
+                actionText = "${RTL}فعالیت ثبت شد"
+
+                // Decode JSON payload if present (Phase 4.7.4)
+                val decoded = decodeDescription(event.description)
+                if (decoded.text != null) {
+                    objectText = decoded.text
+                    supportingText = decoded.durationMinutes?.let { "${RTL}مدت زمان: ${it.formatPersian()} دقیقه" }
+                } else {
+                    // Fallback to legacy format
                     val (title, durationMinutes) = parseManualActivityDescription(event.description)
                     objectText = title
                     supportingText = durationMinutes?.let { "${RTL}مدت زمان: ${it.formatPersian()} دقیقه" }
-                    color = resolveColor(eventType, primary, error, tertiary, outline)
                 }
 
-                ActivityEventType.IMAGE_ADDED -> {
-                    icon = "📷"
-                    actionText = "${RTL}تصویر اضافه شد"
+                // Extract image from attachments if present
+                val imageAttachment = decoded.attachments.firstOrNull { it is com.example.plugins.planner.data.ActivityAttachment.Image }
+                if (imageAttachment is com.example.plugins.planner.data.ActivityAttachment.Image) {
+                    imageUri = imageAttachment.uri
+                }
+
+                color = resolveColor(eventType, primary, error, tertiary, outline)
+            }
+
+            ActivityEventType.IMAGE_ADDED -> {
+                icon = "📷"
+                actionText = "${RTL}تصویر اضافه شد"
+
+                // Decode JSON payload if present (Phase 4.7.4)
+                val decoded = decodeDescription(event.description)
+                if (decoded.attachments.isNotEmpty()) {
+                    // New format: use decoded payload
+                    objectText = decoded.text ?: ""
+                    val imageAttachment = decoded.attachments.firstOrNull { it is com.example.plugins.planner.data.ActivityAttachment.Image }
+                    if (imageAttachment is com.example.plugins.planner.data.ActivityAttachment.Image) {
+                        imageUri = imageAttachment.uri
+                    }
+                } else {
+                    // Legacy format: use ImageEventParser
                     val imageData = ImageEventParser.decode(event.description)
                     objectText = imageData.description
-                    supportingText = null
                     imageUri = imageData.uri.takeIf { it.isNotBlank() }
-                    color = resolveColor(eventType, primary, error, tertiary, outline)
                 }
 
-                null -> {
-                    icon = "•"
-                    actionText = event.eventType
-                    objectText = event.description
-                    supportingText = null
-                    color = resolveColor(null, primary, error, tertiary, outline)
-                }
+                supportingText = null
+                color = resolveColor(eventType, primary, error, tertiary, outline)
             }
 
-            val timeText = if (useTimeOnly) {
-                SimpleDateFormat("HH:mm", Locale.US).format(Date(event.timestamp))
-            } else {
-                formatPersianTime(event.timestamp)
+            null -> {
+                icon = "•"
+                actionText = event.eventType
+                objectText = event.description
+                supportingText = null
+                color = resolveColor(null, primary, error, tertiary, outline)
             }
-
-            TimelineEventUiModel(
-                id = event.id,
-                icon = icon,
-                actionText = actionText,
-                objectText = objectText,
-                supportingText = supportingText,
-                timeText = timeText,
-                color = color,
-                timestamp = event.timestamp,
-                imageUri = imageUri
-            )
         }
+
+        val timeText = if (useTimeOnly) {
+            SimpleDateFormat("HH:mm", Locale.US).format(Date(event.timestamp))
+        } else {
+            formatPersianTime(event.timestamp)
+        }
+
+        return TimelineEventUiModel(
+            id = event.id,
+            icon = icon,
+            actionText = actionText,
+            objectText = objectText,
+            supportingText = supportingText,
+            timeText = timeText,
+            color = color,
+            timestamp = event.timestamp,
+            imageUri = imageUri
+        )
+    }
+
+    /**
+     * Decode description using ActivityPayloadCodec (Phase 4.7.4).
+     * Falls back to empty payload if not JSON format.
+     */
+    private fun decodeDescription(description: String?): ActivityPayload {
+        if (description == null) return ActivityPayload()
+        return ActivityPayloadCodec.decode(description) ?: ActivityPayload()
     }
 
     private fun parseEventType(raw: String): ActivityEventType? = try {
