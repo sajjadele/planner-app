@@ -63,10 +63,11 @@ fun ActivityComposerBottomSheet(
     var composerState by remember { mutableStateOf(ActivityComposerState()) }
     var showDurationPicker by remember { mutableStateOf(false) }
 
-    // ── Dispatch helper ──
-    val dispatch = remember(composerState) {
+    // ── Dispatch helper (use rememberUpdatedState to avoid stale closure) ──
+    val currentState by rememberUpdatedState(composerState)
+    val dispatch = remember {
         { action: ActivityComposerAction ->
-            composerState = ActivityComposerReducer.reduce(composerState, action)
+            composerState = ActivityComposerReducer.reduce(currentState, action)
         }
     }
 
