@@ -490,70 +490,73 @@ private fun CompactClockDial(
     val numbers = if (isMinuteMode) (0..55 step 5).toList() else (0..11).toList()
     val totalSlots = 12
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(max = 260.dp)
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(100))
-            .background(dialColor),
-        contentAlignment = Alignment.Center
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Center dot
+        // Clock face
         Box(
             modifier = Modifier
-                .size(8.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(selectorColor)
-        )
-
-        // Numbers around the dial
-        val dialRadius = 80.dp
-        val density = LocalDensity.current
-
-        numbers.forEachIndexed { index, num ->
-            val itemAngle = (index * (360f / totalSlots) - 90f)
-            val itemRad = Math.toRadians(itemAngle.toDouble())
-
-            val isSelected = when {
-                isMinuteMode -> (minute / 5) % 12 == index
-                else -> hour % 12 == index
-            }
-
-            val displayNum = if (!isMinuteMode && num == 0) 12 else num
-
-            val offsetX = with(density) {
-                (dialRadius * kotlin.math.cos(itemRad).toFloat()).toPx().toDp() - 16.dp
-            }
-            val offsetY = with(density) {
-                (dialRadius * kotlin.math.sin(itemRad).toFloat()).toPx().toDp() - 16.dp
-            }
-
+                .size(220.dp)
+                .clip(RoundedCornerShape(110.dp))
+                .background(dialColor),
+            contentAlignment = Alignment.Center
+        ) {
+            // Center dot
             Box(
                 modifier = Modifier
-                    .offset(x = offsetX, y = offsetY)
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(if (isSelected) selectorColor else Color.Transparent)
-                    .clickable {
-                        if (isMinuteMode) onMinuteChange(num) else onHourChange(num)
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = String.format("%02d", displayNum),
-                    fontSize = 12.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                    color = if (isSelected) selectedNumberColor else unselectedNumberColor
-                )
+                    .size(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(selectorColor)
+            )
+
+            // Numbers around the dial
+            val dialRadius = 85.dp
+
+            numbers.forEachIndexed { index, num ->
+                val itemAngle = (index * (360f / totalSlots) - 90f)
+                val itemRad = Math.toRadians(itemAngle.toDouble())
+
+                val isSelected = when {
+                    isMinuteMode -> (minute / 5) % 12 == index
+                    else -> hour % 12 == index
+                }
+
+                val displayNum = if (!isMinuteMode && num == 0) 12 else num
+
+                // Calculate position using polar coordinates
+                val offsetX = with(LocalDensity.current) {
+                    (dialRadius * kotlin.math.cos(itemRad).toFloat())
+                }
+                val offsetY = with(LocalDensity.current) {
+                    (dialRadius * kotlin.math.sin(itemRad).toFloat())
+                }
+
+                Box(
+                    modifier = Modifier
+                        .offset(x = offsetX - 16.dp, y = offsetY - 16.dp)
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (isSelected) selectorColor else Color.Transparent)
+                        .clickable {
+                            if (isMinuteMode) onMinuteChange(num) else onHourChange(num)
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = String.format("%02d", displayNum),
+                        fontSize = 12.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isSelected) selectedNumberColor else unselectedNumberColor
+                    )
+                }
             }
         }
 
-        // Mode toggle chips
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Mode toggle chips (outside the clock)
         Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             ClockModeChip(
