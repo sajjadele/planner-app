@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.util.RTL
 import com.example.plugins.planner.data.ActivityAttachment
-import com.example.plugins.planner.data.ActivityIntent
+
 
 /**
  * UnifiedComposerContent — Telegram-style unified composer.
@@ -58,13 +58,8 @@ fun UnifiedComposerContent(
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
     ) {
-        // ── Debug: Log received state ──
-        Log.d("COMPOSER_DEBUG", "🎨 UnifiedComposerContent received state: attachments.size=${state.attachments.size}, text='${state.text}', intent=${state.intent}")
-        state.attachments.forEachIndexed { index, attachment ->
-            Log.d("COMPOSER_DEBUG", "🎨   attachment[$index]: type=${attachment::class.simpleName}, uri=${(attachment as? com.example.plugins.planner.data.ActivityAttachment.Image)?.uri}")
-        }
         // ── Step indicator ──
-        if (state.intent == ActivityIntent.STEP) {
+        if (state.isStepMode()) {
             StepIndicator()
             Spacer(modifier = Modifier.height(8.dp))
         }
@@ -130,7 +125,7 @@ fun UnifiedComposerContent(
 
         // ── Toolbar ──
         ComposerToolbar(
-            intent = state.intent,
+            mode = state.mode,
             canSubmit = state.canSubmit(),
             onAddFile = onAddFile,
             onAddImage = onAddImage,

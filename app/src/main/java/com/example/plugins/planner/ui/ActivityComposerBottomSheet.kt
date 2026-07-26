@@ -165,7 +165,7 @@ fun ActivityComposerBottomSheet(
                     onToggleDuration = { showDurationPicker = true },
                     onToggleStep = {
                         dispatch(
-                            if (composerState.intent == com.example.plugins.planner.data.ActivityIntent.STEP) {
+                            if (composerState.isStepMode()) {
                                 ActivityComposerAction.ConvertToActivity
                             } else {
                                 ActivityComposerAction.ConvertToStep

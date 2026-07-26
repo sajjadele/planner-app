@@ -2,19 +2,24 @@ package com.example.plugins.planner.ui.composer
 
 import com.example.plugins.planner.data.ActivityAttachment
 import com.example.plugins.planner.data.ActivityDraft
-import com.example.plugins.planner.data.ActivityIntent
 import com.example.plugins.planner.data.StepDraft
 
 /**
  * ActivityComposerState — Single source of truth for the unified composer.
  *
- * Phase 4.7.3 + 4.10.1 (Domain Separation):
- * - Replaces boolean expansion states
- * - One state object drives the entire composer UI
- * - Generates ActivityDraft or StepDraft when submitted
+ * Phase 4.11.1: Unified Composer State
  *
- * The `intent` field is kept for UI purposes (showing step indicator).
- * When submitting, the state creates the appropriate draft type.
+ * Architecture:
+ * - One state object drives the entire composer UI
+ * - Mode determines what the user is creating
+ * - No UI visibility state (isExpanded flags removed)
+ * - Clean conversion to domain models (ActivityDraft or StepDraft)
+ *
+ * Design Principles:
+ * - Store user input only (text, attachments, duration)
+ * - Mode is a domain concept, not UI state
+ * - No feature-specific flags (no isNoteExpanded, etc.)
+ * - UI adapts based on mode, not vice versa
  *
  * Usage:
  * ```kotlin
@@ -25,6 +30,9 @@ import com.example.plugins.planner.data.StepDraft
  *
  * // Add attachment
  * state = state.copy(attachments = state.attachments + Image(uri))
+ *
+ * // Switch to step mode
+ * state = state.copy(mode = ComposerMode.STEP)
  *
  * // Submit as activity
  * val activityDraft = state.toActivityDraft()
@@ -37,11 +45,17 @@ data class ActivityComposerState(
     val text: String = "",
     val attachments: List<ActivityAttachment> = emptyList(),
     val durationMinutes: Int? = null,
-    val intent: ActivityIntent = ActivityIntent.ACTIVITY
+    val mode: ComposerMode = ComposerMode.ACTIVITY
 ) {
+    // ════════════════════════════════════════════════════════════════
+    // Draft Conversion
+    // ════════════════════════════════════════════════════════════════
+
     /**
      * Convert state to ActivityDraft for submission.
-     * Used when intent == ACTIVITY.
+     * Used when mode == ACTIVITY.
+     *
+     * Creates a simple activity with text, attachments, and duration.
      */
     fun toActivityDraft(): ActivityDraft = ActivityDraft(
         text = text.ifBlank { null },
@@ -51,10 +65,26 @@ data class ActivityComposerState(
 
     /**
      * Convert state to StepDraft for submission.
-     * Used when intent == STEP.
+     * Used when mode == STEP.
      *
      * The step title comes from the text field.
      * Initial activities are created from attachments.
+     *
+     * Example:
+     * State:
+     *   text="Design UI"
+     *   attachments=[Image(uri)]
+     *   mode=STEP
+     *
+     * Produces:
+     * StepDraft(
+     *   title="Design UI",
+     *   initialActivities=[
+     *     ActivityDraft(
+     *       attachments=[Image(uri)]
+     *     )
+     *   ]
+     * )
      */
     fun toStepDraft(): StepDraft {
         val initialActivities = mutableListOf<ActivityDraft>()
@@ -76,6 +106,10 @@ data class ActivityComposerState(
         )
     }
 
+    // ════════════════════════════════════════════════════════════════
+    // State Validation
+    // ════════════════════════════════════════════════════════════════
+
     /**
      * Check if the composer has any content.
      */
@@ -90,16 +124,23 @@ data class ActivityComposerState(
         return hasContent()
     }
 
+    // ════════════════════════════════════════════════════════════════
+    // Mode Helpers
+    // ════════════════════════════════════════════════════════════════
+
     /**
-     * Check if current intent is STEP.
+     * Check if current mode is STEP.
      */
-    fun isStepMode(): Boolean {
-        return intent == ActivityIntent.STEP
-    }
+    fun isStepMode(): Boolean = mode == ComposerMode.STEP
+
+    /**
+     * Check if current mode is ACTIVITY.
+     */
+    fun isActivityMode(): Boolean = mode == ComposerMode.ACTIVITY
 
     companion object {
         /**
-         * Default empty state.
+         * Default empty state (ACTIVITY mode).
          */
         val EMPTY = ActivityComposerState()
     }

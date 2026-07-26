@@ -17,7 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.util.RTL
-import com.example.plugins.planner.data.ActivityIntent
+import com.example.plugins.planner.ui.composer.ComposerMode
 
 /**
  * ComposerToolbar — Bottom toolbar for the unified composer.
@@ -36,7 +36,7 @@ import com.example.plugins.planner.data.ActivityIntent
  */
 @Composable
 fun ComposerToolbar(
-    intent: ActivityIntent,
+    mode: ComposerMode,
     canSubmit: Boolean,
     onAddFile: () -> Unit,
     onAddImage: () -> Unit,
@@ -87,7 +87,7 @@ fun ComposerToolbar(
                 )
 
                 // Step toggle
-                val isStep = intent == ActivityIntent.STEP
+                val isStep = mode == ComposerMode.STEP
                 ToolbarActionButton(
                     icon = "✓",
                     label = "${RTL}مرحله",

@@ -2,12 +2,22 @@ package com.example.plugins.planner.ui.composer
 
 import com.example.plugins.planner.data.ActivityAttachment
 import com.example.plugins.planner.data.ActivityDraft
-import com.example.plugins.planner.data.ActivityIntent
+import com.example.plugins.planner.data.StepDraft
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * ActivityComposerReducerTest — Tests for composer state transitions.
+ *
+ * Phase 4.11.1: Unified Composer State
+ *
+ * Required tests:
+ * - State tests (default state, text, attachments, duration)
+ * - Mode tests (ConvertToStep, ConvertToActivity)
+ * - Conversion tests (ActivityDraft, StepDraft)
+ */
 class ActivityComposerReducerTest {
 
     // ════════════════════════════════════════════════════════════════
@@ -33,9 +43,9 @@ class ActivityComposerReducerTest {
     }
 
     @Test
-    fun `initial state has ACTIVITY intent`() {
+    fun `initial state has ACTIVITY mode`() {
         val state = ActivityComposerState()
-        assertEquals(ActivityIntent.ACTIVITY, state.intent)
+        assertEquals(ComposerMode.ACTIVITY, state.mode)
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -56,7 +66,7 @@ class ActivityComposerReducerTest {
     fun `text change preserves other fields`() {
         val state = ActivityComposerState(
             durationMinutes = 30,
-            intent = ActivityIntent.STEP
+            mode = ComposerMode.STEP
         )
         val newState = ActivityComposerReducer.reduce(
             state,
@@ -64,7 +74,7 @@ class ActivityComposerReducerTest {
         )
         assertEquals("hello", newState.text)
         assertEquals(30, newState.durationMinutes)
-        assertEquals(ActivityIntent.STEP, newState.intent)
+        assertEquals(ComposerMode.STEP, newState.mode)
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -119,13 +129,13 @@ class ActivityComposerReducerTest {
     // ════════════════════════════════════════════════════════════════
 
     @Test
-    fun `convert to step changes intent`() {
+    fun `convert to step changes mode`() {
         val state = ActivityComposerState()
         val newState = ActivityComposerReducer.reduce(
             state,
             ActivityComposerAction.ConvertToStep
         )
-        assertEquals(ActivityIntent.STEP, newState.intent)
+        assertEquals(ComposerMode.STEP, newState.mode)
     }
 
     @Test
@@ -138,7 +148,7 @@ class ActivityComposerReducerTest {
             state,
             ActivityComposerAction.ConvertToStep
         )
-        assertEquals(ActivityIntent.STEP, newState.intent)
+        assertEquals(ComposerMode.STEP, newState.mode)
         assertEquals("My step", newState.text)
         assertEquals(30, newState.durationMinutes)
     }
@@ -153,7 +163,7 @@ class ActivityComposerReducerTest {
             text = "Hello",
             attachments = listOf(ActivityAttachment.Image("content://img/1")),
             durationMinutes = 60,
-            intent = ActivityIntent.STEP
+            mode = ComposerMode.STEP
         )
         val newState = ActivityComposerReducer.reduce(
             state,
@@ -208,48 +218,100 @@ class ActivityComposerReducerTest {
     // ════════════════════════════════════════════════════════════════
 
     @Test
-    fun `convert to activity changes intent`() {
-        val state = ActivityComposerState(intent = ActivityIntent.STEP)
+    fun `convert to activity changes mode`() {
+        val state = ActivityComposerState(mode = ComposerMode.STEP)
         val newState = ActivityComposerReducer.reduce(
             state,
             ActivityComposerAction.ConvertToActivity
         )
-        assertEquals(ActivityIntent.ACTIVITY, newState.intent)
+        assertEquals(ComposerMode.ACTIVITY, newState.mode)
     }
 
     // ════════════════════════════════════════════════════════════════
-    // Test 10: State toDraft conversion
+    // Test 10: State toActivityDraft conversion
     // ════════════════════════════════════════════════════════════════
 
     @Test
-    fun `state toDraft conversion`() {
+    fun `state toActivityDraft conversion`() {
         val state = ActivityComposerState(
             text = "بررسی API",
             attachments = listOf(ActivityAttachment.Image("content://img/1")),
             durationMinutes = 60,
-            intent = ActivityIntent.ACTIVITY
+            mode = ComposerMode.ACTIVITY
         )
-        val draft = state.toDraft()
+        val draft = state.toActivityDraft()
 
         assertEquals("بررسی API", draft.text)
         assertEquals(1, draft.attachments.size)
         assertEquals(60, draft.durationMinutes)
-        assertEquals(ActivityIntent.ACTIVITY, draft.intent)
     }
 
     @Test
-    fun `empty state toDraft returns empty draft`() {
+    fun `empty state toActivityDraft returns empty draft`() {
         val state = ActivityComposerState()
-        val draft = state.toDraft()
+        val draft = state.toActivityDraft()
 
         assertEquals(null, draft.text)
         assertTrue(draft.attachments.isEmpty())
         assertEquals(null, draft.durationMinutes)
-        assertEquals(ActivityIntent.ACTIVITY, draft.intent)
     }
 
     // ════════════════════════════════════════════════════════════════
-    // Test 11: hasContent and canSubmit
+    // Test 11: State toStepDraft conversion
+    // ════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `state toStepDraft conversion`() {
+        val state = ActivityComposerState(
+            text = "طراحی صفحه اصلی",
+            attachments = listOf(ActivityAttachment.Image("content://img/1")),
+            durationMinutes = 30,
+            mode = ComposerMode.STEP
+        )
+        val stepDraft = state.toStepDraft()
+
+        assertEquals("طراحی صفحه اصلی", stepDraft.title)
+        assertEquals(1, stepDraft.initialActivities.size)
+        assertEquals(1, stepDraft.initialActivities[0].attachments.size)
+    }
+
+    @Test
+    fun `empty state toStepDraft returns empty step`() {
+        val state = ActivityComposerState(mode = ComposerMode.STEP)
+        val stepDraft = state.toStepDraft()
+
+        assertEquals("", stepDraft.title)
+        assertTrue(stepDraft.initialActivities.isEmpty())
+    }
+
+    @Test
+    fun `step with text only creates step without activities`() {
+        val state = ActivityComposerState(
+            text = "مرحله جدید",
+            mode = ComposerMode.STEP
+        )
+        val stepDraft = state.toStepDraft()
+
+        assertEquals("مرحله جدید", stepDraft.title)
+        assertFalse(stepDraft.hasInitialContent())
+    }
+
+    @Test
+    fun `step with attachment creates initial activity`() {
+        val state = ActivityComposerState(
+            text = "مرحله جدید",
+            attachments = listOf(ActivityAttachment.Image("content://img/1")),
+            mode = ComposerMode.STEP
+        )
+        val stepDraft = state.toStepDraft()
+
+        assertEquals("مرحله جدید", stepDraft.title)
+        assertTrue(stepDraft.hasInitialContent())
+        assertEquals(1, stepDraft.initialActivities.size)
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // Test 12: hasContent and canSubmit
     // ════════════════════════════════════════════════════════════════
 
     @Test
@@ -280,5 +342,23 @@ class ActivityComposerReducerTest {
         val state = ActivityComposerState(durationMinutes = 30)
         assertTrue(state.hasContent())
         assertTrue(state.canSubmit())
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // Test 13: Mode helpers
+    // ════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `isStepMode returns true for STEP`() {
+        val state = ActivityComposerState(mode = ComposerMode.STEP)
+        assertTrue(state.isStepMode())
+        assertFalse(state.isActivityMode())
+    }
+
+    @Test
+    fun `isActivityMode returns true for ACTIVITY`() {
+        val state = ActivityComposerState(mode = ComposerMode.ACTIVITY)
+        assertTrue(state.isActivityMode())
+        assertFalse(state.isStepMode())
     }
 }
