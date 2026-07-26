@@ -27,6 +27,15 @@ object ActivityMessageMapper {
         // Try to decode JSON payload first
         val payload = decodePayload(entity.description)
 
+        // Debug: Log mapping details
+        Log.d("STEP_IMAGE_DEBUG", "📝 ActivityMessageMapper: entityId=${entity.id}, eventType=${entity.eventType}, stepId=${entity.stepId}")
+        Log.d("STEP_IMAGE_DEBUG", "📝 Payload attachments count: ${payload?.attachments?.size ?: 0}")
+        payload?.attachments?.forEachIndexed { idx, att ->
+            if (att is ActivityAttachment.Image) {
+                Log.d("STEP_IMAGE_DEBUG", "📝 Image[$idx]: ${att.uri}")
+            }
+        }
+
         // Extract fields based on event type
         val text = extractText(payload, entity.description, eventType)
         val attachments = payload?.attachments ?: emptyList()

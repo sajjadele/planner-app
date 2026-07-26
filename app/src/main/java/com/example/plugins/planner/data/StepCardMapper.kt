@@ -29,6 +29,15 @@ object StepCardMapper {
         step: TaskStepEntity,
         activities: List<ActivityMessageModel> = emptyList()
     ): StepCardModel {
+        // Debug: Log step card mapping
+        Log.d("STEP_IMAGE_DEBUG", "🎴 StepCardMapper: stepId=${step.id}, stepTitle=${step.title}")
+        Log.d("STEP_IMAGE_DEBUG", "🎴 Activities count: ${activities.size}")
+        activities.forEachIndexed { idx, msg ->
+            Log.d("STEP_IMAGE_DEBUG", "🎴 Message[$idx]: attachments=${msg.attachments.size}, text=${msg.text?.take(20)}")
+            msg.attachments.filterIsInstance<ActivityAttachment.Image>().forEach { img ->
+                Log.d("STEP_IMAGE_DEBUG", "🎴 Image in message[$idx]: ${img.uri}")
+            }
+        }
         // Sort activities by timestamp ascending
         val sortedActivities = activities.sortedBy { it.timestamp }
 

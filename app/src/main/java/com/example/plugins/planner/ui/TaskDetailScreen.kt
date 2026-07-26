@@ -409,6 +409,12 @@ private fun TaskDetailActivityContent(
     listState: LazyListState = rememberLazyListState(),
     onOpenTimeline: () -> Unit
 ) {
+    // Debug: Log activity content
+    Log.d("STEP_IMAGE_DEBUG", "📋 TaskDetailActivityContent: steps=${steps.size}, activities=${activities.size}")
+    activities.forEachIndexed { idx, event ->
+        Log.d("STEP_IMAGE_DEBUG", "📋 Activity[$idx]: id=${event.id}, eventType=${event.eventType}, stepId=${event.stepId}")
+    }
+
     LazyColumn(
         modifier = modifier,
         state = listState,
@@ -450,8 +456,9 @@ private fun TaskDetailActivityContent(
             items(steps, key = { it.id }) { step ->
                 // Convert step to StepCardModel with its activities
                 val stepActivities = remember(activities, step.id) {
-                    activities.filter { it.stepId == step.id }
-                        .map { ActivityMessageMapper.toMessage(it) }
+                    val filtered = activities.filter { it.stepId == step.id }
+                    Log.d("STEP_IMAGE_DEBUG", "🔍 Step[${step.id}] '${step.title}': ${filtered.size} matching activities")
+                    filtered.map { ActivityMessageMapper.toMessage(it) }
                 }
                 val stepCard = remember(step, stepActivities) {
                     StepCardMapper.toCardModel(step, stepActivities)

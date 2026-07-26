@@ -28,6 +28,7 @@ import coil.request.ImageRequest
 import com.example.core.util.RTL
 import com.example.plugins.planner.data.ActivityAttachment
 import com.example.plugins.planner.data.ActivityMessageModel
+import android.util.Log
 import com.example.plugins.planner.data.StepCardModel
 
 /**
@@ -48,6 +49,18 @@ fun StepCard(
     modifier: Modifier = Modifier
 ) {
     var isExpanded by remember { mutableStateOf(false) }
+
+    // Debug: Log StepCard rendering
+    Log.d("STEP_IMAGE_DEBUG", "🖼 StepCard: title=${model.title}, messages=${model.messages.size}")
+    model.messages.forEachIndexed { idx, msg ->
+        val imageAttachments = msg.attachments.filterIsInstance<ActivityAttachment.Image>()
+        if (imageAttachments.isNotEmpty()) {
+            Log.d("STEP_IMAGE_DEBUG", "🖼 Message[$idx] has ${imageAttachments.size} images")
+            imageAttachments.forEach { img ->
+                Log.d("STEP_IMAGE_DEBUG", "🖼 Image URI: ${img.uri}")
+            }
+        }
+    }
 
     NeumorphicSurface(
         modifier = modifier
@@ -216,6 +229,10 @@ private fun ActivityMessageCard(
 
             // Image attachments
             val images = message.attachments.filterIsInstance<ActivityAttachment.Image>()
+            Log.d("STEP_IMAGE_DEBUG", "🎨 ActivityMessageCard: ${images.size} images to render")
+            images.forEachIndexed { idx, img ->
+                Log.d("STEP_IMAGE_DEBUG", "🎨 Rendering image[$idx]: ${img.uri}")
+            }
             if (images.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 images.forEach { image ->
