@@ -29,8 +29,8 @@ object StepCardMapper {
         step: TaskStepEntity,
         activities: List<ActivityMessageModel> = emptyList()
     ): StepCardModel {
-        // Sort activities by timestamp ascending
-        val sortedActivities = activities.sortedBy { it.timestamp }
+        // Sort activities by creation time ascending
+        val sortedActivities = activities.sortedBy { it.createdAt }
 
         // Calculate total attachment count
         val attachmentCount = sortedActivities.sumOf { it.attachments.size }

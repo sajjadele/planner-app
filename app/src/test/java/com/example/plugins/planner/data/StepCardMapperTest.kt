@@ -54,7 +54,7 @@ class StepCardMapperTest {
             ActivityMessageModel(
                 id = 1,
                 text = "Initial design",
-                timestamp = 1000L
+                createdAt = 1000L
             )
         )
 
@@ -84,7 +84,7 @@ class StepCardMapperTest {
                 id = 1,
                 text = "Mockup added",
                 attachments = listOf(ActivityAttachment.Image("content://img/mockup.png")),
-                timestamp = 1000L
+                createdAt = 1000L
             )
         )
 
@@ -117,7 +117,7 @@ class StepCardMapperTest {
                     ActivityAttachment.Image("content://img/2.jpg"),
                     ActivityAttachment.File("content://file/doc.pdf", "doc.pdf")
                 ),
-                timestamp = 1000L
+                createdAt = 1000L
             )
         )
 
@@ -147,13 +147,13 @@ class StepCardMapperTest {
                 id = 1,
                 text = "Morning coding",
                 durationMinutes = 60,
-                timestamp = 1000L
+                createdAt = 1000L
             ),
             ActivityMessageModel(
                 id = 2,
                 text = "Afternoon coding",
                 durationMinutes = 45,
-                timestamp = 2000L
+                createdAt = 2000L
             )
         )
 
@@ -181,7 +181,7 @@ class StepCardMapperTest {
             ActivityMessageModel(
                 id = 1,
                 text = null,
-                timestamp = 1000L
+                createdAt = 1000L
             )
         )
 
@@ -207,9 +207,9 @@ class StepCardMapperTest {
         )
 
         val activities = listOf(
-            ActivityMessageModel(id = 1, text = "Second", timestamp = 2000L),
-            ActivityMessageModel(id = 2, text = "First", timestamp = 1000L),
-            ActivityMessageModel(id = 3, text = "Third", timestamp = 3000L)
+            ActivityMessageModel(id = 1, text = "Second", createdAt = 2000L),
+            ActivityMessageModel(id = 2, text = "First", createdAt = 1000L),
+            ActivityMessageModel(id = 3, text = "Third", createdAt = 3000L)
         )
 
         val model = StepCardMapper.toCardModel(step, activities)
@@ -232,7 +232,7 @@ class StepCardMapperTest {
 
         val activitiesMap = mapOf(
             1 to listOf(
-                ActivityMessageModel(id = 1, text = "Note", timestamp = 1000L)
+                ActivityMessageModel(id = 1, text = "Note", createdAt = 1000L)
             )
         )
 
@@ -255,8 +255,8 @@ class StepCardMapperTest {
             id = 1,
             title = "Test",
             messages = listOf(
-                ActivityMessageModel(id = 1, timestamp = 1000L),
-                ActivityMessageModel(id = 2, timestamp = 2000L)
+                ActivityMessageModel(id = 1, createdAt = 1000L),
+                ActivityMessageModel(id = 2, createdAt = 2000L)
             ),
             attachmentCount = 3,
             totalDurationMinutes = 90,
@@ -274,7 +274,7 @@ class StepCardMapperTest {
         val model = StepCardModel(
             id = 1,
             title = "Test",
-            messages = listOf(ActivityMessageModel(id = 1, timestamp = 1000L)),
+            messages = listOf(ActivityMessageModel(id = 1, createdAt = 1000L)),
             createdAt = System.currentTimeMillis()
         )
         assertTrue(model.hasRichContent())

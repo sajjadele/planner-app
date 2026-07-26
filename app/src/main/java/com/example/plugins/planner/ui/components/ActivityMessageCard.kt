@@ -129,7 +129,7 @@ fun ActivityMessageCard(
             // ── Timestamp ──
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = formatTimestamp(message.timestamp),
+                text = formatTimestamp(message.createdAt),
                 fontSize = 10.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )

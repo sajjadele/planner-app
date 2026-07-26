@@ -314,10 +314,10 @@ private data class MessageGroup(
 
 private fun groupMessagesByDay(messages: List<ActivityMessageModel>): List<MessageGroup> {
     val grouped = messages.groupBy {
-        JalaliDate.toEpochMs(JalaliDate.fromEpochMs(it.timestamp))
+        JalaliDate.toEpochMs(JalaliDate.fromEpochMs(it.createdAt))
     }
     return grouped.entries
-        .map { MessageGroup(it.key, it.value.sortedByDescending { m -> m.timestamp }) }
+        .map { MessageGroup(it.key, it.value.sortedByDescending { m -> m.createdAt }) }
         .sortedByDescending { it.dateKey }
 }
 

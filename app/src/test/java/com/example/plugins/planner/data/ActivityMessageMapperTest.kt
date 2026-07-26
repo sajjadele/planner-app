@@ -45,8 +45,8 @@ class ActivityMessageMapperTest {
         assertEquals("Initial wireframe completed", model.text)
         assertTrue(model.attachments.isEmpty())
         assertNull(model.durationMinutes)
-        assertEquals(1000L, model.timestamp)
-        assertTrue(model.isEditable)
+        assertEquals(1000L, model.createdAt)
+        assertTrue(model.canEdit)
         assertFalse(model.isDeleted)
         assertNull(model.replyToMessageId)
     }
@@ -374,5 +374,154 @@ class ActivityMessageMapperTest {
         assertEquals(16L, model!!.id)
         assertNull(model.text)
         assertEquals(1, model.attachments.size)
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // Phase 4.14: Identity & Interaction Foundation
+    // ════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `message identity preserved through mapping`() {
+        val entity = ActivityEventEntity(
+            id = 25,
+            taskId = 100,
+            stepId = 20,
+            eventType = ActivityEventType.NOTE_ADDED.name,
+            description = "Test note",
+            timestamp = 5000L
+        )
+
+        val model = ActivityMessageMapper.toMessage(entity)
+
+        assertNotNull(model)
+        assertEquals(25L, model!!.id)
+        assertEquals(25L, model.id)
+    }
+
+    @Test
+    fun `step relation preserved through mapping`() {
+        val entity = ActivityEventEntity(
+            id = 30,
+            taskId = 100,
+            stepId = 20,
+            eventType = ActivityEventType.NOTE_ADDED.name,
+            description = "Step note",
+            timestamp = 6000L
+        )
+
+        val model = ActivityMessageMapper.toMessage(entity)
+
+        assertNotNull(model)
+        assertEquals(20L, model!!.stepId)
+    }
+
+    @Test
+    fun `task-level message has null stepId`() {
+        val entity = ActivityEventEntity(
+            id = 31,
+            taskId = 100,
+            stepId = null,
+            eventType = ActivityEventType.MANUAL_ACTIVITY.name,
+            description = "Task activity",
+            timestamp = 7000L
+        )
+
+        val model = ActivityMessageMapper.toMessage(entity)
+
+        assertNotNull(model)
+        assertNull(model!!.stepId)
+        assertEquals(100L, model.taskId)
+    }
+
+    @Test
+    fun `canDelete false by default for new messages`() {
+        val entity = ActivityEventEntity(
+            id = 32,
+            taskId = 100,
+            stepId = 5,
+            eventType = ActivityEventType.NOTE_ADDED.name,
+            description = "New note",
+            timestamp = 8000L
+        )
+
+        val model = ActivityMessageMapper.toMessage(entity)
+
+        assertNotNull(model)
+        assertFalse(model!!.canDelete)
+    }
+
+    @Test
+    fun `capability() returns correct values for active message`() {
+        val entity = ActivityEventEntity(
+            id = 33,
+            taskId = 100,
+            stepId = 5,
+            eventType = ActivityEventType.NOTE_ADDED.name,
+            description = "Active note",
+            timestamp = 9000L
+        )
+
+        val model = ActivityMessageMapper.toMessage(entity)
+        val capability = model!!.capability()
+
+        assertTrue(capability.canEdit)
+        assertFalse(capability.canDelete)
+        assertTrue(capability.canReply)
+    }
+
+    @Test
+    fun `capability() disables interactions for deleted messages`() {
+        val entity = ActivityEventEntity(
+            id = 34,
+            taskId = 100,
+            stepId = 5,
+            eventType = ActivityEventType.NOTE_ADDED.name,
+            description = "Deleted note",
+            timestamp = 10000L
+        )
+
+        val model = ActivityMessageMapper.toMessage(entity)!!.copy(isDeleted = true)
+        val capability = model.capability()
+
+        assertFalse(capability.canEdit)
+        assertFalse(capability.canDelete)
+        assertFalse(capability.canReply)
+    }
+
+    @Test
+    fun `attachment list preserved through mapping`() {
+        val json = """{"text":"Multi","attachments":[{"type":"IMAGE","uri":"content://img/1.jpg"},{"type":"FILE","uri":"content://file/doc.pdf","name":"doc.pdf"}]}"""
+        val entity = ActivityEventEntity(
+            id = 35,
+            taskId = 100,
+            stepId = 5,
+            eventType = ActivityEventType.IMAGE_ADDED.name,
+            description = json,
+            timestamp = 11000L
+        )
+
+        val model = ActivityMessageMapper.toMessage(entity)
+
+        assertNotNull(model)
+        assertEquals(2, model!!.attachments.size)
+        assertTrue(model.attachments[0] is ActivityAttachment.Image)
+        assertTrue(model.attachments[1] is ActivityAttachment.File)
+        assertEquals("doc.pdf", (model.attachments[1] as ActivityAttachment.File).name)
+    }
+
+    @Test
+    fun `capacity defaults to true for canEdit`() {
+        val entity = ActivityEventEntity(
+            id = 36,
+            taskId = 100,
+            stepId = 5,
+            eventType = ActivityEventType.NOTE_ADDED.name,
+            description = "Default capability check",
+            timestamp = 12000L
+        )
+
+        val model = ActivityMessageMapper.toMessage(entity)
+        assertNotNull(model)
+        assertTrue(model!!.canEdit)
     }
 }

@@ -80,8 +80,9 @@ object ActivityMessageMapper {
             text = text,
             attachments = attachments,
             durationMinutes = durationMinutes,
-            timestamp = entity.timestamp,
-            isEditable = true,
+            createdAt = entity.timestamp,
+            canEdit = true,
+            canDelete = false,
             isDeleted = false,
             replyToMessageId = null
         )
