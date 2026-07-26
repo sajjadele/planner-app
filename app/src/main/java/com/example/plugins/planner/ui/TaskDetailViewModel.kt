@@ -15,6 +15,8 @@ import com.example.plugins.notes.data.NoteEntity
 import com.example.plugins.notes.data.NoteRepository
 import com.example.plugins.planner.data.ActivityDraft
 import com.example.plugins.planner.data.ActivityDraftResolver
+import com.example.plugins.planner.data.ActivityMessageMapper
+import com.example.plugins.planner.data.ActivityMessageModel
 import com.example.plugins.planner.data.ActivityEventEntity
 import com.example.plugins.planner.data.ActivityEventRepository
 import com.example.plugins.planner.data.ActivityEventType
@@ -104,6 +106,15 @@ class TaskDetailViewModel(
 
     /** Activity timeline for this task — most recent first */
     val activities: StateFlow<List<ActivityEventEntity>> = activityEventRepository.observeActivities(taskId)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    /** Pre-mapped activity messages — system events filtered out */
+    val activityMessages: StateFlow<List<ActivityMessageModel>> = activities
+        .map { ActivityMessageMapper.toMessages(it) }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),

@@ -82,7 +82,7 @@ object StepCardMapper {
             .filter { it.stepId != null }
             .groupBy { it.stepId!! }
             .mapValues { (_, stepEvents) ->
-                stepEvents.map { ActivityMessageMapper.toMessage(it) }
+                stepEvents.mapNotNull { ActivityMessageMapper.toMessage(it) }
             }
     }
 

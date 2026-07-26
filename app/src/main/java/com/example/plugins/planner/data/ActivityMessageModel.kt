@@ -1,106 +1,65 @@
 package com.example.plugins.planner.data
 
 /**
- * ActivityMessageModel — UI-independent read model for activity events.
+ * ActivityMessageModel — UI-independent read model for activity messages.
  *
- * Architecture (Phase 4.8.2):
+ * Phase 4.12: Activity Message Domain Refactor
+ *
+ * Architecture:
  * - Decouples UI from database entities
  * - Decouples UI from raw event types (NOTE_ADDED, IMAGE_ADDED, etc.)
- * - Provides clean, typed access to activity data
- * - Supports future Telegram-style unified UI
+ * - Never exposes system events (STEP_CREATED, STEP_COMPLETED, etc.)
+ * - Provides clean, typed access to user-created message content
+ * - Supports future Telegram-style interactions (edit, delete, reply)
  *
  * Flow:
  * ```
  * ActivityEventEntity
+ *       ↓  (ActivityMessageMapper.toMessage() — returns null for system events)
+ * ActivityMessageModel
  *       ↓
- *   Mapper (ActivityMessageMapper)
- *       ↓
- *   ActivityMessageModel
- *       ↓
- *   Future UI
+ * StepCard / TimelineBottomSheet / ActivityMessageCard
  * ```
  *
- * Usage:
- * ```
- * val model = ActivityMessageMapper.toMessage(event)
- * if (model.isStep) { ... }
- * if (model.attachments.isNotEmpty()) { ... }
- * ```
+ * Storage:
+ * - id: comes from ActivityEventEntity.id
+ * - taskId: comes from ActivityEventEntity.taskId (for AI context in future phases)
+ * - stepId: comes from ActivityEventEntity.stepId (nullable, null for task-level messages)
+ * - text: decoded from ActivityPayload.text or legacy format
+ * - attachments: decoded from ActivityPayload.attachments
+ * - durationMinutes: decoded from ActivityPayload.durationMinutes or legacy format
+ * - isEditable: true for user-created messages (future: role-based)
+ * - isDeleted: soft-delete flag (future)
+ * - replyToMessageId: for threading (future Phase 6)
  */
 data class ActivityMessageModel(
-    /**
-     * Unique identifier from ActivityEventEntity.
-     */
+    /** Unique identifier from ActivityEventEntity. */
     val id: Long,
 
-    /**
-     * Text content of the activity.
-     * Null if no text was provided.
-     */
-    val text: String? = null,
+    /** Task this message belongs to. For AI context in future phases. */
+    val taskId: Long,
 
-    /**
-     * List of attached files/images.
-     * Empty if no attachments.
-     */
+    /** Step this message belongs to. Null for task-level messages. */
+    val stepId: Long?,
+
+    /** Text content of the message. Null if no text (e.g., image-only message). */
+    val text: String?,
+
+    /** List of attached files/images. Empty if no attachments. */
     val attachments: List<ActivityAttachment> = emptyList(),
 
-    /**
-     * Duration in minutes.
-     * Null if no duration was set.
-     */
-    val durationMinutes: Int? = null,
+    /** Duration in minutes. Null if no duration was recorded. */
+    val durationMinutes: Int?,
 
-    /**
-     * Timestamp of the activity event.
-     */
+    /** Timestamp of the message event. */
     val timestamp: Long,
 
-    /**
-     * Whether this activity is a step (task).
-     */
-    val isStep: Boolean = false,
+    /** Whether this message can be edited by the user. */
+    val isEditable: Boolean = true,
 
-    /**
-     * Whether this step is completed.
-     */
-    val isCompleted: Boolean = false,
+    /** Whether this message has been soft-deleted. */
+    val isDeleted: Boolean = false,
 
-    /**
-     * The raw event type string for analytics/debugging.
-     * UI should NOT use this for display logic.
-     */
-    val eventTypeRaw: String = ""
-) {
-    /**
-     * Check if this activity has any content.
-     */
-    fun hasContent(): Boolean {
-        return text != null || attachments.isNotEmpty() || durationMinutes != null
-    }
-
-    /**
-     * Get a summary text for display.
-     */
-    fun getSummary(): String {
-        val parts = mutableListOf<String>()
-        text?.let { parts.add(it) }
-        if (attachments.isNotEmpty()) {
-            parts.add("${attachments.size} فایل پیوست")
-        }
-        durationMinutes?.let {
-            parts.add("${it} دقیقه")
-        }
-        return parts.joinToString(" • ").ifEmpty { "بدون محتوا" }
-    }
-
-    companion object {
-        /**
-         * Empty model for default state.
-         */
-        val EMPTY = ActivityMessageModel(
-            id = 0,
-            timestamp = System.currentTimeMillis()
-        )
-    }
-}
+    /** ID of the message this replies to. Null for top-level messages. */
+    val replyToMessageId: Long? = null
+)

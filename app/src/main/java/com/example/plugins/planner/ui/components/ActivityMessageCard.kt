@@ -175,7 +175,6 @@ fun ActivityMessageCard(
  */
 private fun getMessageIcon(message: ActivityMessageModel): String {
     return when {
-        message.isStep -> "✓"
         message.attachments.any { it is ActivityAttachment.Image } -> "📷"
         message.attachments.any { it is ActivityAttachment.File } -> "📎"
         message.durationMinutes != null -> "⏱️"
@@ -188,7 +187,6 @@ private fun getMessageIcon(message: ActivityMessageModel): String {
  */
 private fun getMessageLabel(message: ActivityMessageModel): String {
     return when {
-        message.isStep -> "${RTL}مرحله"
         message.attachments.any { it is ActivityAttachment.Image } -> "${RTL}تصویر"
         message.attachments.any { it is ActivityAttachment.File } -> "${RTL}فایل"
         message.durationMinutes != null -> "${RTL}فعالیت"

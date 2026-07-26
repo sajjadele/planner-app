@@ -27,7 +27,8 @@ import coil.request.ImageRequest
 import com.example.core.calendar.PersianCalendarDialog
 import com.example.core.util.JalaliDate
 import com.example.core.util.RTL
-import com.example.plugins.planner.data.ActivityEventEntity
+import com.example.plugins.planner.data.ActivityMessageModel
+import com.example.plugins.planner.ui.components.ActivityMessageCard
 import com.example.plugins.planner.ui.components.NeumorphicSurface
 
 private const val DAY_MILLIS = 86_400_000L
@@ -39,7 +40,7 @@ fun TimelineBottomSheet(
     selectedDate: Long,
     timelineStartDate: Long,
     timelineEndDate: Long,
-    activities: List<ActivityEventEntity>,
+    messages: List<ActivityMessageModel>,
     onDismiss: () -> Unit,
     onSelectDate: (Long) -> Unit,
     onGoToToday: () -> Unit,
@@ -59,7 +60,7 @@ fun TimelineBottomSheet(
             selectedDate = selectedDate,
             timelineStartDate = timelineStartDate,
             timelineEndDate = timelineEndDate,
-            activities = activities,
+            messages = messages,
             onGoToToday = onGoToToday,
             onMoveDate = onMoveDate,
             onSelectDate = onSelectDate
@@ -72,23 +73,13 @@ private fun TimelineSheetContent(
     selectedDate: Long,
     timelineStartDate: Long,
     timelineEndDate: Long,
-    activities: List<ActivityEventEntity>,
+    messages: List<ActivityMessageModel>,
     onGoToToday: () -> Unit,
     onMoveDate: (Int) -> Unit,
     onSelectDate: (Long) -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val uiModels = remember(activities, colorScheme) {
-        TimelineEventMapper.mapEvents(
-            events = activities,
-            useTimeOnly = true,
-            primary = colorScheme.primary,
-            error = colorScheme.error,
-            tertiary = colorScheme.tertiary,
-            outline = colorScheme.outline
-        )
-    }
-    val activityGroups = remember(uiModels) { groupActivitiesByDay(uiModels) }
+    val activityGroups = remember(messages) { groupMessagesByDay(messages) }
     val listState = rememberLazyListState()
 
     val canMovePrevious = selectedDate > timelineStartDate
@@ -151,7 +142,7 @@ private fun TimelineSheetContent(
         Spacer(modifier = Modifier.height(4.dp))
 
         // ── Timeline List ──
-        if (activities.isEmpty()) {
+        if (messages.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -188,10 +179,10 @@ private fun TimelineSheetContent(
                         ActivityDayHeader(dateKey = group.dateKey)
                     }
                     items(
-                        items = group.events,
+                        items = group.messages,
                         key = { it.id }
-                    ) { uiModel ->
-                        ActivityEventItem(uiModel = uiModel)
+                    ) { message ->
+                        ActivityMessageCard(message = message)
                     }
                 }
             }
@@ -313,20 +304,20 @@ private fun ActivityDateNavigation(
 }
 
 // ════════════════════════════════════════════════════════════════
-// ACTIVITY GROUPING
+// MESSAGE GROUPING BY DAY
 // ════════════════════════════════════════════════════════════════
 
-private data class ActivityGroup(
+private data class MessageGroup(
     val dateKey: Long,
-    val events: List<TimelineEventUiModel>
+    val messages: List<ActivityMessageModel>
 )
 
-private fun groupActivitiesByDay(activities: List<TimelineEventUiModel>): List<ActivityGroup> {
-    val grouped = activities.groupBy {
+private fun groupMessagesByDay(messages: List<ActivityMessageModel>): List<MessageGroup> {
+    val grouped = messages.groupBy {
         JalaliDate.toEpochMs(JalaliDate.fromEpochMs(it.timestamp))
     }
     return grouped.entries
-        .map { ActivityGroup(it.key, it.value.sortedByDescending { e -> e.timestamp }) }
+        .map { MessageGroup(it.key, it.value.sortedByDescending { m -> m.timestamp }) }
         .sortedByDescending { it.dateKey }
 }
 
@@ -354,110 +345,4 @@ private fun ActivityDayHeader(dateKey: Long) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
     )
-}
-
-// ════════════════════════════════════════════════════════════════
-// ACTIVITY EVENT ITEM
-// ════════════════════════════════════════════════════════════════
-
-@Composable
-private fun ActivityEventItem(uiModel: TimelineEventUiModel) {
-    var showImageViewer by remember { mutableStateOf(false) }
-
-    NeumorphicSurface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        elevation = 2
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-        ) {
-            // Layer 1: icon + action header
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = uiModel.icon,
-                    fontSize = 14.sp,
-                    color = uiModel.color
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = uiModel.actionText,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = uiModel.color
-                )
-            }
-
-            if (uiModel.imageUri != null) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { showImageViewer = true },
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(uiModel.imageUri)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
-                }
-            }
-
-            // Layer 3: object/context
-            uiModel.objectText?.let { obj ->
-                if (obj.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(3.dp))
-                    Text(
-                        text = "${RTL}$obj",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(start = 22.dp)
-                    )
-                }
-            }
-
-            // Layer 3b: supporting context
-            uiModel.supportingText?.let { support ->
-                if (support.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = support,
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 22.dp)
-                    )
-                }
-            }
-
-            // Layer 4: timestamp
-            Spacer(modifier = Modifier.height(3.dp))
-            Text(
-                text = uiModel.timeText,
-                fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.padding(start = 22.dp)
-            )
-        }
-    }
-
-    if (showImageViewer) {
-        ImageViewerDialog(
-            imageUri = uiModel.imageUri!!,
-            onDismiss = { showImageViewer = false }
-        )
-    }
 }

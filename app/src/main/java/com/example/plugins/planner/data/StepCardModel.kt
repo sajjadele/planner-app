@@ -94,15 +94,7 @@ data class StepCardModel(
         return messages.isNotEmpty() || attachmentCount > 0 || totalDurationMinutes != null
     }
 
-    /**
-     * Get message count by type.
-     */
-    fun getMessageCountByType(): Map<String, Int> {
-        return messages.groupBy { it.eventTypeRaw }
-            .mapValues { it.value.size }
-    }
-
-    /**
+    companion object {
      * Get all image attachments from all messages.
      */
     fun getAllImages(): List<ActivityAttachment.Image> {

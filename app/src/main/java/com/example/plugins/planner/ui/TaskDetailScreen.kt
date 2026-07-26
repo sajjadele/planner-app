@@ -70,6 +70,7 @@ fun TaskDetailScreen(
     val taskLogs by viewModel.taskLogs.collectAsState()
     val steps by viewModel.steps.collectAsState()
     val activities by viewModel.activities.collectAsState()
+    val activityMessages by viewModel.activityMessages.collectAsState()
     val selectedActivityDate by viewModel.selectedActivityDate.collectAsState()
     val timelineStartDate by viewModel.timelineStartDate.collectAsState()
     val timelineEndDate by viewModel.timelineEndDate.collectAsState()
@@ -165,7 +166,7 @@ fun TaskDetailScreen(
             selectedDate = selectedActivityDate,
             timelineStartDate = timelineStartDate,
             timelineEndDate = timelineEndDate,
-            activities = activities,
+            messages = activityMessages,
             onDismiss = { showTimelineSheet = false },
             onSelectDate = { viewModel.selectActivityDate(it) },
             onGoToToday = { viewModel.goToToday() },
@@ -475,7 +476,7 @@ private fun TaskDetailActivityContent(
                 // Convert step to StepCardModel with its activities
                 val stepActivities = remember(activities, step.id) {
                     val filtered = activities.filter { it.stepId == step.id }
-                    filtered.map { ActivityMessageMapper.toMessage(it) }
+                    filtered.mapNotNull { ActivityMessageMapper.toMessage(it) }
                 }
                 val stepCard = remember(step, stepActivities) {
                     StepCardMapper.toCardModel(step, stepActivities)
@@ -630,11 +631,12 @@ private fun TimelinePreviewCard(
                 val message = remember(latestActivity) {
                     ActivityMessageMapper.toMessage(latestActivity)
                 }
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp)
-                ) {
+                if (message != null) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp)
+                    ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(text = "📅", fontSize = 16.sp)
                         Spacer(modifier = Modifier.width(6.dp))

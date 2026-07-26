@@ -1,123 +1,158 @@
 package com.example.plugins.planner.data
 
+import org.json.JSONObject
+
 /**
  * ActivityMessageMapper — Converts ActivityEventEntity to ActivityMessageModel.
  *
- * Architecture (Phase 4.8.3):
- * - Single responsibility: Entity → Model mapping
- * - Decodes JSON payloads using ActivityPayloadCodec
- * - Falls back to legacy format for backward compatibility
- * - Never exposes raw JSON to UI
+ * Phase 4.12: Activity Message Domain Refactor
+ *
+ * Responsibilities:
+ * - Decode ActivityPayload JSON via ActivityPayloadCodec
+ * - Extract text, attachments, duration
+ * - Handle legacy formats (uri:::description, title|duration, plain text)
+ * - **Filter out system events** — they must never reach the UI
+ * - Never expose raw JSON or internal event types to UI
+ * - Return null for system events and unrecognizable formats
+ *
+ * System events (invisible to UI):
+ * - STEP_CREATED
+ * - STEP_COMPLETED
+ * - STEP_REOPENED
+ * - STEP_DELETED
+ *
+ * User messages (visible in UI):
+ * - NOTE_ADDED
+ * - IMAGE_ADDED
+ * - FILE_ADDED
+ * - MANUAL_ACTIVITY
  *
  * Usage:
- * ```
- * val model = ActivityMessageMapper.toMessage(entity)
- * // or
- * val models = ActivityMessageMapper.toMessages(entities)
+ * ```kotlin
+ * // Single event
+ * val message = ActivityMessageMapper.toMessage(entity)
+ * // message is null for system events
+ *
+ * // Batch conversion — automatically filters system events
+ * val messages = entities.mapNotNull { ActivityMessageMapper.toMessage(it) }
  * ```
  */
 object ActivityMessageMapper {
 
+    // ════════════════════════════════════════════════════════════════
+    // System events — should NEVER appear as user-facing messages
+    // ════════════════════════════════════════════════════════════════
+
+    private val SYSTEM_EVENTS = setOf(
+        ActivityEventType.STEP_CREATED,
+        ActivityEventType.STEP_COMPLETED,
+        ActivityEventType.STEP_REOPENED,
+        ActivityEventType.STEP_DELETED
+    )
+
+    // ════════════════════════════════════════════════════════════════
+    // Public API
+    // ════════════════════════════════════════════════════════════════
+
     /**
      * Convert a single ActivityEventEntity to ActivityMessageModel.
+     *
+     * @return ActivityMessageModel for user messages, null for system events or unrecognized types
      */
-    fun toMessage(entity: ActivityEventEntity): ActivityMessageModel {
-        val eventType = parseEventType(entity.eventType)
+    fun toMessage(entity: ActivityEventEntity): ActivityMessageModel? {
+        val eventType = parseEventType(entity.eventType) ?: return null
 
-        // Try to decode JSON payload first
-        val payload = decodePayload(entity.description)
+        // System events are invisible to the user — return null
+        if (eventType in SYSTEM_EVENTS) return null
 
-        // Extract fields based on event type
+        // Decode JSON payload (new format) or legacy format
+        val payload = ActivityPayloadCodec.decode(entity.description)
+
+        // Extract fields from payload or legacy description
         val text = extractText(payload, entity.description, eventType)
         val attachments = payload?.attachments ?: emptyList()
-        val durationMinutes = extractDuration(payload, entity, eventType)
-        val isStep = eventType == ActivityEventType.STEP_CREATED
-        val isCompleted = eventType == ActivityEventType.STEP_COMPLETED
+        val durationMinutes = extractDuration(payload, entity.description, eventType)
 
         return ActivityMessageModel(
             id = entity.id.toLong(),
+            taskId = entity.taskId.toLong(),
+            stepId = entity.stepId?.toLong(),
             text = text,
             attachments = attachments,
             durationMinutes = durationMinutes,
             timestamp = entity.timestamp,
-            isStep = isStep,
-            isCompleted = isCompleted,
-            eventTypeRaw = entity.eventType
+            isEditable = true,
+            isDeleted = false,
+            replyToMessageId = null
         )
     }
 
     /**
      * Convert a list of ActivityEventEntity to ActivityMessageModel list.
+     * Automatically filters system events (returns only user messages).
      */
     fun toMessages(entities: List<ActivityEventEntity>): List<ActivityMessageModel> {
-        return entities.map { toMessage(it) }
+        return entities.mapNotNull { toMessage(it) }
     }
 
-    /**
-     * Decode JSON payload using ActivityPayloadCodec.
-     * Returns null if not JSON format.
-     */
-    private fun decodePayload(description: String?): ActivityPayload? {
-        if (description == null) return null
-        return ActivityPayloadCodec.decode(description)
-    }
+    // ════════════════════════════════════════════════════════════════
+    // Private helpers
+    // ════════════════════════════════════════════════════════════════
 
-    /**
-     * Extract text based on payload and event type.
-     */
-    private fun extractText(
-        payload: ActivityPayload?,
-        description: String?,
-        eventType: ActivityEventType?
-    ): String? {
-        // If payload has text, use it
-        if (payload?.text != null) {
-            return payload.text
-        }
-
-        // Legacy format handling
-        return when (eventType) {
-            ActivityEventType.MANUAL_ACTIVITY -> {
-                // Legacy: "title|duration"
-                description?.split("|")?.firstOrNull()
-            }
-            ActivityEventType.IMAGE_ADDED -> {
-                // Legacy: "uri:::description"
-                description?.split(":::")?.getOrNull(1)
-            }
-            else -> description
-        }
-    }
-
-    /**
-     * Extract duration based on payload and event type.
-     */
-    private fun extractDuration(
-        payload: ActivityPayload?,
-        entity: ActivityEventEntity,
-        eventType: ActivityEventType?
-    ): Int? {
-        // If payload has duration, use it
-        if (payload?.durationMinutes != null) {
-            return payload.durationMinutes
-        }
-
-        // Legacy format: "title|duration"
-        if (eventType == ActivityEventType.MANUAL_ACTIVITY) {
-            return entity.description?.split("|")?.getOrNull(1)?.toIntOrNull()
-        }
-
-        return null
-    }
-
-    /**
-     * Parse event type string to ActivityEventType enum.
-     */
     private fun parseEventType(raw: String): ActivityEventType? {
         return try {
             ActivityEventType.valueOf(raw)
         } catch (_: Exception) {
             null
         }
+    }
+
+    /**
+     * Extract text content from payload or legacy format.
+     */
+    private fun extractText(
+        payload: ActivityPayload?,
+        description: String?,
+        eventType: ActivityEventType
+    ): String? {
+        // If payload has text, use it directly
+        payload?.text?.let { return it }
+
+        // Legacy format handling
+        return when (eventType) {
+            ActivityEventType.MANUAL_ACTIVITY -> {
+                // Legacy: "title|duration" — take the title part
+                description?.split("|")?.firstOrNull()?.ifBlank { null }
+            }
+            ActivityEventType.IMAGE_ADDED -> {
+                // Legacy: "uri:::description" — take the description part
+                description?.split(":::")?.getOrNull(1)?.ifBlank { null }
+            }
+            ActivityEventType.NOTE_ADDED,
+            ActivityEventType.FILE_ADDED -> {
+                // Plain text note or file name
+                description?.ifBlank { null }
+            }
+            else -> description?.ifBlank { null }
+        }
+    }
+
+    /**
+     * Extract duration in minutes from payload or legacy format.
+     */
+    private fun extractDuration(
+        payload: ActivityPayload?,
+        description: String?,
+        eventType: ActivityEventType
+    ): Int? {
+        // If payload has duration, use it directly
+        payload?.durationMinutes?.let { return it }
+
+        // Legacy format: "title|duration"
+        if (eventType == ActivityEventType.MANUAL_ACTIVITY) {
+            return description?.split("|")?.getOrNull(1)?.toIntOrNull()
+        }
+
+        return null
     }
 }

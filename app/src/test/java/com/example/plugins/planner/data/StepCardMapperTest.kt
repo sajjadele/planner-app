@@ -54,8 +54,7 @@ class StepCardMapperTest {
             ActivityMessageModel(
                 id = 1,
                 text = "Initial design",
-                timestamp = 1000L,
-                eventTypeRaw = "NOTE_ADDED"
+                timestamp = 1000L
             )
         )
 
@@ -85,8 +84,7 @@ class StepCardMapperTest {
                 id = 1,
                 text = "Mockup added",
                 attachments = listOf(ActivityAttachment.Image("content://img/mockup.png")),
-                timestamp = 1000L,
-                eventTypeRaw = "IMAGE_ADDED"
+                timestamp = 1000L
             )
         )
 
@@ -119,8 +117,7 @@ class StepCardMapperTest {
                     ActivityAttachment.Image("content://img/2.jpg"),
                     ActivityAttachment.File("content://file/doc.pdf", "doc.pdf")
                 ),
-                timestamp = 1000L,
-                eventTypeRaw = "IMAGE_ADDED"
+                timestamp = 1000L
             )
         )
 
@@ -150,15 +147,13 @@ class StepCardMapperTest {
                 id = 1,
                 text = "Morning coding",
                 durationMinutes = 60,
-                timestamp = 1000L,
-                eventTypeRaw = "MANUAL_ACTIVITY"
+                timestamp = 1000L
             ),
             ActivityMessageModel(
                 id = 2,
                 text = "Afternoon coding",
                 durationMinutes = 45,
-                timestamp = 2000L,
-                eventTypeRaw = "MANUAL_ACTIVITY"
+                timestamp = 2000L
             )
         )
 
@@ -186,8 +181,7 @@ class StepCardMapperTest {
             ActivityMessageModel(
                 id = 1,
                 text = null,
-                timestamp = 1000L,
-                eventTypeRaw = "UNKNOWN"
+                timestamp = 1000L
             )
         )
 
