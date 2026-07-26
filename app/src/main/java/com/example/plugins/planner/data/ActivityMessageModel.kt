@@ -1,3 +1,5 @@
+package com.example.plugins.planner.data
+
 /**
  * ActivityMessageModel — UI-independent read model for activity messages.
  *
