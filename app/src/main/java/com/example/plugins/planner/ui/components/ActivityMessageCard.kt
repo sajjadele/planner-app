@@ -22,17 +22,20 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * ActivityMessageCard — Reusable component for rendering activity messages.
+ * ActivityMessageCard — Telegram-style message renderer.
  *
- * Phase 4.12: Telegram-style Activity UI
+ * Phase 4.13: Telegram-style Activity UI
  *
- * Renders:
- * - Text content
- * - Image attachments (with thumbnails)
- * - File attachments
- * - Duration
- * - Timestamp
- * - Activity type indicator
+ * Renders a user-created message as a chat-like bubble:
+ * - Text content as the main body
+ * - Image previews with aspect ratio
+ * - File attachment count footer
+ * - Duration shown inline with text
+ * - Timestamp subtle at bottom
+ *
+ * Does NOT render:
+ * - Event type labels (no "NOTE_ADDED", "IMAGE_ADDED" headers)
+ * - Raw JSON or URIs
  *
  * Usage:
  * ```kotlin
@@ -46,156 +49,110 @@ fun ActivityMessageCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-        shape = RoundedCornerShape(12.dp)
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(16.dp),
+        shadowElevation = 1.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
-            // ── Header: Icon + Type Label ──
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = getMessageIcon(message),
-                    fontSize = 14.sp
-                )
-                Text(
-                    text = getMessageLabel(message),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
             // ── Text Content ──
             message.text?.let { text ->
                 if (text.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = text,
-                        fontSize = 13.sp,
+                        fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 6,
+                        maxLines = 8,
                         overflow = TextOverflow.Ellipsis,
-                        lineHeight = 18.sp
+                        lineHeight = 22.sp
                     )
+                    if (hasMediaContent(message)) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
             }
 
             // ── Image Attachments ──
             val images = message.attachments.filterIsInstance<ActivityAttachment.Image>()
             if (images.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                images.forEach { image ->
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(android.net.Uri.parse(image.uri))
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "${RTL}تصویر پیوست",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Crop
-                    )
+                ActivityAttachmentRenderer(
+                    attachments = listOf(ActivityAttachment.Image(images.first().uri))
+                )
+                if (images.size > 1) {
                     Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${RTL}+ ${images.size - 1} تصویر دیگر",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+                if (hasOtherContentAfterMedia(message)) {
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
 
-            // ── File Attachments ──
+            // ── File Attachments (count only, not individual cards in message view) ──
             val files = message.attachments.filterIsInstance<ActivityAttachment.File>()
-            if (files.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                files.forEach { file ->
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(text = "📎", fontSize = 12.sp)
-                            Text(
-                                text = file.name ?: "فایل پیوست",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
+            if (files.isNotEmpty() && images.isEmpty()) {
+                // Show single file preview when no images
+                ActivityAttachmentRenderer(attachments = listOf(files.first()))
+                if (files.size > 1) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${RTL}+ ${files.size - 1} فایل دیگر",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
                 }
             }
 
-            // ── Duration ──
+            // ── Duration (inline, subtle) ──
             message.durationMinutes?.let { duration ->
-                Spacer(modifier = Modifier.height(8.dp))
-                Surface(
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                    shape = RoundedCornerShape(6.dp)
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(text = "⏱️", fontSize = 11.sp)
-                        Text(
-                            text = "$duration ${RTL}دقیقه",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
+                    Text(text = "⏱", fontSize = 12.sp)
+                    Text(
+                        text = "$duration ${RTL}دقیقه",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
 
             // ── Timestamp ──
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = formatTimestamp(message.timestamp),
                 fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
         }
     }
 }
 
 /**
- * Get icon for message type.
+ * Check if the message has media content (images or files).
  */
-private fun getMessageIcon(message: ActivityMessageModel): String {
-    return when {
-        message.attachments.any { it is ActivityAttachment.Image } -> "📷"
-        message.attachments.any { it is ActivityAttachment.File } -> "📎"
-        message.durationMinutes != null -> "⏱️"
-        else -> "📝"
-    }
+private fun hasMediaContent(message: ActivityMessageModel): Boolean {
+    return message.attachments.isNotEmpty()
 }
 
 /**
- * Get label for message type.
+ * Check if there's content after media (text or duration).
  */
-private fun getMessageLabel(message: ActivityMessageModel): String {
-    return when {
-        message.attachments.any { it is ActivityAttachment.Image } -> "${RTL}تصویر"
-        message.attachments.any { it is ActivityAttachment.File } -> "${RTL}فایل"
-        message.durationMinutes != null -> "${RTL}فعالیت"
-        else -> "${RTL}یادداشت"
-    }
+private fun hasOtherContentAfterMedia(message: ActivityMessageModel): Boolean {
+    return message.text.isNullOrBlank().not() || message.durationMinutes != null
 }
 
 /**
- * Format timestamp to Persian date/time.
+ * Format timestamp to Persian time.
  */
 private fun formatTimestamp(timestamp: Long): String {
     val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
