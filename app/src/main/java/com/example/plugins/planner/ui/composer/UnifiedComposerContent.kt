@@ -102,16 +102,6 @@ fun UnifiedComposerContent(
             )
         }
 
-        // ── Duration picker dialog ──
-        if (false) { // This will be controlled by parent
-            DurationPickerDialog(
-                onDismiss = { /* handled by parent */ },
-                onConfirm = { minutes ->
-                    dispatch(ActivityComposerAction.DurationChanged(minutes))
-                }
-            )
-        }
-
         Spacer(modifier = Modifier.height(8.dp))
 
         // ── Toolbar ──
@@ -151,45 +141,4 @@ private fun StepIndicator() {
             )
         }
     }
-}
-
-@Composable
-fun DurationPickerDialog(
-    onDismiss: () -> Unit,
-    onConfirm: (Int) -> Unit
-) {
-    var durationText by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text("${RTL}مدت زمان")
-        },
-        text = {
-            OutlinedTextField(
-                value = durationText,
-                onValueChange = { durationText = it },
-                label = { Text("${RTL}دقیقه") },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = {
-                    durationText.toIntOrNull()?.let { onConfirm(it) }
-                }),
-                singleLine = true
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    durationText.toIntOrNull()?.let { onConfirm(it) }
-                }
-            ) {
-                Text("${RTL}تأیید")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("${RTL}لغو")
-            }
-        }
-    )
 }
