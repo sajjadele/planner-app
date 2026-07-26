@@ -1,4 +1,6 @@
-package com.example.plugins.planner.data
+package com.example
+
+import android.util.Log.plugins.planner.data
 
 /**
  * ActivityMessageMapper — Converts ActivityEventEntity to ActivityMessageModel.
