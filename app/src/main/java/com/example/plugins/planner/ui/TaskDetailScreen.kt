@@ -163,23 +163,8 @@ fun TaskDetailScreen(
         if (showActivityComposer) {
             ActivityComposerBottomSheet(
                 onDismiss = { showActivityComposer = false },
-                onAddStep = { title ->
-                    viewModel.addStep(title)
-                    showActivityComposer = false
-                    focusManager.clearFocus()
-                },
-                onAddNote = { text ->
-                    viewModel.addNote(text)
-                    showActivityComposer = false
-                    focusManager.clearFocus()
-                },
-                onAddManualActivity = { title, durationMinutes ->
-                    viewModel.addManualActivity(title, durationMinutes)
-                    showActivityComposer = false
-                    focusManager.clearFocus()
-                },
-                onAddImage = { uri, description ->
-                    viewModel.addImage(uri, description)
+                onCreateActivity = { draft ->
+                    viewModel.createActivity(draft)
                     showActivityComposer = false
                     focusManager.clearFocus()
                 }

@@ -12,6 +12,8 @@ import com.example.core.receiver.ReminderScheduler
 import com.example.core.util.JalaliDate
 import com.example.plugins.notes.data.NoteEntity
 import com.example.plugins.notes.data.NoteRepository
+import com.example.plugins.planner.data.ActivityDraft
+import com.example.plugins.planner.data.ActivityDraftType
 import com.example.plugins.planner.data.ActivityEventEntity
 import com.example.plugins.planner.data.ActivityEventRepository
 import com.example.plugins.planner.data.ActivityEventType
@@ -184,6 +186,75 @@ class TaskDetailViewModel(
             )
         }
     }
+
+    // ════════════════════════════════════════════════════════════════
+    // NEW: Unified Activity Creation (Phase 4.6)
+    // ════════════════════════════════════════════════════════════════
+
+    /**
+     * Create an activity from an ActivityDraft.
+     *
+     * This is the new unified entry point for activity creation.
+     * It maps the draft to the appropriate ActivityEventType and storage format.
+     *
+     * Future: This will handle ActivityDraft with multiple attachments.
+     */
+    fun createActivity(draft: ActivityDraft) {
+        viewModelScope.launch {
+            when (draft.type) {
+                ActivityDraftType.STEP -> {
+                    // Create step entity + STEP_CREATED event
+                    val step = TaskStepEntity(taskId = taskId, title = draft.text ?: return@launch)
+                    taskStepRepository.addStep(step)
+                }
+                ActivityDraftType.NOTE -> {
+                    // Create NOTE_ADDED event
+                    activityEventRepository.addEvent(
+                        ActivityEventEntity(
+                            taskId = taskId,
+                            stepId = null,
+                            eventType = ActivityEventType.NOTE_ADDED.name,
+                            description = draft.text
+                        )
+                    )
+                }
+                ActivityDraftType.MANUAL_ACTIVITY -> {
+                    // Create MANUAL_ACTIVITY event with title|duration format
+                    val description = if (draft.durationMinutes != null) {
+                        "${draft.text}|${draft.durationMinutes}"
+                    } else {
+                        draft.text
+                    }
+                    activityEventRepository.addEvent(
+                        ActivityEventEntity(
+                            taskId = taskId,
+                            stepId = null,
+                            eventType = ActivityEventType.MANUAL_ACTIVITY.name,
+                            description = description
+                        )
+                    )
+                }
+                ActivityDraftType.IMAGE -> {
+                    // Create IMAGE_ADDED event with encoded uri|description
+                    activityEventRepository.addEvent(
+                        ActivityEventEntity(
+                            taskId = taskId,
+                            stepId = null,
+                            eventType = ActivityEventType.IMAGE_ADDED.name,
+                            description = ImageEventParser.encode(
+                                draft.imageUri ?: return@launch,
+                                draft.imageDescription
+                            )
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // LEGACY: Keep for backward compatibility (can be removed later)
+    // ════════════════════════════════════════════════════════════════
 
     /** Create a step — STEP_CREATED event is handled by the repository */
     fun addStep(title: String) {

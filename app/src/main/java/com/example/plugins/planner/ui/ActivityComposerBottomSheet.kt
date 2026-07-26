@@ -31,6 +31,9 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.core.util.RTL
+import com.example.plugins.planner.data.ActivityDraft
+import com.example.plugins.planner.data.ActivityDraftType
+import com.example.plugins.planner.data.ActivityPayloadParser
 
 enum class ComposerMode {
     NONE,
@@ -40,13 +43,23 @@ enum class ComposerMode {
     IMAGE
 }
 
+/**
+ * ActivityComposerBottomSheet — Unified activity creation UI.
+ *
+ * Architecture (Phase 4.6):
+ * - Uses a single callback: onCreateActivity(ActivityDraft)
+ * - Internally uses ActivityPayloadParser to create drafts
+ * - UI behavior unchanged from previous version
+ *
+ * Future (Phase B):
+ * - Will evolve to Telegram-style unified composer
+ * - Multiple attachments in one event
+ * - Single text input with attachment actions
+ */
 @Composable
 fun ActivityComposerBottomSheet(
     onDismiss: () -> Unit,
-    onAddStep: (String) -> Unit,
-    onAddNote: (String) -> Unit,
-    onAddManualActivity: (String, Int?) -> Unit,
-    onAddImage: (String, String?) -> Unit
+    onCreateActivity: (ActivityDraft) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var composerMode by remember { mutableStateOf(ComposerMode.NONE) }
@@ -131,7 +144,7 @@ fun ActivityComposerBottomSheet(
                         onSubmit = {
                             if (stepTitle.isNotBlank()) {
                                 focusManager.clearFocus()
-                                onAddStep(stepTitle)
+                                onCreateActivity(ActivityPayloadParser.step(stepTitle))
                                 composerMode = ComposerMode.NONE
                                 stepTitle = ""
                             }
@@ -149,7 +162,7 @@ fun ActivityComposerBottomSheet(
                         onSubmit = {
                             if (noteText.isNotBlank()) {
                                 focusManager.clearFocus()
-                                onAddNote(noteText)
+                                onCreateActivity(ActivityPayloadParser.note(noteText))
                                 composerMode = ComposerMode.NONE
                                 noteText = ""
                             }
@@ -174,9 +187,11 @@ fun ActivityComposerBottomSheet(
                         },
                         onSubmit = {
                             if (selectedImageUri != null) {
-                                onAddImage(
-                                    selectedImageUri.toString(),
-                                    imageDescription.ifBlank { null }
+                                onCreateActivity(
+                                    ActivityPayloadParser.image(
+                                        uri = selectedImageUri.toString(),
+                                        description = imageDescription.ifBlank { null }
+                                    )
                                 )
                                 composerMode = ComposerMode.NONE
                                 selectedImageUri = null
@@ -200,7 +215,12 @@ fun ActivityComposerBottomSheet(
                         onSubmit = {
                             if (manualTitle.isNotBlank() && manualDuration.isValidDuration()) {
                                 focusManager.clearFocus()
-                                onAddManualActivity(manualTitle, manualDuration.toIntOrNull())
+                                onCreateActivity(
+                                    ActivityPayloadParser.manualActivity(
+                                        title = manualTitle,
+                                        durationMinutes = manualDuration.toIntOrNull()
+                                    )
+                                )
                                 composerMode = ComposerMode.NONE
                                 manualTitle = ""
                                 manualDuration = ""
