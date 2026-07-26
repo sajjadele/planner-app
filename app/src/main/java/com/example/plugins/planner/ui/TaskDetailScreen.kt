@@ -42,6 +42,7 @@ import com.example.plugins.planner.data.StepDraft
 import com.example.plugins.planner.data.TaskEntity
 import com.example.plugins.planner.data.TaskStepEntity
 import com.example.plugins.planner.ui.components.NeumorphicSurface
+import com.example.plugins.planner.ui.components.ActivityMessageCard
 import com.example.plugins.planner.ui.components.ReminderSection
 import com.example.plugins.planner.ui.components.StepCard
 import com.example.plugins.planner.ui.components.skeletonShimmerBrush

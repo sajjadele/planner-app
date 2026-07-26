@@ -125,7 +125,7 @@ fun ActivityMessageCard(
                         ) {
                             Text(text = "📎", fontSize = 12.sp)
                             Text(
-                                text = file.name,
+                                text = file.name ?: "فایل پیوست",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
