@@ -623,46 +623,39 @@ private fun TimelinePreviewCard(
                 )
             }
         } else {
-            val colorScheme = MaterialTheme.colorScheme
-            val uiModels = remember(activities, colorScheme) {
-                TimelineEventMapper.mapEvents(
-                    events = activities,
-                    useTimeOnly = false,
-                    primary = colorScheme.primary,
-                    error = colorScheme.error,
-                    tertiary = colorScheme.tertiary,
-                    outline = colorScheme.outline
-                )
-            }
-            val latestModel = uiModels.maxByOrNull { it.timestamp }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "📅", fontSize = 16.sp)
-                    Spacer(modifier = Modifier.width(6.dp))
+            // Show latest activity using ActivityMessageCard
+            val latestActivity = activities.maxByOrNull { it.timestamp }
+            if (latestActivity != null) {
+                val message = remember(latestActivity) {
+                    ActivityMessageMapper.toMessage(latestActivity)
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "📅", fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "${RTL}تاریخچه فعالیت",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ActivityMessageCard(message = message)
+
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "${RTL}تاریخچه فعالیت",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        text = "${RTL}مشاهده تاریخچه ←",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
-
-                if (latestModel != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TimelinePreviewLatestEvent(uiModel = latestModel)
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "${RTL}مشاهده تاریخچه ←",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.primary
-                )
             }
         }
     }

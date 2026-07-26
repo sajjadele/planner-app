@@ -3,7 +3,6 @@ package com.example.plugins.planner.ui.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,28 +16,30 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.example.core.util.RTL
 import com.example.plugins.planner.data.ActivityAttachment
-import com.example.plugins.planner.data.ActivityMessageModel
 import com.example.plugins.planner.data.StepCardModel
 
 /**
  * StepCard — Rich step card with activity preview.
  *
- * Architecture (Phase 4.9.3 + 4.9.4):
- * - Collapsed: title + summary
- * - Expanded: title + activity messages
+ * Phase 4.12: Telegram-style Activity UI
+ *
+ * Architecture:
+ * - Collapsed: title + summary stats (activity count, image count, file count)
+ * - Expanded: title + activity messages using ActivityMessageCard
  * - RTL compatible
- * - Neumorphic design system
  * - Material3 components
+ *
+ * Summary Stats:
+ * Shows when collapsed:
+ * - 📝 X فعالیت
+ * - 📷 X تصویر
+ * - 📎 X فایل
  */
 @Composable
 fun StepCard(
@@ -50,12 +51,13 @@ fun StepCard(
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
-    NeumorphicSurface(
+    Surface(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp)),
+        color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(12.dp),
-        elevation = 3
+        shadowElevation = 2.dp
     ) {
         Column(
             modifier = Modifier
@@ -92,14 +94,44 @@ fun StepCard(
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    // Activity summary
-                    if (model.hasRichContent()) {
+                    // ── Summary Stats (Collapsed) ──
+                    if (model.messages.isNotEmpty() && !isExpanded) {
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = model.getActivitySummary(),
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Activity count
+                            val activityCount = model.messages.size
+                            Text(
+                                text = "📝 $activityCount ${RTL}فعالیت",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            // Image count
+                            val imageCount = model.messages.sumOf { msg ->
+                                msg.attachments.filterIsInstance<ActivityAttachment.Image>().size
+                            }
+                            if (imageCount > 0) {
+                                Text(
+                                    text = "📷 $imageCount ${RTL}تصویر",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            // File count
+                            val fileCount = model.messages.sumOf { msg ->
+                                msg.attachments.filterIsInstance<ActivityAttachment.File>().size
+                            }
+                            if (fileCount > 0) {
+                                Text(
+                                    text = "📎 $fileCount ${RTL}فایل",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -149,7 +181,7 @@ fun StepCard(
                 ) {
                     // Activity count header
                     Text(
-                        text = "فعالیت‌ها (${model.messages.size})",
+                        text = "${RTL}فعالیت‌ها (${model.messages.size})",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
@@ -184,7 +216,7 @@ fun StepCard(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "افزودن فعالیت",
+                                text = "${RTL}افزودن فعالیت",
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -193,111 +225,5 @@ fun StepCard(
                 }
             }
         }
-    }
-}
-
-/**
- * ActivityMessageCard — Shows a single activity message.
- */
-@Composable
-private fun ActivityMessageCard(
-    message: ActivityMessageModel,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp)
-        ) {
-            // Message header with icon
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = getMessageIcon(message),
-                    fontSize = 12.sp
-                )
-                Text(
-                    text = getMessageLabel(message),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            // Text content
-            message.text?.let { text ->
-                if (text.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = text,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 4,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            // Image attachments
-            val images = message.attachments.filterIsInstance<ActivityAttachment.Image>()
-            if (images.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                images.forEach { image ->
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(android.net.Uri.parse(image.uri))
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "${RTL}تصویر پیوست",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(120.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-            }
-
-            // Duration
-            message.durationMinutes?.let { duration ->
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "⏱️ $duration ${RTL}دقیقه",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-    }
-}
-
-/**
- * Get icon for message type.
- */
-private fun getMessageIcon(message: ActivityMessageModel): String {
-    return when {
-        message.isStep -> "✓"
-        message.attachments.isNotEmpty() -> "📷"
-        message.durationMinutes != null -> "📌"
-        else -> "📝"
-    }
-}
-
-/**
- * Get label for message type.
- */
-private fun getMessageLabel(message: ActivityMessageModel): String {
-    return when {
-        message.isStep -> "مرحله"
-        message.attachments.isNotEmpty() -> "تصویر"
-        message.durationMinutes != null -> "فعالیت دستی"
-        else -> "یادداشت"
     }
 }
