@@ -3,6 +3,7 @@
 package com.example.plugins.planner.ui
 
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -75,8 +76,13 @@ fun ActivityComposerBottomSheet(
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri: Uri? ->
+            Log.d("COMPOSER_DEBUG", "📸 Image picker returned: uri=$uri")
             if (uri != null) {
+                Log.d("COMPOSER_DEBUG", "📸 Dispatching AddAttachment action")
                 dispatch(ActivityComposerAction.AddAttachment(ActivityAttachment.Image(uri.toString())))
+                Log.d("COMPOSER_DEBUG", "📸 After dispatch, composerState.attachments.size=${composerState.attachments.size}")
+            } else {
+                Log.d("COMPOSER_DEBUG", "📸 Image picker returned null uri")
             }
         }
     )

@@ -1,5 +1,6 @@
 package com.example.plugins.planner.ui.composer
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -52,6 +53,11 @@ fun UnifiedComposerContent(
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
     ) {
+        // ── Debug: Log received state ──
+        Log.d("COMPOSER_DEBUG", "🎨 UnifiedComposerContent received state: attachments.size=${state.attachments.size}, text='${state.text}', intent=${state.intent}")
+        state.attachments.forEachIndexed { index, attachment ->
+            Log.d("COMPOSER_DEBUG", "🎨   attachment[$index]: type=${attachment::class.simpleName}, uri=${(attachment as? com.example.plugins.planner.data.ActivityAttachment.Image)?.uri}")
+        }
         // ── Step indicator ──
         if (state.intent == ActivityIntent.STEP) {
             StepIndicator()

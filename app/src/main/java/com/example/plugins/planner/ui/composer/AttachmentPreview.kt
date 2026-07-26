@@ -1,6 +1,7 @@
 package com.example.plugins.planner.ui.composer
 
 import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -40,8 +41,13 @@ fun AttachmentPreview(
     onRemoveAttachment: (ActivityAttachment) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (attachments.isEmpty()) return
+    Log.d("COMPOSER_DEBUG", "🖼 AttachmentPreview called with ${attachments.size} attachments")
+    if (attachments.isEmpty()) {
+        Log.d("COMPOSER_DEBUG", "🖼 AttachmentPreview: returning early (empty)")
+        return
+    }
 
+    Log.d("COMPOSER_DEBUG", "🖼 AttachmentPreview: rendering ${attachments.size} attachments")
     Column(
         modifier = modifier
             .fillMaxWidth()

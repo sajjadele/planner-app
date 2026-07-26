@@ -1,5 +1,6 @@
 package com.example.plugins.planner.ui.composer
 
+import android.util.Log
 import com.example.plugins.planner.data.ActivityIntent
 
 /**
@@ -28,7 +29,9 @@ object ActivityComposerReducer {
         state: ActivityComposerState,
         action: ActivityComposerAction
     ): ActivityComposerState {
-        return when (action) {
+        Log.d("COMPOSER_DEBUG", "⚡ Reducer called: action=${action::class.simpleName}, state.attachments.size=${state.attachments.size}")
+        
+        val newState = when (action) {
             is ActivityComposerAction.TextChanged -> {
                 state.copy(text = action.value)
             }
@@ -61,5 +64,8 @@ object ActivityComposerReducer {
                 ActivityComposerState.EMPTY
             }
         }
+        
+        Log.d("COMPOSER_DEBUG", "⚡ Reducer result: newState.attachments.size=${newState.attachments.size}")
+        return newState
     }
 }
