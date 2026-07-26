@@ -29,7 +29,6 @@ import coil.request.ImageRequest
 import com.example.core.util.RTL
 import com.example.plugins.planner.data.ActivityAttachment
 import com.example.plugins.planner.data.ActivityMessageModel
-import android.util.Log
 import com.example.plugins.planner.data.StepCardModel
 
 /**
