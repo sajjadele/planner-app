@@ -217,6 +217,85 @@ class TimelineEventMapperTest {
         assertFalse(result[0].objectText.orEmpty().contains(uri))
     }
 
+    // ── NOTE_ADDED with JSON payload (Phase 4.7.4) ──────────────────────
+
+    @Test
+    fun `note event with json payload extracts imageUri from attachments`() {
+        val json = """{"text":"","attachments":[{"type":"IMAGE","uri":"content://test/photo.jpg"}]}"""
+        val result = map(listOf(event(1, eventType = ActivityEventType.NOTE_ADDED, description = json)))
+        assertEquals("content://test/photo.jpg", result[0].imageUri)
+    }
+
+    @Test
+    fun `note event with json payload text and image extracts both`() {
+        val json = """{"text":"تست تصویر","attachments":[{"type":"IMAGE","uri":"content://test/photo.jpg"}]}"""
+        val result = map(listOf(event(1, eventType = ActivityEventType.NOTE_ADDED, description = json)))
+        assertEquals("تست تصویر", result[0].objectText)
+        assertEquals("content://test/photo.jpg", result[0].imageUri)
+    }
+
+    @Test
+    fun `note event with json payload imageOnly has null objectText`() {
+        val json = """{"attachments":[{"type":"IMAGE","uri":"content://test/photo.jpg"}]}"""
+        val result = map(listOf(event(1, eventType = ActivityEventType.NOTE_ADDED, description = json)))
+        assertNull(result[0].objectText)
+        assertEquals("content://test/photo.jpg", result[0].imageUri)
+    }
+
+    @Test
+    fun `note event with json payload no image has null imageUri`() {
+        val json = """{"text":"note without image"}"""
+        val result = map(listOf(event(1, eventType = ActivityEventType.NOTE_ADDED, description = json)))
+        assertEquals("note without image", result[0].objectText)
+        assertNull(result[0].imageUri)
+    }
+
+    @Test
+    fun `note event with plain text has null imageUri`() {
+        val result = map(listOf(event(1, eventType = ActivityEventType.NOTE_ADDED, description = "plain note")))
+        assertEquals("plain note", result[0].objectText)
+        assertNull(result[0].imageUri)
+    }
+
+    // ── FILE_ADDED with JSON payload (Phase 4.7.4) ──────────────────────
+
+    @Test
+    fun `file event with json payload extracts imageUri from image attachment`() {
+        val json = """{"text":"report","attachments":[{"type":"IMAGE","uri":"content://test/image.png"}]}"""
+        val result = map(listOf(event(1, eventType = ActivityEventType.FILE_ADDED, description = json)))
+        assertEquals("content://test/image.png", result[0].imageUri)
+    }
+
+    // ── IMAGE_ADDED with JSON payload (Phase 4.7.4) ─────────────────────
+
+    @Test
+    fun `image event with json payload extracts imageUri`() {
+        val json = """{"text":"description","attachments":[{"type":"IMAGE","uri":"content://test/img.jpg"}]}"""
+        val result = map(listOf(event(1, eventType = ActivityEventType.IMAGE_ADDED, description = json)))
+        assertEquals("description", result[0].objectText)
+        assertEquals("content://test/img.jpg", result[0].imageUri)
+    }
+
+    @Test
+    fun `image event with json payload imageOnly has null objectText`() {
+        val json = """{"attachments":[{"type":"IMAGE","uri":"content://test/img.jpg"}]}"""
+        val result = map(listOf(event(1, eventType = ActivityEventType.IMAGE_ADDED, description = json)))
+        assertNull(result[0].objectText)
+        assertEquals("content://test/img.jpg", result[0].imageUri)
+    }
+
+    @Test
+    fun `multiple attachments all preserved in event types`() {
+        val json = """{"text":"multi","attachments":[{"type":"IMAGE","uri":"content://test/1.jpg"},{"type":"FILE","uri":"content://test/doc.pdf","name":"doc"}]}"""
+        val noteResult = map(listOf(event(1, eventType = ActivityEventType.NOTE_ADDED, description = json)))
+        assertEquals("multi", noteResult[0].objectText)
+        assertEquals("content://test/1.jpg", noteResult[0].imageUri)
+
+        val imageResult = map(listOf(event(2, eventType = ActivityEventType.IMAGE_ADDED, description = json)))
+        assertEquals("multi", imageResult[0].objectText)
+        assertEquals("content://test/1.jpg", imageResult[0].imageUri)
+    }
+
     // ── Color assignment ────────────────────────────────────────────────
 
     @Test

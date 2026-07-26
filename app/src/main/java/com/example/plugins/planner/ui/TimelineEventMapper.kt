@@ -135,9 +135,12 @@ object TimelineEventMapper {
                 ActivityEventType.NOTE_ADDED -> {
                     icon = "📝"
                     actionText = "${RTL}یادداشت اضافه شد"
-                    // Decode JSON payload if present (Phase 4.7.4)
                     val decoded = decodeDescription(event.description)
-                    objectText = decoded.text ?: event.description
+                    objectText = decoded.text
+                    val imageAttachment = decoded.attachments.firstOrNull { it is ActivityAttachment.Image }
+                    if (imageAttachment is ActivityAttachment.Image) {
+                        imageUri = imageAttachment.uri
+                    }
                     supportingText = null
                     color = resolveColor(eventType, primary, error, tertiary, outline)
                 }
@@ -145,9 +148,12 @@ object TimelineEventMapper {
                 ActivityEventType.FILE_ADDED -> {
                     icon = "📎"
                     actionText = "${RTL}فایل اضافه شد"
-                    // Decode JSON payload if present (Phase 4.7.4)
                     val decoded = decodeDescription(event.description)
                     objectText = decoded.text ?: event.description
+                    val imageAttachment = decoded.attachments.firstOrNull { it is ActivityAttachment.Image }
+                    if (imageAttachment is ActivityAttachment.Image) {
+                        imageUri = imageAttachment.uri
+                    }
                     supportingText = null
                     color = resolveColor(eventType, primary, error, tertiary, outline)
                 }

@@ -16,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -78,32 +80,41 @@ private fun ImageAttachmentPreview(
     uri: String,
     onRemove: () -> Unit
 ) {
-    Log.d("COMPOSER_DEBUG", "🖼 ImageAttachmentPreview: loading uri=$uri")
+    Log.d("COMPOSER_DEBUG", "🖼 ImageAttachmentPreview COMPOSING: uri=$uri")
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(160.dp)
             .clip(RoundedCornerShape(12.dp))
+            .background(Color.Red.copy(alpha = 0.3f))
+            .onGloballyPositioned { coordinates ->
+                val posInWindow = coordinates.positionInWindow()
+                val size = coordinates.size
+                Log.d("COMPOSER_DEBUG", "🖼 Box posInWindow=(${posInWindow.x.toInt()},${posInWindow.y.toInt()}) size=${size.width}x${size.height}")
+            }
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(Uri.parse(uri))
-                .crossfade(true)
                 .listener(
+                    onStart = {
+                        Log.d("COMPOSER_DEBUG", "🖼 Coil STARTED loading")
+                        null
+                    },
                     onError = { _, errorResult ->
-                        Log.e("COMPOSER_DEBUG", "🖼 Coil error: ${errorResult.throwable?.message}", errorResult.throwable)
+                        Log.e("COMPOSER_DEBUG", "🖼 Coil ERROR: ${errorResult.throwable?.message}", errorResult.throwable)
                     },
                     onSuccess = { _, _ ->
-                        Log.d("COMPOSER_DEBUG", "🖼 Coil success: image loaded")
+                        Log.d("COMPOSER_DEBUG", "🖼 Coil SUCCESS: image loaded")
                     }
                 )
                 .build(),
             contentDescription = "${RTL}پیش‌نمایش تصویر",
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Fit
         )
 
-        // Remove button
         Surface(
             modifier = Modifier
                 .align(Alignment.TopEnd)

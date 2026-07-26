@@ -117,43 +117,58 @@ fun ActivityComposerBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp)
-                .verticalScroll(rememberScrollState())
+                .heightIn(max = 500.dp)
         ) {
-            // ── Header ──
-            Text(
-                text = "${RTL}ثبت مورد جدید",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-            )
+            val scrollState = rememberScrollState()
+            val attachmentCount = composerState.attachments.size
 
-            // ── Unified Composer Content ──
-            UnifiedComposerContent(
-                state = composerState,
-                dispatch = dispatch,
-                onSubmit = handleSubmit,
-                onAddFile = { /* Future: file picker */ },
-                onAddImage = {
-                    imagePickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
-                },
-                onToggleDuration = { showDurationPicker = true },
-                onToggleStep = {
-                    dispatch(
-                        if (composerState.intent == com.example.plugins.planner.data.ActivityIntent.STEP) {
-                            ActivityComposerAction.ConvertToActivity
-                        } else {
-                            ActivityComposerAction.ConvertToStep
-                        }
-                    )
-                },
-                onShowDurationPicker = { showDurationPicker = true }
-            )
+            LaunchedEffect(attachmentCount) {
+                if (attachmentCount > 0) {
+                    scrollState.animateScrollTo(scrollState.maxValue)
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+                    .verticalScroll(scrollState)
+            ) {
+                // ── Header ──
+                Text(
+                    text = "${RTL}ثبت مورد جدید",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                )
+
+                // ── Unified Composer Content ──
+                UnifiedComposerContent(
+                    state = composerState,
+                    dispatch = dispatch,
+                    onSubmit = handleSubmit,
+                    onAddFile = { /* Future: file picker */ },
+                    onAddImage = {
+                        imagePickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    onToggleDuration = { showDurationPicker = true },
+                    onToggleStep = {
+                        dispatch(
+                            if (composerState.intent == com.example.plugins.planner.data.ActivityIntent.STEP) {
+                                ActivityComposerAction.ConvertToActivity
+                            } else {
+                                ActivityComposerAction.ConvertToStep
+                            }
+                        )
+                    },
+                    onShowDurationPicker = { showDurationPicker = true }
+                )
+            }
         }
 
         // ── Duration Picker Dialog ──
