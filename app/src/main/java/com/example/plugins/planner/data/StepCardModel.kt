@@ -67,6 +67,15 @@ data class StepCardModel(
     val createdAt: Long
 ) {
     /**
+     * Get all image attachments from all messages.
+     */
+    fun getAllImages(): List<ActivityAttachment.Image> {
+        return messages.flatMap { msg ->
+            msg.attachments.filterIsInstance<ActivityAttachment.Image>()
+        }
+    }
+
+    /**
      * Get a summary of the step's activity.
      */
     fun getActivitySummary(): String {
@@ -92,15 +101,6 @@ data class StepCardModel(
      */
     fun hasRichContent(): Boolean {
         return messages.isNotEmpty() || attachmentCount > 0 || totalDurationMinutes != null
-    }
-
-    companion object {
-     * Get all image attachments from all messages.
-     */
-    fun getAllImages(): List<ActivityAttachment.Image> {
-        return messages.flatMap { msg ->
-            msg.attachments.filterIsInstance<ActivityAttachment.Image>()
-        }
     }
 
     companion object {
