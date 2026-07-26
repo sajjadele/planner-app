@@ -1,8 +1,8 @@
 # Vision Planner — Product & Architecture Direction Decision Document
 
 > **Status:** Active product source of truth  
-> **Date:** 2026-07-15  
-> **Updated:** 2026-07-16 (docs hierarchy cleanup)
+> **Date:** 2026-07-26  
+> **Updated:** 2026-07-26 (docs cleanup & phase status update)
 
 This document defines product philosophy and product boundaries.  
 Technical status lives in `docs/ARCHITECTURE_STATE.md`.  

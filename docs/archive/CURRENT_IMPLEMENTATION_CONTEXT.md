@@ -7,13 +7,13 @@
 Vision Planner — goal-oriented progress system (not a todo app).
 
 ## Current Phase
-- Completed: Phase 1–6 (including 5.1–5.4, 6.1–6.4)
-- **Phase 7 — AI Insight Layer** — Planned
+- Completed: Phase 1–3
+- Next focus: **Phase 4 — Mirror Engine Foundation**
 
 ## Tech Stack
 - Kotlin
 - Jetpack Compose + Material3
-- Room (v14)
+- Room
 - Coroutines + Flow
 - MVVM
 - Offline-first (no network dependency)
@@ -21,9 +21,9 @@ Vision Planner — goal-oriented progress system (not a todo app).
 ## Architecture Rules
 - Goal is the primary entity
 - Task is the execution unit and may optionally belong to a Goal
-- Events (`task_events`, `goal_events`, `activity_events`) are the source of truth
+- Events (`task_events`, `goal_events`) are the source of truth
 - Snapshots are rebuildable projections, not authoritative writes
-- Domain logic is pure Kotlin (`domain.insight`, `domain.snapshot`, `domain.mirror`, `domain.attention`, `domain.graph`)
+- Domain logic is pure Kotlin (`domain.insight`, `domain.snapshot`, planned `domain.mirror`)
 - UI stays dumb; math stays out of ViewModels
 - No WorkManager for analytics
 - No AI dependency in V1
@@ -34,11 +34,11 @@ Vision Planner — goal-oriented progress system (not a todo app).
 - No forced reflection/journaling
 - Tasks without goals are allowed as Inbox/capture
 - Life Area is metadata only (not first-class entity / not graph node)
-- Graph is behavioral solar system: Goal→Task, computed on demand
+- Graph is future and simple: Goal→Task, computed on demand
 
 ## Current Data Surfaces
-- Tables: `goals`, `goal_events`, `tasks`, `task_events`, `notes`, `module_settings`, `goal_progress_snapshot`, `behavior_snapshot`, `activity_events`, `task_steps`
-- DB version: **14**
+- Tables: goals, goal_events, tasks, task_events, notes, module_settings, goal_progress_snapshot, behavior_snapshot
+- DB version: 9
 - Snapshot refresh: real-time today + app-launch backfill
 
 ## Mirror V1 Scope
@@ -46,13 +46,6 @@ Vision Planner — goal-oriented progress system (not a todo app).
 - Placement: inside Goal Dashboard
 - No separate Mirror screen yet
 - Meaningful analysis after roughly 7 days of usage
-
-## Graph (Behavioral Solar System)
-- Goal = Sun (center)
-- Task = orbiting satellite / cluster
-- Adaptive cluster overview for large goals
-- Attention-based positioning (not priority)
-- 19+ pure-JVM tests
 
 ## Do Not Do
 - Do not reintroduce dual sources of truth

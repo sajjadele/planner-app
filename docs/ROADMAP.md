@@ -26,13 +26,13 @@ Goal → Task → Event → Snapshot → Mirror → Feedback
 ## Phase Overview
 
 | Phase | Name | Status |
-|------|------|--------|
+|-------|------|--------|
 | 1 | Foundation | ✅ Complete |
 | 2 | Goal System | ✅ Complete |
 | 3 | Behavior Data Foundation | ✅ Complete |
 | 4 | Mirror Engine Foundation | ✅ Complete |
-| 5 | Goal Experience Evolution | Planned |
-| 6 | Graph Exploration | Planned |
+| 5 | Goal Experience Evolution | ✅ Complete (5.1–5.4) |
+| 6 | Behavioral Solar System | ✅ Complete (6.1–6.4) |
 | 7 | AI Insight Layer | Planned |
 
 ---
@@ -75,7 +75,6 @@ Decision record: `docs/ADR/ADR-0003-progress-behavior-snapshots.md`
 
 **Status:** Complete
 
-Goals of this phase:
 - Detect behavioral patterns from existing data
 - Provide neutral feedback inside Goal Detail
 - No forced reflection / journaling
@@ -88,21 +87,15 @@ Initial patterns (all implemented):
 4. Consistency Decay
 
 Implemented architecture surfaces:
-- `domain.mirror` — `MirrorEngine` (signal → insight rendering), `MirrorHeuristics` (four detectors), `MirrorSignal` / `MirrorSignalType` / `MirrorInsight`
-- `core.mirror` — `MirrorRepository` interface + `RoomMirrorRepository` (wires Insight / Goal / Snapshot repositories)
-- `MirrorFeedbackCard` in Goal Detail, driven by `GoalDetailViewModel.mirrorInsights`
-- Snapshots (`behavior_snapshot`) and aggregates are Mirror inputs
-
-Remaining hardening items (post-implementation):
-- ViewModel tests for `GoalDetailViewModel` / `PlannerViewModel`
-- UX refinement of the feedback card
-- Feedback wording validation (neutral, non-judgmental language review)
+- `domain.mirror` — `MirrorEngine`, `MirrorHeuristics`, `MirrorSignal` / `MirrorSignalType` / `MirrorInsight`
+- `core.mirror` — `MirrorRepository` interface + `RoomMirrorRepository`
+- `MirrorFeedbackCard` in Goal Detail
 
 ---
 
 ## Phase 5 — Goal Experience Evolution
 
-**Status:** Planned
+**Status:** Complete (5.1–5.4)
 
 Goals of this phase:
 - Strengthen Goal-first daily UX
@@ -110,27 +103,37 @@ Goals of this phase:
 - Visually separate Inbox/capture tasks from goal-linked tasks
 - Improve Goal Card progress and feedback presentation
 
+Sub-phases:
+- **5.1–5.2:** Goal lifecycle, performance optimizations
+- **5.3:** GoalDetail metrics, active-days window
+- **5.4:** Performance & UX Stability Audit (indexes, deferred init)
+
+Decision records: `docs/ADR/ADR-0009-performance-audit-5.4.md`
+
 ---
 
-## Phase 6 — Graph Exploration
+## Phase 6 — Behavioral Solar System
 
-**Status:** In progress (foundation 6.1–6.5 complete; **Phase 2A Attention Foundation complete**; **Phase 2B Visibility Resolver complete**)
+**Status:** Complete (6.1–6.4)
 
-Goals of this phase:
-- Simple Goal→Task graph
+- Goal = Sun (center), Task = orbiting satellite / cluster
 - Computed on demand, never stored
 - Visual understanding tool, not a complex knowledge graph
-- Behavioral Solar System: Goal = Sun, tasks = orbiting satellites
-- Attention-driven gravity and progressive visibility (2A/2B)
+- Attention-driven positioning
 
-Status (2B): `VisibilityResolver` selects overview/expanded/insight content from AttentionScore;
-continuous orbit radius; attention-band clustering; renderer consumes `VisibleGraphModel`.
-Decision record: `docs/ADR/ADR-0014-visibility-resolver.md`
+Sub-phases:
+- **6.1:** Foundation audit & alignment, Help/Legend
+- **6.2:** Individual task satellites
+- **6.3:** Adaptive cluster visualization
+- **6.4:** Solar System motion & animation
 
-Status (6.1–6.5): domain layer + ViewModel pipeline + Compose Canvas renderer + adaptive density
-and visual polish delivered earlier.
-
-Decision records: `docs/ADR/ADR-0002-graph-architecture.md`, `docs/ADR/ADR-0004-graph-solar-system.md`, `docs/ADR/ADR-0005-behavioral-solar-system.md`, `docs/ADR/ADR-0014-visibility-resolver.md`
+Decision records:
+- `docs/ADR/ADR-0002-graph-architecture.md`
+- `docs/ADR/ADR-0004-graph-solar-system.md`
+- `docs/ADR/ADR-0005-behavioral-solar-system.md`
+- `docs/ADR/ADR-0008-solar-system-motion.md`
+- `docs/ATTENTION_ARCHITECTURE.md`
+- `docs/GRAPH_VIEW_RETROSPECTIVE.md`
 
 ---
 

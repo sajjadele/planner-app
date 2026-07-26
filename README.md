@@ -32,7 +32,7 @@ Goal → Task → Event → Snapshot → Mirror → Feedback
 
 ## Feature Status
 
-### Implemented (Phase 1–3 Complete)
+### Implemented (Phase 1–6 Complete)
 
 | Feature | Status | Description |
 |---|---|---|
@@ -60,14 +60,17 @@ Goal → Task → Event → Snapshot → Mirror → Feedback
 | Weekly Insight Card | ✅ | Compact insight summary with expandable detail sheet |
 | Mirror Engine (V1) | ✅ | `domain.mirror` + `core.mirror`; patterns Boulder, Initiator/Finisher, Goal Attention, Consistency Decay |
 | Mirror Feedback UI | ✅ | `MirrorFeedbackCard` inside Goal Detail; neutral language, no separate screen |
+| Behavioral Solar System | ✅ | Goal-centered graph view with attention-driven positioning |
+| Adaptive Cluster Visualization | ✅ | Automatic clustering for goals with >8 tasks |
+| Solar System Motion | ✅ | Staged entrance animation, breathing shimmer, cluster expand/collapse |
 
-### In Progress / Planned
+### Planned
 
 | Feature | Status | Notes |
 |---|---|---|
+| AI Insight Layer | 🔜 | Phase 7: Uses structured events, snapshots, and Mirror outputs |
 | Task Inbox behavior | 🔜 | Task creation without a goal remains allowed as quick capture |
 | Goal-first main layout | 🔜 | Preserve daily task flow while emphasizing goal context |
-| Graph visualization | 🔜 | Simple Goal→Task graph, computed on demand, not stored |
 
 ### Deferred / Out of Scope
 
@@ -96,7 +99,7 @@ Goal → Task → Event → Snapshot → Mirror → Feedback
 | Min SDK | 24 |
 | Target SDK | 36 |
 
-### Database Schema (v9)
+### Database Schema (v14)
 
 ```
 goals          → GoalEntity (id, title, description, status, createdAt, completedAt)
@@ -107,6 +110,8 @@ tasks          → TaskEntity (id, title, priority, isCompleted, dateEpochMs, ti
 task_events    → TaskEventEntity (id, taskId, eventType, timestamp)
 notes          → NoteEntity (id, content, timestamp, goalId?, taskId?)
 module_settings → ModuleSettingsEntity (moduleId, isEnabled)
+activity_events → ActivityEventEntity (id, taskId, eventType, timestamp)
+task_steps     → TaskStepEntity (id, taskId FK, title, isCompleted, order)
 ```
 
 **Key relationships:**
@@ -122,7 +127,7 @@ module_settings → ModuleSettingsEntity (moduleId, isEnabled)
 app/src/main/java/com/example/
 │
 ├── core/
-│   ├── database/           # AppDatabase (v9)
+│   ├── database/           # AppDatabase (v14), migrations
 │   ├── goal/               # GoalEntity, GoalDao, GoalRepository
 │   ├── snapshot/           # GoalProgressSnapshotEntity, BehaviorSnapshotEntity,
 │   │                        # SnapshotDao, SnapshotRepository, SnapshotAggregator
@@ -135,9 +140,12 @@ app/src/main/java/com/example/
 │   └── util/               # DateTimeUtils, PersianDigits, JalaliDate
 │
 ├── domain/
+│   ├── attention/          # AttentionCalculator, AttentionResult (Behavioral Solar System)
+│   ├── goal/               # Goal domain logic
+│   ├── graph/              # GoalGraphBuilder, GoalGraphModels, GraphGeometry
 │   ├── insight/            # Streak, rate, velocity, procrastination calculators
-│   ├── snapshot/           # Daily goal progress + behavior projection math
-│   └── mirror/             # MirrorEngine, MirrorHeuristics, MirrorSignal, MirrorInsight
+│   ├── mirror/             # MirrorEngine, MirrorHeuristics, MirrorSignal, MirrorInsight
+│   └── snapshot/           # Daily goal progress + behavior projection math
 │
 ├── plugins/
 │   ├── goals/              # GoalsPlugin, GoalDashboardScreen, GoalDetailScreen
@@ -148,7 +156,7 @@ app/src/main/java/com/example/
 │   │   └── ui/components/  # Neumorphic components, dialogs, insight card
 │   └── planner/            # PlannerPlugin
 │       ├── data/           # TaskEntity, TaskEventEntity, TaskDao, TaskEventDao,
-│       │                   # InsightDao, TaskRepository
+│       │                   # InsightDao, TaskRepository, ActivityEventDao, TaskStepDao
 │       └── ui/             # PlannerScreen, PlannerViewModel, TaskDetailScreen,
 │           │               # TaskDetailViewModel, WeeklyInsightViewModel
 │           └── components/ # AddTaskDialog, TaskCard, DaySelector,
@@ -203,33 +211,43 @@ One-shot side-effects are delivered through a replay-free `Channel` exposed as a
 
 ---
 
-## Behavioral Insights & Mirror (Phase 3 → Phase 3.5)
+## Behavioral Insights & Mirror
 
-Current Phase 3 insight metrics:
+### Mirror V1 Patterns
 
-| Metric | Source | Purpose |
-|---|---|---|
-| Completion Streak | `task_events` (completed) | Consecutive days with completions |
-| Weekly Velocity | Current vs previous week | Accelerating / stable / declining |
-| Procrastination Alerts | `task_events` (rescheduled ≥ 3x) | Tasks being avoided |
-| Goal Attention | Goal activity over time | Goals receiving less attention recently |
+| Pattern | Description |
+|---|---|
+| Boulder | Tasks being avoided (rescheduled ≥ 2x) |
+| Initiator vs Finisher | User starts many tasks but completes few |
+| Goal Attention | Goals receiving less attention recently |
+| Consistency Decay | Declining activity over time |
 
-Mirror V1 scope:
-- Boulder pattern
-- Initiator vs Finisher pattern
-- Goal Attention pattern
-- Consistency Decay pattern
+### Mirror Architecture
 
-Mirror architecture:
 - `domain.mirror` — pure-Kotlin: `MirrorEngine` (signal → feedback rendering), `MirrorHeuristics` (four detectors), `MirrorSignal` / `MirrorSignalType` / `MirrorInsight`
 - `core.mirror` — `MirrorRepository` interface + `RoomMirrorRepository` (wires Insight / Goal / Snapshot repositories)
 - UI — `MirrorFeedbackCard` rendered inside the **Goal Detail** screen, driven by `GoalDetailViewModel.mirrorInsights`
 
-Mirror constraints:
+### Mirror Constraints
+
 - No separate Mirror screen in V1
 - Feedback appears inside the Goal experience (currently Goal Detail)
 - No forced input, no judgmental language
 - Real analysis matures after roughly 7 days of usage
+
+---
+
+## Behavioral Solar System (Graph)
+
+The graph is a **Behavioral Understanding Tool**, not a generic data visualization.
+
+- **Goal = Sun** (center, with progress ring + glow)
+- **Task = Orbiting satellite** (positioned by attention score)
+- **Attention-based positioning** (date pressure, staleness, avoidance)
+- **Adaptive clusters** for goals with >8 tasks
+- **Motion language:** staged entrance, breathing shimmer, cluster expand/collapse
+
+Decision records: `docs/ADR/ADR-0005-behavioral-solar-system.md`, `docs/ADR/ADR-0008-solar-system-motion.md`
 
 ---
 
@@ -283,8 +301,8 @@ Android Studio is not required.
 | Phase 2 | ✅ | Architecture stabilization, domain layer, `goal_events` |
 | Phase 3 | ✅ | Progress & behavior snapshots, backfill engine |
 | Phase 4 | ✅ | Mirror Engine Foundation: heuristics, feedback engine, Goal Detail integration |
-| Phase 5 | 🔜 | Goal Experience Evolution: strengthen goal-first daily UX, Inbox separation |
-| Phase 6 | 🔜 | Graph Exploration: simple Goal→Task graph, computed on demand |
+| Phase 5 | ✅ | Goal Experience Evolution: goal-first UX, performance optimizations, stability audit |
+| Phase 6 | ✅ | Behavioral Solar System: graph view, adaptive clusters, motion |
 | Phase 7 | 🔜 | AI Insight Generator: consumes structured data and Mirror outputs |
 
 ---

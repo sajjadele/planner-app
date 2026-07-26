@@ -62,21 +62,27 @@ Primary value:
 
 ## Current Development Focus
 
-Mirror Engine Foundation: **COMPLETE** (implemented in `domain.mirror` + `core.mirror`, shown in Goal Detail via `MirrorFeedbackCard`).
+**Phases 1–6: COMPLETE**
 
-Mirror V1:
-- Boulder
-- Initiator vs Finisher
-- Goal Attention
-- Consistency Decay
-- Appears inside Goal Detail (no separate Mirror screen)
+- Phase 1: Foundation ✅
+- Phase 2: Goal System ✅
+- Phase 3: Behavior Data Foundation ✅
+- Phase 4: Mirror Engine Foundation ✅
+- Phase 5: Goal Experience Evolution ✅ (5.1–5.4)
+- Phase 6: Behavioral Solar System ✅ (6.1–6.4)
+
+**Next: Phase 7 — AI Insight Layer** (Planned)
+
+### Mirror V1
+- Patterns: Boulder, Initiator vs Finisher, Goal Attention, Consistency Decay
+- Placement: inside Goal Detail (no separate Mirror screen)
 - No forced reflection / journaling
 
-Next priorities:
-- ViewModel tests (not started)
-- UX refinement of feedback card
-- Feedback wording validation
-- Graph remains later exploration (Phase 6)
+### Behavioral Solar System (Graph)
+- Goal = Sun (center), Task = orbiting satellite / cluster
+- Attention-driven positioning
+- Adaptive cluster visualization for large goals
+- 19+ pure-JVM tests
 
 ## Working Style
 
