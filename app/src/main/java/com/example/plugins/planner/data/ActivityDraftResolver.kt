@@ -1,20 +1,23 @@
 package com.example.plugins.planner.data
 
 /**
- * ActivityDraftResolver — Converts ActivityDraft to existing ActivityEvent representation.
+ * ActivityDraftResolver — Converts ActivityDraft to ActivityEvent representation.
  *
- * Architecture (Phase 4.7.2):
- * - Pure Kotlin, no Android/Room dependencies
- * - Maps draft intent + metadata to ActivityEventType
+ * Phase 4.10.1: Domain Separation
+ *
+ * Responsibility:
+ * - Maps ActivityDraft to ActivityEventType
  * - Uses ActivityPayloadCodec for encoding description
- * - Maintains backward compatibility with current storage format
+ * - Maintains backward compatibility with storage format
  *
  * Rules:
- * - intent == STEP → STEP_CREATED
- * - else → NOTE_ADDED / MANUAL_ACTIVITY (based on duration)
+ * - durationMinutes != null → MANUAL_ACTIVITY
+ * - else → NOTE_ADDED
+ *
+ * Step creation is handled by StepDraftResolver.
+ * This resolver only handles Activity creation.
  *
  * Attachments are part of the activity payload.
- * For now, we preserve existing event types for backward compatibility.
  * Future migration will simplify to single ACTIVITY_CREATED event.
  */
 object ActivityDraftResolver {
@@ -23,10 +26,10 @@ object ActivityDraftResolver {
      * Resolve the ActivityEventType for a given draft.
      */
     fun resolveEventType(draft: ActivityDraft): ActivityEventType {
-        return when {
-            draft.intent == ActivityIntent.STEP -> ActivityEventType.STEP_CREATED
-            draft.durationMinutes != null -> ActivityEventType.MANUAL_ACTIVITY
-            else -> ActivityEventType.NOTE_ADDED
+        return if (draft.durationMinutes != null) {
+            ActivityEventType.MANUAL_ACTIVITY
+        } else {
+            ActivityEventType.NOTE_ADDED
         }
     }
 
@@ -77,14 +80,6 @@ object ActivityDraftResolver {
      */
     fun decodeDescription(description: String?): ActivityPayload? {
         return ActivityPayloadCodec.decode(description)
-    }
-
-    /**
-     * Get the step title if this draft is a STEP intent.
-     * Returns null for non-STEP drafts.
-     */
-    fun getStepTitle(draft: ActivityDraft): String? {
-        return if (draft.intent == ActivityIntent.STEP) draft.text else null
     }
 
     /**

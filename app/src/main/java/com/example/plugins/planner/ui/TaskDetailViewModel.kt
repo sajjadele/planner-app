@@ -18,8 +18,9 @@ import com.example.plugins.planner.data.ActivityDraftResolver
 import com.example.plugins.planner.data.ActivityEventEntity
 import com.example.plugins.planner.data.ActivityEventRepository
 import com.example.plugins.planner.data.ActivityEventType
-import com.example.plugins.planner.data.ActivityIntent
 import com.example.plugins.planner.data.ImageEventParser
+import com.example.plugins.planner.data.StepDraft
+import com.example.plugins.planner.data.StepDraftResolver
 import com.example.plugins.planner.data.TaskDao
 import com.example.plugins.planner.data.TaskEntity
 import com.example.plugins.planner.data.TaskStepEntity
@@ -196,62 +197,53 @@ class TaskDetailViewModel(
     /**
      * Create an activity from an ActivityDraft.
      *
-     * Uses ActivityDraftResolver to map draft → ActivityEventType + description.
-     * Maintains backward compatibility with current storage format.
+     * Phase 4.10.1: Domain Separation
+     * - ActivityDraft no longer has intent or stepId
+     * - stepId is passed as a separate parameter
+     * - This method ONLY creates activities, not steps
      */
-    fun createActivity(draft: ActivityDraft) {
+    fun createActivity(draft: ActivityDraft, stepId: Int? = null) {
         viewModelScope.launch {
             val eventType = ActivityDraftResolver.resolveEventType(draft)
+            val description = ActivityDraftResolver.encodeDescription(draft)
 
-            when (eventType) {
-                ActivityEventType.STEP_CREATED -> {
-                    // Phase 4.10: Use createStepWithActivities for step drafts
-                    createStepWithActivities(draft)
-                }
-                else -> {
-                    // Create activity event with encoded description
-                    val description = ActivityDraftResolver.encodeDescription(draft)
-                    activityEventRepository.addEvent(
-                        ActivityEventEntity(
-                            taskId = taskId,
-                            stepId = draft.stepId,
-                            eventType = eventType.name,
-                            description = description
-                        )
-                    )
-                }
-            }
+            activityEventRepository.addEvent(
+                ActivityEventEntity(
+                    taskId = taskId,
+                    stepId = stepId,
+                    eventType = eventType.name,
+                    description = description
+                )
+            )
         }
     }
 
     /**
-     * Phase 4.10: Create a step with optional initial activity.
+     * Create a Step from a StepDraft.
      *
-     * When draft has attachments (images, files) or text beyond the title,
-     * creates both STEP_CREATED and NOTE_ADDED events in a single transaction.
-     *
-     * @param draft The activity draft with intent=STEP and optional content
+     * Phase 4.10.1: Domain Separation
+     * - StepDraft is a separate domain model
+     * - Handles step creation + initial activities
+     * - Ensures stepId is always assigned to child activities
      */
-    fun createStepWithActivities(draft: ActivityDraft) {
+    fun createStep(draft: StepDraft) {
         viewModelScope.launch {
             // 1. Create step entity
-            val stepTitle = ActivityDraftResolver.getStepTitle(draft) ?: return@launch
+            val stepTitle = StepDraftResolver.getStepTitle(draft)
             val step = TaskStepEntity(taskId = taskId, title = stepTitle)
             val stepId = taskStepRepository.addStep(step)
 
-            // 2. If draft has attachments, create child activity
-            if (draft.attachments.isNotEmpty()) {
-                val childDraft = draft.copy(
-                    intent = ActivityIntent.ACTIVITY,
-                    stepId = stepId,
-                    text = null  // step title already on the step itself
-                )
-                val description = ActivityDraftResolver.encodeDescription(childDraft)
+            // 2. Create initial activities with stepId
+            val initialActivities = StepDraftResolver.getInitialActivities(draft)
+            for (activity in initialActivities) {
+                val eventType = StepDraftResolver.resolveActivityEventType(activity)
+                val description = StepDraftResolver.encodeActivityDescription(activity)
+
                 activityEventRepository.addEvent(
                     ActivityEventEntity(
                         taskId = taskId,
                         stepId = stepId,
-                        eventType = ActivityEventType.NOTE_ADDED.name,
+                        eventType = eventType.name,
                         description = description
                     )
                 )

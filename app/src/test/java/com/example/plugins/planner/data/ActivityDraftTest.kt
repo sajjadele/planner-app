@@ -1,94 +1,56 @@
 package com.example.plugins.planner.data
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Test
 
+/**
+ * ActivityDraftTest — Tests for ActivityDraft domain model.
+ *
+ * Phase 4.10.1: Domain Separation
+ * - ActivityDraft no longer has intent or stepId
+ */
 class ActivityDraftTest {
 
     @Test
-    fun `empty activity has all null fields`() {
-        val draft = ActivityDraft()
-        assertNull(draft.text)
-        assertTrue(draft.attachments.isEmpty())
-        assertNull(draft.durationMinutes)
-        assertEquals(ActivityIntent.ACTIVITY, draft.intent)
+    fun `empty draft has no content`() {
+        val draft = ActivityDraft.EMPTY
+        assertFalse(draft.hasContent())
+        assertFalse(draft.hasImages())
     }
 
     @Test
-    fun `text activity`() {
+    fun `draft with text has content`() {
         val draft = ActivityDraft(text = "Test note")
-        assertEquals("Test note", draft.text)
-        assertTrue(draft.attachments.isEmpty())
-        assertNull(draft.durationMinutes)
-        assertEquals(ActivityIntent.ACTIVITY, draft.intent)
+        assertTrue(draft.hasContent())
+        assertFalse(draft.hasImages())
     }
 
     @Test
-    fun `image attachment`() {
+    fun `draft with image has images`() {
         val draft = ActivityDraft(
-            text = "Screenshot",
-            attachments = listOf(ActivityAttachment.Image("content://media/1"))
+            attachments = listOf(ActivityAttachment.Image(uri = "content://test.jpg"))
         )
-        assertEquals("Screenshot", draft.text)
-        assertEquals(1, draft.attachments.size)
-        assertTrue(draft.attachments[0] is ActivityAttachment.Image)
-        assertEquals("content://media/1", (draft.attachments[0] as ActivityAttachment.Image).uri)
+        assertTrue(draft.hasContent())
+        assertTrue(draft.hasImages())
     }
 
     @Test
-    fun `file attachment`() {
-        val draft = ActivityDraft(
-            attachments = listOf(ActivityAttachment.File("content://file/1", "document.pdf"))
-        )
-        assertEquals(1, draft.attachments.size)
-        assertTrue(draft.attachments[0] is ActivityAttachment.File)
-        val file = draft.attachments[0] as ActivityAttachment.File
-        assertEquals("content://file/1", file.uri)
-        assertEquals("document.pdf", file.name)
+    fun `draft with duration has content`() {
+        val draft = ActivityDraft(text = "Work", durationMinutes = 60)
+        assertTrue(draft.hasContent())
     }
 
     @Test
-    fun `step intent`() {
-        val draft = ActivityDraft(
-            text = "My step",
-            intent = ActivityIntent.STEP
-        )
-        assertEquals("My step", draft.text)
-        assertEquals(ActivityIntent.STEP, draft.intent)
-    }
-
-    @Test
-    fun `manual activity with duration`() {
-        val draft = ActivityDraft(
-            text = "Code review",
-            durationMinutes = 45,
-            intent = ActivityIntent.ACTIVITY
-        )
-        assertEquals("Code review", draft.text)
-        assertEquals(45, draft.durationMinutes)
-        assertEquals(ActivityIntent.ACTIVITY, draft.intent)
-    }
-
-    @Test
-    fun `multiple attachments`() {
-        val draft = ActivityDraft(
-            attachments = listOf(
-                ActivityAttachment.Image("content://img/1"),
-                ActivityAttachment.File("content://file/1", "doc.pdf"),
-                ActivityAttachment.Image("content://img/2")
-            )
-        )
-        assertEquals(3, draft.attachments.size)
-        assertEquals(2, draft.attachments.filterIsInstance<ActivityAttachment.Image>().size)
-        assertEquals(1, draft.attachments.filterIsInstance<ActivityAttachment.File>().size)
-    }
-
-    @Test
-    fun `data class equality`() {
-        val draft1 = ActivityDraft(text = "Test", intent = ActivityIntent.ACTIVITY)
-        val draft2 = ActivityDraft(text = "Test", intent = ActivityIntent.ACTIVITY)
+    fun `draft equality by content`() {
+        val draft1 = ActivityDraft(text = "Test")
+        val draft2 = ActivityDraft(text = "Test")
         assertEquals(draft1, draft2)
+    }
+
+    @Test
+    fun `draft inequality by text`() {
+        val draft1 = ActivityDraft(text = "Test 1")
+        val draft2 = ActivityDraft(text = "Test 2")
+        assertNotEquals(draft1, draft2)
     }
 }

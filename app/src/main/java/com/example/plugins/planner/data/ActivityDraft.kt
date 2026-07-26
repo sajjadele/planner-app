@@ -1,25 +1,25 @@
 package com.example.plugins.planner.data
 
 /**
- * ActivityDraft — Rich content container for creating a new activity.
+ * ActivityDraft — Content container for creating a new Activity.
  *
- * Architecture (Phase 4.7.1):
- * - Generic model: supports text + attachments + duration + intent
- * - Decouples content from event types
- * - Future-ready for Telegram-style unified composer
+ * Phase 4.10.1: Domain Separation
+ *
+ * Responsibility:
+ * - Represents activity content ONLY
+ * - Does NOT contain Step logic (intent, stepId)
+ * - Step creation is handled by StepDraft
  *
  * Example:
- * ```
+ * ```kotlin
  * ActivityDraft(
  *     text = "جلسه طراحی UI",
- *     attachments = [ImageAttachment(uri)],
- *     durationMinutes = 60,
- *     intent = ACTIVITY
+ *     attachments = [ActivityAttachment.Image(uri)],
+ *     durationMinutes = 60
  * )
  * ```
  *
  * Mapping to ActivityEventType:
- * - intent == STEP → STEP_CREATED
  * - durationMinutes != null → MANUAL_ACTIVITY
  * - else → NOTE_ADDED
  *
@@ -27,9 +27,39 @@ package com.example.plugins.planner.data
  * They belong to the activity payload.
  */
 data class ActivityDraft(
+    /**
+     * Text content of the activity.
+     */
     val text: String? = null,
+
+    /**
+     * Attached files/images.
+     */
     val attachments: List<ActivityAttachment> = emptyList(),
-    val durationMinutes: Int? = null,
-    val intent: ActivityIntent = ActivityIntent.ACTIVITY,
-    val stepId: Int? = null
-)
+
+    /**
+     * Duration in minutes (for manual activity tracking).
+     */
+    val durationMinutes: Int? = null
+) {
+    /**
+     * Check if this draft has any content.
+     */
+    fun hasContent(): Boolean {
+        return text != null || attachments.isNotEmpty() || durationMinutes != null
+    }
+
+    /**
+     * Check if this draft has image attachments.
+     */
+    fun hasImages(): Boolean {
+        return attachments.any { it is ActivityAttachment.Image }
+    }
+
+    companion object {
+        /**
+         * Empty draft for default state.
+         */
+        val EMPTY = ActivityDraft()
+    }
+}

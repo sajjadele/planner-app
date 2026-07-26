@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.example.core.util.RTL
 import com.example.plugins.planner.data.ActivityAttachment
 import com.example.plugins.planner.data.ActivityDraft
+import com.example.plugins.planner.data.StepDraft
 import com.example.plugins.planner.ui.composer.ActivityComposerAction
 import com.example.plugins.planner.ui.composer.ActivityComposerReducer
 import com.example.plugins.planner.ui.composer.ActivityComposerState
@@ -58,7 +59,8 @@ import com.example.plugins.planner.ui.composer.UnifiedComposerContent
 @Composable
 fun ActivityComposerBottomSheet(
     onDismiss: () -> Unit,
-    onCreateActivity: (ActivityDraft) -> Unit
+    onCreateActivity: (ActivityDraft) -> Unit,
+    onCreateStep: (StepDraft) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val focusManager = LocalFocusManager.current
@@ -107,7 +109,11 @@ fun ActivityComposerBottomSheet(
         {
             if (composerState.canSubmit()) {
                 focusManager.clearFocus()
-                onCreateActivity(composerState.toDraft())
+                if (composerState.isStepMode()) {
+                    onCreateStep(composerState.toStepDraft())
+                } else {
+                    onCreateActivity(composerState.toActivityDraft())
+                }
                 dispatch(ActivityComposerAction.Reset)
             }
         }

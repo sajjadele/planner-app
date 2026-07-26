@@ -38,6 +38,7 @@ import com.example.plugins.planner.data.ActivityEventEntity
 import com.example.plugins.planner.data.ActivityMessageMapper
 import com.example.plugins.planner.data.StepCardMapper
 import com.example.plugins.planner.data.StepCardModel
+import com.example.plugins.planner.data.StepDraft
 import com.example.plugins.planner.data.TaskEntity
 import com.example.plugins.planner.data.TaskStepEntity
 import com.example.plugins.planner.ui.components.NeumorphicSurface
@@ -177,12 +178,18 @@ fun TaskDetailScreen(
                     selectedStepIdForActivity = -1
                 },
                 onCreateActivity = { draft ->
-                    val draftWithStepId = if (selectedStepIdForActivity != -1) {
-                        draft.copy(stepId = selectedStepIdForActivity)
+                    val stepId = if (selectedStepIdForActivity != -1) {
+                        selectedStepIdForActivity
                     } else {
-                        draft
+                        null
                     }
-                    viewModel.createActivity(draftWithStepId)
+                    viewModel.createActivity(draft, stepId)
+                    showActivityComposer = false
+                    selectedStepIdForActivity = -1
+                    focusManager.clearFocus()
+                },
+                onCreateStep = { stepDraft ->
+                    viewModel.createStep(stepDraft)
                     showActivityComposer = false
                     selectedStepIdForActivity = -1
                     focusManager.clearFocus()
