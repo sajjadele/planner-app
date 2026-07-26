@@ -1,6 +1,6 @@
-package com.example
+package com.example.plugins.planner.data
 
-import android.util.Log.plugins.planner.data
+import android.util.Log
 
 /**
  * StepCardMapper — Converts TaskStepEntity + ActivityMessageModels to StepCardModel.
