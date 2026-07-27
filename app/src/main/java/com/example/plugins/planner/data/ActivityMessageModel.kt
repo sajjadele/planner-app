@@ -71,7 +71,10 @@ data class ActivityMessageModel(
     val isDeleted: Boolean = false,
 
     /** ID of the message this replies to. Null for top-level messages. */
-    val replyToMessageId: Long? = null
+    val replyToMessageId: Long? = null,
+
+    /** Whether this message has been edited after creation. */
+    val isEdited: Boolean = false
 ) {
     /** @deprecated Use createdAt instead. Kept for backward compatibility. */
     @Deprecated(

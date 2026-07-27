@@ -4,6 +4,7 @@ package com.example.plugins.planner.data
  * ActivityMessageAction — Represents an interaction the user can perform on a message.
  *
  * Phase 4.14: Identity & Interaction Foundation
+ * Phase 5.3: Telegram-style Message Experience Polish (added ReplyNavigation)
  *
  * Sealed class so all possible actions are type-safe and exhaustive.
  * UI layer observes these actions and triggers the appropriate behavior.
@@ -14,11 +15,9 @@ package com.example.plugins.planner.data
  *     is ActivityMessageAction.Edit -> { openEditor(action.messageId) }
  *     is ActivityMessageAction.Delete -> { showDeleteConfirmation(action.messageId) }
  *     is ActivityMessageAction.Reply -> { openReplyComposer(action.messageId) }
+ *     is ActivityMessageAction.ReplyNavigation -> { scrollToMessage(action.messageId) }
  * }
  * ```
- *
- * This is the foundation for Phase 5+ interaction layer.
- * UI components will emit these actions; ViewModel/repository will handle execution.
  */
 sealed class ActivityMessageAction {
 
@@ -27,13 +26,21 @@ sealed class ActivityMessageAction {
         val messageId: Long
     ) : ActivityMessageAction()
 
-    /** Delete a message by its ID (soft delete). */
+    /** Delete a message by its ID (hard delete). */
     data class Delete(
         val messageId: Long
     ) : ActivityMessageAction()
 
     /** Reply to a message by its ID. */
     data class Reply(
+        val messageId: Long
+    ) : ActivityMessageAction()
+
+    /**
+     * Navigate to the original message that this message is replying to.
+     * Triggers scroll-to-message behavior in the feed.
+     */
+    data class ReplyNavigation(
         val messageId: Long
     ) : ActivityMessageAction()
 }

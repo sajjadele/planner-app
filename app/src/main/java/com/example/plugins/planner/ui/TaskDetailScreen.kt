@@ -94,6 +94,19 @@ fun TaskDetailScreen(
     var editingMessage: ActivityMessageModel? by remember { mutableStateOf(null) }
     var deletingMessageId: Long? by remember { mutableStateOf(null) }
     var replyingToMessage: ActivityMessageModel? by remember { mutableStateOf(null) }
+    var selectedMessageId: Long? by remember { mutableStateOf(null) }
+    var scrollToMessageId: Long? by remember { mutableStateOf(null) }
+
+    // ── Scroll to message on ReplyNavigation ──
+    LaunchedEffect(scrollToMessageId) {
+        val targetId = scrollToMessageId ?: return@LaunchedEffect
+        val index = filteredActivityMessages.indexOfFirst { it.id == targetId }
+        if (index >= 0) {
+            activityListState.animateScrollToItem(index)
+            selectedMessageId = targetId
+        }
+        scrollToMessageId = null
+    }
 
     val handleMessageAction: (ActivityMessageAction) -> Unit = remember(viewModel, activityMessages) { { action ->
         when (action) {
@@ -103,6 +116,7 @@ fun TaskDetailScreen(
                     editingMessage = message
                     showActivityComposer = true
                 }
+                selectedMessageId = null
             }
             is ActivityMessageAction.Delete -> {
                 deletingMessageId = action.messageId
@@ -113,6 +127,10 @@ fun TaskDetailScreen(
                     replyingToMessage = message
                     showActivityComposer = true
                 }
+                selectedMessageId = null
+            }
+            is ActivityMessageAction.ReplyNavigation -> {
+                scrollToMessageId = action.messageId
             }
         }
     } }
@@ -182,6 +200,7 @@ fun TaskDetailScreen(
                     allMessages = activityMessages,
                     steps = steps,
                     filterState = filterState,
+                    selectedMessageId = selectedMessageId,
                     onTapComposer = { showActivityComposer = true },
                     onMessageAction = handleMessageAction,
                     onShowAll = { viewModel.showAllActivities() },
@@ -240,14 +259,39 @@ fun TaskDetailScreen(
         deletingMessageId?.let { msgId ->
             AlertDialog(
                 onDismissRequest = { deletingMessageId = null },
-                title = { Text("${RTL}حذف فعالیت") },
-                text = { Text("${RTL}این فعالیت حذف شود؟") },
+                title = {
+                    Text(
+                        "${RTL}حذف پیام",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            "${RTL}این پیام حذف خواهد شد.",
+                            fontSize = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "${RTL}این عملیات قابل بازگشت نیست.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                },
                 confirmButton = {
-                    TextButton(onClick = {
-                        viewModel.deleteActivity(msgId)
-                        deletingMessageId = null
-                    }) {
-                        Text("${RTL}حذف", color = MaterialTheme.colorScheme.error)
+                    TextButton(
+                        onClick = {
+                            viewModel.deleteActivity(msgId)
+                            deletingMessageId = null
+                        }
+                    ) {
+                        Text(
+                            "${RTL}حذف",
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 },
                 dismissButton = {
@@ -488,6 +532,7 @@ private fun TaskDetailActivityContent(
     allMessages: List<ActivityMessageModel>,
     steps: List<TaskStepEntity>,
     filterState: ActivityFeedFilterState,
+    selectedMessageId: Long? = null,
     onTapComposer: () -> Unit,
     onMessageAction: ((ActivityMessageAction) -> Unit)? = null,
     onShowAll: () -> Unit = {},
@@ -535,9 +580,20 @@ private fun TaskDetailActivityContent(
                 }
 
                 items(group.messages, key = { it.id }) { message ->
+                    val repliedTo = if (message.replyToMessageId != null) {
+                        messages.find { it.id == message.replyToMessageId }
+                    } else null
+
                     ActivityMessageCard(
                         message = message,
-                        onAction = onMessageAction
+                        repliedToMessage = repliedTo,
+                        isSelected = message.id == selectedMessageId,
+                        onAction = onMessageAction,
+                        onReplyReferenceClick = { targetId ->
+                            onMessageAction?.invoke(
+                                ActivityMessageAction.ReplyNavigation(targetId)
+                            )
+                        }
                     )
                 }
             }
