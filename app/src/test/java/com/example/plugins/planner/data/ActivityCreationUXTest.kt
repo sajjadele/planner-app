@@ -68,17 +68,7 @@ class ActivityCreationUXTest {
     fun `composer default mode is ACTIVITY`() {
         val state = ActivityComposerState()
         assertEquals(ComposerMode.ACTIVITY, state.mode)
-        assertFalse("Default composer is not step mode", state.isStepMode())
-    }
-
-    @Test
-    fun `composer placeholder is not chat-style`() {
-        // The placeholder text was changed from "چیزی که انجام دادی..." to "متن فعالیت"
-        // This is verified by UnifiedComposerContent.kt changes
-        // Here we verify the composer state model works without chat assumptions
-        val state = ActivityComposerState(text = "یادداشت روزانه")
-        val draft = state.toActivityDraft()
-        assertEquals("یادداشت روزانه", draft.text)
+        assertFalse("Default composer has no step mode", "STEP" !in ComposerMode.values().map { it.name })
     }
 
     @Test

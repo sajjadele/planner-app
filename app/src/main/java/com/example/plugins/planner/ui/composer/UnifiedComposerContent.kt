@@ -13,25 +13,22 @@ import androidx.compose.ui.unit.sp
 import com.example.core.util.RTL
 import com.example.plugins.planner.data.ActivityAttachment
 
-
 /**
  * UnifiedComposerContent — Telegram-style unified composer.
  *
+ * Phase 5.9.1: Remove StepIndicator and step mode — Composer is Activity-only.
+ *
  * Layout:
  * ┌─────────────────────────────────────┐
- * │                                     │
- * │  چیزی که انجام دادی...             │
- * │                                     │
+ * │  [EDIT/REPLY indicator]             │
+ * │  متن فعالیت                         │
  * │  ┌─────────────────────────────┐   │
  * │  │      image preview          │   │
  * │  └─────────────────────────────┘   │
- * │                                     │
  * │  ┌─────────────────────────────┐   │
- * │  │  ⏱️ ۹۰ دقیقه               │   │
+ * │  │  ⏱️ 90 دقیقه               │   │
  * │  └─────────────────────────────┘   │
- * │                                     │
- * └─────────────────────────────────────┘
- * │ 📎   🖼   ⏱️   ✓ مرحله     ➤ │
+ * │ 📎   🖼   ⏱️                ➤ │
  * └─────────────────────────────────────┘
  */
 @Composable
@@ -42,7 +39,6 @@ fun UnifiedComposerContent(
     onAddFile: () -> Unit,
     onAddImage: () -> Unit,
     onToggleDuration: () -> Unit,
-    onToggleStep: () -> Unit,
     onShowDurationPicker: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -59,10 +55,6 @@ fun UnifiedComposerContent(
             }
             state.isReplyMode() -> {
                 ReplyIndicator()
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-            state.isStepMode() -> {
-                StepIndicator()
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
@@ -89,8 +81,8 @@ fun UnifiedComposerContent(
             maxLines = 6
         )
 
-        // ── Attachments preview (hidden in STEP mode — tags don't have attachments) ──
-        if (state.attachments.isNotEmpty() && !state.isStepMode()) {
+        // ── Attachments preview ──
+        if (state.attachments.isNotEmpty()) {
             Spacer(modifier = Modifier.height(12.dp))
             AttachmentPreview(
                 attachments = state.attachments,
@@ -100,8 +92,8 @@ fun UnifiedComposerContent(
             )
         }
 
-        // ── Duration chip (hidden in STEP mode — tags don't have durations) ──
-        if (state.durationMinutes != null && !state.isStepMode()) {
+        // ── Duration chip ──
+        if (state.durationMinutes != null) {
             Spacer(modifier = Modifier.height(8.dp))
             DurationChip(
                 durationMinutes = state.durationMinutes,
@@ -115,12 +107,10 @@ fun UnifiedComposerContent(
 
         // ── Toolbar ──
         ComposerToolbar(
-            mode = state.mode,
             canSubmit = state.canSubmit(),
             onAddFile = onAddFile,
             onAddImage = onAddImage,
             onToggleDuration = onToggleDuration,
-            onToggleStep = onToggleStep,
             onSubmit = onSubmit
         )
     }
@@ -171,32 +161,6 @@ private fun ReplyIndicator() {
             Text(text = "↩", fontSize = 14.sp)
             Text(
                 text = "${RTL}پاسخ به فعالیت",
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
-}
-
-@Composable
-private fun StepIndicator() {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp),
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(text = "✓", fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
-            Text(
-                text = "${RTL}مرحله جدید",
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.primary
             )

@@ -7,16 +7,18 @@ import com.example.plugins.planner.data.StepDraft
 /**
  * ActivityComposerState — Single source of truth for the unified composer.
  *
+ * Phase 5.9.1: Remove STEP mode — Composer is Activity-only.
+ * Removed: toStepDraft(), isStepMode(), step-specific canSubmit().
+ *
  * Architecture:
  * - One state object drives the entire composer UI
  * - Mode determines what the user is creating
- * - Clean conversion to domain models (ActivityDraft or StepDraft)
+ * - Only converts to ActivityDraft (no StepDraft)
  *
  * Design Principles:
  * - Store user input only (text, attachments, duration)
  * - Mode is a domain concept, not UI state
- * - No feature-specific flags (no isNoteExpanded, etc.)
- * - UI adapts based on mode, not vice versa
+ * - Composer is Activity-only — tag creation uses dedicated dialog
  *
  * Usage:
  * ```kotlin
@@ -28,14 +30,8 @@ import com.example.plugins.planner.data.StepDraft
  * // Add attachment
  * state = state.copy(attachments = state.attachments + Image(uri))
  *
- * // Switch to step mode
- * state = state.copy(mode = ComposerMode.STEP)
- *
  * // Submit as activity
  * val activityDraft = state.toActivityDraft()
- *
- * // Submit as step (tag only, no initial activities)
- * val stepDraft = state.toStepDraft()
  * ```
  */
 data class ActivityComposerState(
@@ -52,7 +48,6 @@ data class ActivityComposerState(
 
     /**
      * Convert state to ActivityDraft for submission.
-     * Used when mode == ACTIVITY / EDIT / REPLY.
      */
     fun toActivityDraft(): ActivityDraft = ActivityDraft(
         text = text.ifBlank { null },
@@ -60,19 +55,6 @@ data class ActivityComposerState(
         durationMinutes = durationMinutes,
         replyToMessageId = replyToMessageId
     )
-
-    /**
-     * Convert to StepDraft — pure tag creation, no initial activities.
-     *
-     * Phase 5.5d: Step is metadata/tag only.
-     * Only the title text is used as the step/tag name.
-     * Attachments and duration are NOT used for tag creation.
-     */
-    fun toStepDraft(): StepDraft {
-        return StepDraft(
-            title = text.ifBlank { "" }
-        )
-    }
 
     // ════════════════════════════════════════════════════════════════
     // State Validation
@@ -88,18 +70,12 @@ data class ActivityComposerState(
     /**
      * Check if the composer can be submitted.
      */
-    fun canSubmit(): Boolean {
-        return when (mode) {
-            ComposerMode.STEP -> text.isNotBlank()  // tag only needs a name
-            else -> hasContent()                     // activity needs text/attachments/duration
-        }
-    }
+    fun canSubmit(): Boolean = hasContent()
 
     // ════════════════════════════════════════════════════════════════
     // Mode Helpers
     // ════════════════════════════════════════════════════════════════
 
-    fun isStepMode(): Boolean = mode == ComposerMode.STEP
     fun isActivityMode(): Boolean = mode == ComposerMode.ACTIVITY
     fun isEditMode(): Boolean = mode == ComposerMode.EDIT
     fun isReplyMode(): Boolean = mode == ComposerMode.REPLY

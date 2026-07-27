@@ -3,18 +3,13 @@ package com.example.plugins.planner.ui.composer
 /**
  * ComposerMode — Represents the user's creation or interaction intent.
  *
- * Phase 4.11.1: Unified Composer State
- * Phase 4.16: Activity Interaction Foundation
- *
- * Responsibility:
- * - Defines what the user is currently creating or modifying
- * - Drives the composer UI and submission logic
+ * Phase 5.9.1: Remove STEP mode — Composer is Activity-only.
+ * Tag creation is handled via dedicated dialog, not the composer.
  *
  * Modes:
  * - ACTIVITY: Normal activity message (note, image, duration)
- * - STEP: Creating a new step with optional initial activities
- * - EDIT: Editing an existing message (Phase 5+)
- * - REPLY: Replying to an existing message (Phase 5+)
+ * - EDIT: Editing an existing message
+ * - REPLY: Replying to an existing message
  *
  * Design:
  * - Mode determines which draft type to create
@@ -23,7 +18,6 @@ package com.example.plugins.planner.ui.composer
  */
 enum class ComposerMode {
     ACTIVITY,
-    STEP,
     EDIT,
     REPLY
 }

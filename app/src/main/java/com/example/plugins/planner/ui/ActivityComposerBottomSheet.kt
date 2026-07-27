@@ -11,7 +11,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -22,7 +21,6 @@ import com.example.core.util.RTL
 import com.example.plugins.planner.data.ActivityAttachment
 import com.example.plugins.planner.data.ActivityDraft
 import com.example.plugins.planner.data.ActivityMessageModel
-import com.example.plugins.planner.data.StepDraft
 import com.example.plugins.planner.ui.composer.ActivityComposerAction
 import com.example.plugins.planner.ui.composer.ActivityComposerReducer
 import com.example.plugins.planner.ui.composer.ActivityComposerState
@@ -30,11 +28,16 @@ import com.example.plugins.planner.ui.composer.ComposerMode
 import com.example.plugins.planner.ui.composer.DurationPickerDialog
 import com.example.plugins.planner.ui.composer.UnifiedComposerContent
 
+/**
+ * ActivityComposerBottomSheet — Modal sheet for creating/editing activities.
+ *
+ * Phase 5.9.1: Remove STEP mode — Composer is Activity-only.
+ * Removed: onCreateStep callback, isStepMode branching, step toggle.
+ */
 @Composable
 fun ActivityComposerBottomSheet(
     onDismiss: () -> Unit,
     onCreateActivity: (ActivityDraft) -> Unit,
-    onCreateStep: (StepDraft) -> Unit,
     onUpdateActivity: ((Long, ActivityDraft) -> Unit)? = null,
     initialMessage: ActivityMessageModel? = null,
     replyToMessage: ActivityMessageModel? = null,
@@ -98,19 +101,13 @@ fun ActivityComposerBottomSheet(
         {
             if (composerState.canSubmit()) {
                 focusManager.clearFocus()
-                when {
-                    composerState.isEditMode() && composerState.existingMessageId != null -> {
-                        onUpdateActivity?.invoke(
-                            composerState.existingMessageId!!,
-                            composerState.toActivityDraft()
-                        )
-                    }
-                    composerState.isStepMode() -> {
-                        onCreateStep(composerState.toStepDraft())
-                    }
-                    else -> {
-                        onCreateActivity(composerState.toActivityDraft())
-                    }
+                if (composerState.isEditMode() && composerState.existingMessageId != null) {
+                    onUpdateActivity?.invoke(
+                        composerState.existingMessageId!!,
+                        composerState.toActivityDraft()
+                    )
+                } else {
+                    onCreateActivity(composerState.toActivityDraft())
                 }
                 dispatch(ActivityComposerAction.Reset)
             }
@@ -120,7 +117,6 @@ fun ActivityComposerBottomSheet(
     val headerText = when {
         composerState.isEditMode() -> "${RTL}ویرایش فعالیت"
         composerState.isReplyMode() -> "${RTL}پاسخ به فعالیت"
-        composerState.isStepMode() -> "${RTL}ثبت مرحله جدید"
         else -> "${RTL}ثبت فعالیت"
     }
 
@@ -166,17 +162,6 @@ fun ActivityComposerBottomSheet(
                         )
                     },
                     onToggleDuration = { showDurationPicker = true },
-                    onToggleStep = {
-                        if (!composerState.isEditMode() && !composerState.isReplyMode()) {
-                            dispatch(
-                                if (composerState.isStepMode()) {
-                                    ActivityComposerAction.ConvertToActivity
-                                } else {
-                                    ActivityComposerAction.ConvertToStep
-                                }
-                            )
-                        }
-                    },
                     onShowDurationPicker = { showDurationPicker = true }
                 )
             }

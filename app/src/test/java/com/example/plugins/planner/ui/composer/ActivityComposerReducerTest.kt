@@ -2,7 +2,6 @@ package com.example.plugins.planner.ui.composer
 
 import com.example.plugins.planner.data.ActivityAttachment
 import com.example.plugins.planner.data.ActivityDraft
-import com.example.plugins.planner.data.StepDraft
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -12,12 +11,8 @@ import org.junit.Test
 /**
  * ActivityComposerReducerTest — Tests for composer state transitions.
  *
- * Phase 4.11.1: Unified Composer State
- *
- * Required tests:
- * - State tests (default state, text, attachments, duration)
- * - Mode tests (ConvertToStep, ConvertToActivity)
- * - Conversion tests (ActivityDraft, StepDraft)
+ * Phase 5.9.1: Remove STEP mode — Composer is Activity-only.
+ * Removed: ConvertToStep/ConvertToActivity, toStepDraft, isStepMode tests.
  */
 class ActivityComposerReducerTest {
 
@@ -65,17 +60,13 @@ class ActivityComposerReducerTest {
 
     @Test
     fun `text change preserves other fields`() {
-        val state = ActivityComposerState(
-            durationMinutes = 30,
-            mode = ComposerMode.STEP
-        )
+        val state = ActivityComposerState(durationMinutes = 30)
         val newState = ActivityComposerReducer.reduce(
             state,
             ActivityComposerAction.TextChanged("hello")
         )
         assertEquals("hello", newState.text)
         assertEquals(30, newState.durationMinutes)
-        assertEquals(ComposerMode.STEP, newState.mode)
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -104,7 +95,6 @@ class ActivityComposerReducerTest {
     fun `multiple attachments`() {
         var state = ActivityComposerState()
 
-        // Add image
         state = ActivityComposerReducer.reduce(
             state,
             ActivityComposerAction.AddAttachment(
@@ -112,7 +102,6 @@ class ActivityComposerReducerTest {
             )
         )
 
-        // Add file
         state = ActivityComposerReducer.reduce(
             state,
             ActivityComposerAction.AddAttachment(
@@ -126,36 +115,7 @@ class ActivityComposerReducerTest {
     }
 
     // ════════════════════════════════════════════════════════════════
-    // Test 5: Convert to step
-    // ════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `convert to step changes mode`() {
-        val state = ActivityComposerState()
-        val newState = ActivityComposerReducer.reduce(
-            state,
-            ActivityComposerAction.ConvertToStep
-        )
-        assertEquals(ComposerMode.STEP, newState.mode)
-    }
-
-    @Test
-    fun `convert to step preserves other fields`() {
-        val state = ActivityComposerState(
-            text = "My step",
-            durationMinutes = 30
-        )
-        val newState = ActivityComposerReducer.reduce(
-            state,
-            ActivityComposerAction.ConvertToStep
-        )
-        assertEquals(ComposerMode.STEP, newState.mode)
-        assertEquals("My step", newState.text)
-        assertEquals(30, newState.durationMinutes)
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    // Test 6: Reset
+    // Test 5: Reset
     // ════════════════════════════════════════════════════════════════
 
     @Test
@@ -163,8 +123,7 @@ class ActivityComposerReducerTest {
         val state = ActivityComposerState(
             text = "Hello",
             attachments = listOf(ActivityAttachment.Image("content://img/1")),
-            durationMinutes = 60,
-            mode = ComposerMode.STEP
+            durationMinutes = 60
         )
         val newState = ActivityComposerReducer.reduce(
             state,
@@ -174,15 +133,13 @@ class ActivityComposerReducerTest {
     }
 
     // ════════════════════════════════════════════════════════════════
-    // Test 7: Remove attachment
+    // Test 6: Remove attachment
     // ════════════════════════════════════════════════════════════════
 
     @Test
     fun `remove attachment`() {
         val image = ActivityAttachment.Image("content://img/1")
-        val state = ActivityComposerState(
-            attachments = listOf(image)
-        )
+        val state = ActivityComposerState(attachments = listOf(image))
         val newState = ActivityComposerReducer.reduce(
             state,
             ActivityComposerAction.RemoveAttachment(image)
@@ -191,7 +148,7 @@ class ActivityComposerReducerTest {
     }
 
     // ════════════════════════════════════════════════════════════════
-    // Test 8: Duration change
+    // Test 7: Duration change
     // ════════════════════════════════════════════════════════════════
 
     @Test
@@ -215,21 +172,7 @@ class ActivityComposerReducerTest {
     }
 
     // ════════════════════════════════════════════════════════════════
-    // Test 9: Convert to activity
-    // ════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `convert to activity changes mode`() {
-        val state = ActivityComposerState(mode = ComposerMode.STEP)
-        val newState = ActivityComposerReducer.reduce(
-            state,
-            ActivityComposerAction.ConvertToActivity
-        )
-        assertEquals(ComposerMode.ACTIVITY, newState.mode)
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    // Test 10: State toActivityDraft conversion
+    // Test 8: State toActivityDraft conversion
     // ════════════════════════════════════════════════════════════════
 
     @Test
@@ -258,58 +201,7 @@ class ActivityComposerReducerTest {
     }
 
     // ════════════════════════════════════════════════════════════════
-    // Test 11: State toStepDraft conversion
-    // ════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `state toStepDraft conversion`() {
-        val state = ActivityComposerState(
-            text = "طراحی صفحه اصلی",
-            attachments = listOf(ActivityAttachment.Image("content://img/1")),
-            durationMinutes = 30,
-            mode = ComposerMode.STEP
-        )
-        val stepDraft = state.toStepDraft()
-
-        assertEquals("طراحی صفحه اصلی", stepDraft.title)
-        // Phase 5.5d: StepDraft has no initialActivities — pure tag creation
-    }
-
-    @Test
-    fun `empty state toStepDraft returns empty step`() {
-        val state = ActivityComposerState(mode = ComposerMode.STEP)
-        val stepDraft = state.toStepDraft()
-
-        assertEquals("", stepDraft.title)
-    }
-
-    @Test
-    fun `step with text only creates StepDraft with title`() {
-        val state = ActivityComposerState(
-            text = "مرحله جدید",
-            mode = ComposerMode.STEP
-        )
-        val stepDraft = state.toStepDraft()
-
-        assertEquals("مرحله جدید", stepDraft.title)
-    }
-
-    @Test
-    fun `step with attachment ignores attachments in StepDraft`() {
-        val state = ActivityComposerState(
-            text = "مرحله جدید",
-            attachments = listOf(ActivityAttachment.Image("content://img/1")),
-            mode = ComposerMode.STEP
-        )
-        val stepDraft = state.toStepDraft()
-
-        assertEquals("مرحله جدید", stepDraft.title)
-        // Phase 5.5d: Attachments are NOT mapped to StepDraft
-        // StepDraft is pure tag creation — no initialActivities
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    // Test 12: hasContent and canSubmit
+    // Test 9: hasContent and canSubmit
     // ════════════════════════════════════════════════════════════════
 
     @Test
@@ -343,25 +235,17 @@ class ActivityComposerReducerTest {
     }
 
     // ════════════════════════════════════════════════════════════════
-    // Test 13: Mode helpers
+    // Test 10: Mode helpers
     // ════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `isStepMode returns true for STEP`() {
-        val state = ActivityComposerState(mode = ComposerMode.STEP)
-        assertTrue(state.isStepMode())
-        assertFalse(state.isActivityMode())
-    }
 
     @Test
     fun `isActivityMode returns true for ACTIVITY`() {
         val state = ActivityComposerState(mode = ComposerMode.ACTIVITY)
         assertTrue(state.isActivityMode())
-        assertFalse(state.isStepMode())
     }
 
     // ════════════════════════════════════════════════════════════════
-    // Phase 4.16: EDIT/REPLY mode support
+    // EDIT/REPLY mode support
     // ════════════════════════════════════════════════════════════════
 
     @Test
@@ -389,7 +273,7 @@ class ActivityComposerReducerTest {
     }
 
     @Test
-    fun `CancelInteraction resets mode to ACTIVITY and clears interaction state`() {
+    fun `CancelInteraction resets mode to ACTIVITY`() {
         val state = ActivityComposerState(
             mode = ComposerMode.EDIT,
             existingMessageId = 42L,
@@ -409,7 +293,6 @@ class ActivityComposerReducerTest {
         val state = ActivityComposerState(mode = ComposerMode.EDIT)
         assertTrue(state.isEditMode())
         assertFalse(state.isActivityMode())
-        assertFalse(state.isStepMode())
         assertFalse(state.isReplyMode())
     }
 
@@ -418,7 +301,6 @@ class ActivityComposerReducerTest {
         val state = ActivityComposerState(mode = ComposerMode.REPLY)
         assertTrue(state.isReplyMode())
         assertFalse(state.isActivityMode())
-        assertFalse(state.isStepMode())
         assertFalse(state.isEditMode())
     }
 

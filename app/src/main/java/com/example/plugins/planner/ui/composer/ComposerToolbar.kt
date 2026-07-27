@@ -13,31 +13,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.util.RTL
-import com.example.plugins.planner.ui.composer.ComposerMode
 
 /**
  * ComposerToolbar — Bottom toolbar for the unified composer.
  *
+ * Phase 5.9.1: Remove step toggle — Composer is Activity-only.
+ *
  * Layout:
- * ┌────────────────────────────────────────┐
- * │ 📎   🖼   ⏱️   ✓ مرحله          ➤ │
- * └────────────────────────────────────────┘
+ * ┌────────────────────────────────────┐
+ * │ 📎   🖼   ⏱️                ➤ │
+ * └────────────────────────────────────┘
  *
  * Actions:
  * - 📎 Add File (future)
  * - 🖼 Add Image
  * - ⏱️ Duration
- * - ✓ Convert to Step
  * - ➤ Submit
  */
 @Composable
 fun ComposerToolbar(
-    mode: ComposerMode,
     canSubmit: Boolean,
     onAddFile: () -> Unit,
     onAddImage: () -> Unit,
     onToggleDuration: () -> Unit,
-    onToggleStep: () -> Unit,
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -80,16 +78,6 @@ fun ComposerToolbar(
                     label = "${RTL}مدت",
                     enabled = true,
                     onClick = onToggleDuration
-                )
-
-                // Step toggle
-                val isStep = mode == ComposerMode.STEP
-                ToolbarActionButton(
-                    icon = "✓",
-                    label = "${RTL}مرحله",
-                    enabled = true,
-                    isActive = isStep,
-                    onClick = onToggleStep
                 )
             }
 

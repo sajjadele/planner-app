@@ -336,14 +336,6 @@ fun TaskDetailScreen(
                     initialComposerDuration = null
                     focusManager.clearFocus()
                 },
-                onCreateStep = { stepDraft ->
-                    viewModel.createStep(stepDraft)
-                    showActivityComposer = false
-                    editingMessage = null
-                    replyingToMessage = null
-                    initialComposerDuration = null
-                    focusManager.clearFocus()
-                },
                 onUpdateActivity = { messageId, draft ->
                     viewModel.updateActivity(messageId, draft)
                     showActivityComposer = false

@@ -5,8 +5,7 @@ import com.example.plugins.planner.data.ActivityAttachment
 /**
  * ActivityComposerAction — All possible actions in the unified composer.
  *
- * Phase 4.11.1: Unified Composer State
- * Phase 4.16: Activity Interaction Foundation
+ * Phase 5.9.1: Remove ConvertToStep/ConvertToActivity — Composer is Activity-only.
  *
  * Architecture:
  * - Sealed class for type-safe actions
@@ -17,14 +16,12 @@ import com.example.plugins.planner.data.ActivityAttachment
  * - Actions describe WHAT the user wants to do
  * - Actions do NOT describe HOW the UI should change
  * - No UI-specific actions (no OpenImageSection, ExpandNote, etc.)
- * - Mode changes are actions, not state mutations
- * - EDIT/REPLY actions are placeholders for Phase 5 UI integration
+ * - EDIT/REPLY actions handle interaction modes
  *
  * Usage:
  * ```kotlin
  * dispatch(ActivityComposerAction.TextChanged("Hello"))
  * dispatch(ActivityComposerAction.AddAttachment(Image(uri)))
- * dispatch(ActivityComposerAction.ConvertToStep)
  * dispatch(ActivityComposerAction.StartEdit(messageId))
  * dispatch(ActivityComposerAction.StartReply(messageId))
  * ```
@@ -64,20 +61,7 @@ sealed class ActivityComposerAction {
     ) : ActivityComposerAction()
 
     /**
-     * Switch to STEP mode.
-     * User wants to create a step with optional initial activities.
-     * The text becomes the step title.
-     */
-    data object ConvertToStep : ActivityComposerAction()
-
-    /**
-     * Switch to ACTIVITY mode.
-     * User wants to create a normal activity message.
-     */
-    data object ConvertToActivity : ActivityComposerAction()
-
-    /**
-     * Start editing an existing message (Phase 5+).
+     * Start editing an existing message.
      * Pre-populates composer with message content.
      */
     data class StartEdit(
@@ -85,7 +69,7 @@ sealed class ActivityComposerAction {
     ) : ActivityComposerAction()
 
     /**
-     * Start replying to an existing message (Phase 5+).
+     * Start replying to an existing message.
      * Opens composer in REPLY mode.
      */
     data class StartReply(

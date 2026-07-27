@@ -61,14 +61,6 @@ object ActivityComposerReducer {
                 state.copy(durationMinutes = action.minutes)
             }
 
-            is ActivityComposerAction.ConvertToStep -> {
-                state.copy(mode = ComposerMode.STEP)
-            }
-
-            is ActivityComposerAction.ConvertToActivity -> {
-                state.copy(mode = ComposerMode.ACTIVITY)
-            }
-
             is ActivityComposerAction.StartEdit -> {
                 state.copy(
                     mode = ComposerMode.EDIT,
