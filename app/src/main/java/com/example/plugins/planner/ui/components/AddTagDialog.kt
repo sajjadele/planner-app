@@ -195,9 +195,9 @@ private fun TagColorSwatch(
         color = bgColor,
         shape = RoundedCornerShape(6.dp),
         border = if (isSelected) BorderStroke(
-            width = 2.dp,
-            color = MaterialTheme.colorScheme.primary
-        ) else BorderStroke(0.dp, Color.Transparent)
+                width = 2.dp,
+                color = chipColor
+            ) else BorderStroke(0.dp, Color.Transparent)
     ) {
         if (colorHex == null) {
             // Default swatch: subtle pattern indicating "no color"
