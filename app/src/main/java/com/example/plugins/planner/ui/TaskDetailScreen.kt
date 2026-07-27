@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.pointerInput
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -726,6 +727,7 @@ private fun TaskDetailActivityContent(
     onShowAll: () -> Unit = {},
     onFilterByStep: (Long) -> Unit = {},
     onAddTag: () -> Unit = {},
+    onTagLongPress: (TaskStepEntity) -> Unit = {},
     listState: LazyListState = rememberLazyListState()
 ) {
     val groups = remember(messages) { groupActivityMessagesByDay(messages) }
@@ -758,7 +760,8 @@ private fun TaskDetailActivityContent(
                         selectedStepId = filterState.selectedStepId,
                         onShowAll = onShowAll,
                         onFilterByStep = onFilterByStep,
-                        onAddTag = onAddTag
+                        onAddTag = onAddTag,
+                        onTagLongPress = onTagLongPress
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                 }
@@ -797,15 +800,13 @@ private fun TaskDetailActivityContent(
                                 ActivityMessageAction.ReplyNavigation(targetId)
                             )
                         }
-                    )
+                    }
                 }
             }
-        }
-    }
 }
 
 // ════════════════════════════════════════════════════════════════
-// FEED HEADER with dropdown quick action menu
+// ENHANCED EMPTY STATE
 // ════════════════════════════════════════════════════════════════
 
 @Composable
