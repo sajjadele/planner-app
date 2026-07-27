@@ -414,6 +414,11 @@ class TaskDetailViewModel(
     // ════════════════════════════════════════════════════════════════
 
     /** Create a step — STEP_CREATED event is handled by the repository */
+    @Deprecated(
+        "Step creation now uses createStep(StepDraft) via composer. " +
+        "Plain addStep creates orphan steps with no UI path.",
+        replaceWith = ReplaceWith("createStep(StepDraft(title = title))")
+    )
     fun addStep(title: String) {
         viewModelScope.launch {
             taskStepRepository.addStep(
@@ -423,6 +428,11 @@ class TaskDetailViewModel(
     }
 
     /** Create a note — NOTE_ADDED event, independent of any step */
+    @Deprecated(
+        "Use createActivity(ActivityDraft(text = ...)) instead. " +
+        "This method does not support the context-aware creation flow.",
+        replaceWith = ReplaceWith("createActivity(ActivityDraft(text = text))")
+    )
     fun addNote(text: String) {
         viewModelScope.launch {
             activityEventRepository.addEvent(
@@ -437,6 +447,13 @@ class TaskDetailViewModel(
     }
 
     /** Create a manual activity — MANUAL_ACTIVITY event, independent of any step */
+    @Deprecated(
+        "Use createActivity(ActivityDraft(text = ..., durationMinutes = ...)) instead. " +
+        "This method does not support the context-aware creation flow.",
+        replaceWith = ReplaceWith(
+            "createActivity(ActivityDraft(text = title, durationMinutes = durationMinutes))"
+        )
+    )
     fun addManualActivity(title: String, durationMinutes: Int?) {
         viewModelScope.launch {
             val description = if (durationMinutes != null) {
@@ -456,6 +473,13 @@ class TaskDetailViewModel(
     }
 
     /** Create an image activity — IMAGE_ADDED event, independent of any step */
+    @Deprecated(
+        "Use createActivity(ActivityDraft(attachments = listOf(ActivityAttachment.Image(uri)))) instead. " +
+        "This method does not support the context-aware creation flow.",
+        replaceWith = ReplaceWith(
+            "createActivity(ActivityDraft(attachments = listOf(ActivityAttachment.Image(uri))))"
+        )
+    )
     fun addImage(uri: String, description: String?) {
         viewModelScope.launch {
             activityEventRepository.addEvent(
@@ -470,6 +494,12 @@ class TaskDetailViewModel(
     }
 
     /** Toggle step completion status and log the activity event */
+    @Deprecated(
+        "Step completion as container behavior is removed. " +
+        "Steps are now tags/metadata only. " +
+        "Use the Activity Feed for tracking progress.",
+        level = DeprecationLevel.WARNING
+    )
     fun toggleStepCompletion(step: TaskStepEntity) {
         viewModelScope.launch {
             val nowCompleted = !step.isCompleted
@@ -496,6 +526,12 @@ class TaskDetailViewModel(
     }
 
     /** Delete a step and log the activity event */
+    @Deprecated(
+        "Step deletion as container behavior is removed. " +
+        "Steps are now tags/metadata only. " +
+        "Use the Activity Feed for managing activities.",
+        level = DeprecationLevel.WARNING
+    )
     fun deleteStep(step: TaskStepEntity) {
         viewModelScope.launch {
             activityEventRepository.addEvent(

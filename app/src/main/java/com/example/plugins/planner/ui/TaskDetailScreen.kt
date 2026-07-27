@@ -29,7 +29,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -39,18 +38,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.example.core.util.JalaliDate
 import com.example.core.util.RTL
 import androidx.compose.material3.AlertDialog
-import com.example.plugins.planner.data.ActivityEventEntity
 import com.example.plugins.planner.data.ActivityCreationAction
 import com.example.plugins.planner.data.ActivityDraft
 import com.example.plugins.planner.data.ActivityAttachment
 import com.example.plugins.planner.data.ActivityFeedFilterState
 import com.example.plugins.planner.data.ActivityMessageAction
-import com.example.plugins.planner.data.ActivityMessageMapper
 import com.example.plugins.planner.data.ActivityMessageModel
 import com.example.plugins.planner.data.StepDraft
 import com.example.plugins.planner.data.TaskEntity
@@ -957,223 +952,6 @@ private fun ActivityFeedDayHeader(dateKey: Long) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// STEP ITEM
-// ════════════════════════════════════════════════════════════════
-
-@Composable
-private fun TaskStepItem(
-    step: TaskStepEntity,
-    onToggle: (TaskStepEntity) -> Unit,
-    onDelete: (TaskStepEntity) -> Unit
-) {
-    NeumorphicSurface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        elevation = 3
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Checkbox(
-                checked = step.isCompleted,
-                onCheckedChange = { onToggle(step) },
-                modifier = Modifier.size(22.dp),
-                colors = CheckboxDefaults.colors(
-                    checkedColor = MaterialTheme.colorScheme.primary,
-                    uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            )
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            Text(
-                text = "${RTL}${step.title}",
-                fontSize = 13.sp,
-                color = if (step.isCompleted)
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                else
-                    MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            IconButton(
-                onClick = { onDelete(step) },
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "${RTL}حذف",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-    }
-}
-
-// ════════════════════════════════════════════════════════════════
-// TIMELINE PREVIEW CARD
-// ════════════════════════════════════════════════════════════════
-
-@Composable
-private fun TimelinePreviewCard(
-    activities: List<ActivityEventEntity>,
-    onClick: () -> Unit
-) {
-    NeumorphicSurface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
-        elevation = 4
-    ) {
-        if (activities.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "${RTL}هنوز فعالیتی ثبت نشده",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
-            // Show latest activity using ActivityMessageCard
-            val latestActivity = activities.maxByOrNull { it.timestamp }
-            if (latestActivity != null) {
-                val message = remember(latestActivity) {
-                    ActivityMessageMapper.toMessage(latestActivity)
-                }
-                if (message != null) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp)
-                    ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "📅", fontSize = 16.sp)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "${RTL}تاریخچه فعالیت",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    ActivityMessageCard(message = message)
-
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "${RTL}مشاهده تاریخچه ←",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-        }
-    }
-}
-
-}
-
-@Composable
-private fun TimelinePreviewLatestEvent(uiModel: TimelineEventUiModel) {
-    var showImageViewer by remember { mutableStateOf(false) }
-
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = uiModel.icon,
-                fontSize = 12.sp,
-                color = uiModel.color
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = uiModel.actionText,
-                fontSize = 12.sp,
-                color = uiModel.color,
-                fontWeight = FontWeight.Medium
-            )
-        }
-
-        if (uiModel.imageUri != null) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable { showImageViewer = true },
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-            ) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(uiModel.imageUri)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-            }
-        }
-
-        uiModel.objectText?.let { obj ->
-            if (obj.isNotBlank()) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "${RTL}$obj",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 16.dp)
-                )
-            }
-        }
-
-        uiModel.supportingText?.let { support ->
-            if (support.isNotBlank()) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = support,
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                    modifier = Modifier.padding(start = 16.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = uiModel.timeText,
-            fontSize = 10.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            modifier = Modifier.padding(start = 16.dp)
-        )
-    }
-
-    if (showImageViewer) {
-        ImageViewerDialog(
-            imageUri = uiModel.imageUri!!,
-            onDismiss = { showImageViewer = false }
-        )
-    }
-}
-
-// ════════════════════════════════════════════════════════════════
 // SKELETON LOADING — mirrors real TaskDetailScreen layout
 // ════════════════════════════════════════════════════════════════
 
@@ -1284,93 +1062,5 @@ private fun TaskDetailSkeleton(modifier: Modifier = Modifier) {
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // ── Steps section header ──
-        SkeletonBar(
-            modifier = Modifier
-                .padding(horizontal = 24.dp)
-                .fillMaxWidth(0.3f),
-            height = 14.sp.value.dp
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // ── Add step input placeholder ──
-        SkeletonBar(
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .fillMaxWidth()
-                .height(44.dp)
-        )
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // ── Step items skeleton ──
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            repeat(2) {
-                NeumorphicSurface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    elevation = 3
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(22.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(skeletonShimmerBrush())
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        SkeletonBar(modifier = Modifier.weight(1f), height = 13.sp.value.dp)
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // ── Divider placeholder ──
-        Box(
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(skeletonShimmerBrush())
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // ── Timeline preview card skeleton ──
-        NeumorphicSurface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            shape = RoundedCornerShape(14.dp),
-            elevation = 4
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    SkeletonBar(modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    SkeletonBar(modifier = Modifier.fillMaxWidth(0.4f), height = 14.sp.value.dp)
-                }
-                SkeletonBar(modifier = Modifier.fillMaxWidth(0.5f), height = 12.sp.value.dp)
-                SkeletonBar(modifier = Modifier.fillMaxWidth(0.3f), height = 12.sp.value.dp)
-            }
-        }
     }
 }

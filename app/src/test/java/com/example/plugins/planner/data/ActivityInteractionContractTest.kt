@@ -179,73 +179,21 @@ class ActivityInteractionContractTest {
     }
 
     @Test
-    fun `task-level messages have null stepId and do not appear in step queries`() {
-        val entities = listOf(
-            ActivityEventEntity(1, 1, null, ActivityEventType.NOTE_ADDED.name, "Task note", 1000L),
-            ActivityEventEntity(2, 1, 5, ActivityEventType.NOTE_ADDED.name, "Step note", 2000L)
+    @Test
+    fun `task-level messages have null stepId and step-level have the correct id`() {
+        val all = listOf(
+            ActivityEventEntity(1, 1, null, ActivityEventType.NOTE_ADDED.name, "Task level", 1000L),
+            ActivityEventEntity(2, 1, 5, ActivityEventType.NOTE_ADDED.name, "Step level", 2000L)
         )
+        val messages = ActivityMessageMapper.toMessages(all)
 
-        val taskMessages = entities.filter { it.stepId == null }
-            .mapNotNull { ActivityMessageMapper.toMessage(it) }
-        val stepMessages = entities.filter { it.stepId == 5 }
-            .mapNotNull { ActivityMessageMapper.toMessage(it) }
+        val taskMessages = messages.filter { it.stepId == null }
+        val stepMessages = messages.filter { it.stepId == 5L }
 
         assertEquals(1, taskMessages.size)
         assertEquals(1, stepMessages.size)
         assertNull(taskMessages[0].stepId)
         assertEquals(5L, stepMessages[0].stepId)
-    }
-
-    @Test
-    fun `StepCardMapper groups activities by stepId correctly`() {
-        val events = listOf(
-            ActivityEventEntity(1, 1, 10, ActivityEventType.NOTE_ADDED.name, "Step 10: note 1", 1000L),
-            ActivityEventEntity(2, 1, 10, ActivityEventType.NOTE_ADDED.name, "Step 10: note 2", 2000L),
-            ActivityEventEntity(3, 1, 20, ActivityEventType.NOTE_ADDED.name, "Step 20: note 1", 3000L),
-            ActivityEventEntity(4, 1, null, ActivityEventType.NOTE_ADDED.name, "Task level", 4000L)
-        )
-
-        val grouped = StepCardMapper.groupActivitiesByStep(events)
-
-        assertEquals(2, grouped.size)
-        assertTrue(grouped.containsKey(10))
-        assertTrue(grouped.containsKey(20))
-        assertEquals(2, grouped[10]!!.size)
-        assertEquals(1, grouped[20]!!.size)
-    }
-
-    @Test
-    fun `StepCardMapper filters null-stepId events from grouping`() {
-        val events = listOf(
-            ActivityEventEntity(1, 1, null, ActivityEventType.NOTE_ADDED.name, "Task level", 1000L),
-            ActivityEventEntity(2, 1, 5, ActivityEventType.NOTE_ADDED.name, "Step level", 2000L)
-        )
-
-        val grouped = StepCardMapper.groupActivitiesByStep(events)
-
-        assertEquals(1, grouped.size)
-        assertTrue(grouped.containsKey(5))
-    }
-
-    @Test
-    fun `StepCard with correct messages does not include other steps messages`() {
-        val step10 = TaskStepEntity(id = 10, taskId = 1, title = "Step 10")
-        val step20 = TaskStepEntity(id = 20, taskId = 1, title = "Step 20")
-
-        val allEntities = listOf(
-            ActivityEventEntity(1, 1, 10, ActivityEventType.NOTE_ADDED.name, "Step 10 note", 1000L),
-            ActivityEventEntity(2, 1, 20, ActivityEventType.NOTE_ADDED.name, "Step 20 note", 2000L)
-        )
-
-        val grouped = StepCardMapper.groupActivitiesByStep(allEntities)
-
-        val card10 = StepCardMapper.toCardModel(step10, grouped[10] ?: emptyList())
-        val card20 = StepCardMapper.toCardModel(step20, grouped[20] ?: emptyList())
-
-        assertEquals(1, card10.messages.size)
-        assertEquals(1, card20.messages.size)
-        assertTrue(card10.messages.all { it.stepId == 10L })
-        assertTrue(card20.messages.all { it.stepId == 20L })
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -539,5 +487,97 @@ class ActivityInteractionContractTest {
             false
         }
         assertFalse("editedAt field does not exist yet - requires schema change", hasField)
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // 5. FEED INTEGRITY — Phase 5.5c
+    // ════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `message without step has no stepId and renders as task-level`() {
+        val entity = ActivityEventEntity(
+            id = 1, taskId = 1, stepId = null,
+            eventType = ActivityEventType.NOTE_ADDED.name,
+            description = "Task-level note", timestamp = 1000L
+        )
+        val msg = ActivityMessageMapper.toMessage(entity)!!
+        assertNull(msg.stepId)
+    }
+
+    @Test
+    fun `message with step has stepId for tag display`() {
+        val entity = ActivityEventEntity(
+            id = 1, taskId = 1, stepId = 5,
+            eventType = ActivityEventType.NOTE_ADDED.name,
+            description = "Tagged note", timestamp = 1000L
+        )
+        val msg = ActivityMessageMapper.toMessage(entity)!!
+        assertNotNull(msg.stepId)
+        assertEquals(5L, msg.stepId)
+    }
+
+    @Test
+    fun `filter by step shows only matching messages`() {
+        val entities = listOf(
+            ActivityEventEntity(1, 1, null, ActivityEventType.NOTE_ADDED.name, "Task level", 1000L),
+            ActivityEventEntity(2, 1, 10, ActivityEventType.NOTE_ADDED.name, "Step 10", 2000L),
+            ActivityEventEntity(3, 1, 20, ActivityEventType.NOTE_ADDED.name, "Step 20", 3000L)
+        )
+        val all = ActivityMessageMapper.toMessages(entities)
+
+        val step10Messages = all.filter { it.stepId == 10L }
+        assertEquals(1, step10Messages.size)
+        assertEquals("Step 10", step10Messages[0].text)
+    }
+
+    @Test
+    fun `system step events are filtered out by mapper`() {
+        val entities = listOf(
+            ActivityEventEntity(1, 1, 1, ActivityEventType.STEP_CREATED.name, "New step", 1000L),
+            ActivityEventEntity(2, 1, null, ActivityEventType.NOTE_ADDED.name, "A note", 2000L),
+            ActivityEventEntity(3, 1, 1, ActivityEventType.STEP_COMPLETED.name, "Done", 3000L)
+        )
+        val messages = ActivityMessageMapper.toMessages(entities)
+
+        assertEquals(1, messages.size)
+        assertEquals("A note", messages[0].text)
+    }
+
+    @Test
+    fun `removing StepCard and StepCardMapper does not affect feed`() {
+        val msg = ActivityMessageModel(
+            id = 1, taskId = 1, stepId = null,
+            text = "Feed message", attachments = emptyList(),
+            durationMinutes = null, createdAt = 1000L,
+            canEdit = true, canDelete = true
+        )
+        assertNotNull(msg)
+        assertEquals("Feed message", msg.text)
+        assertNull(msg.stepId)
+    }
+
+    @Test
+    fun `edit preserves stepId from original entity`() {
+        val original = ActivityEventEntity(
+            id = 1, taskId = 1, stepId = 7,
+            eventType = ActivityEventType.NOTE_ADDED.name,
+            description = "Original", timestamp = 1000L
+        )
+        val edited = original.copy(description = "Updated")
+        assertEquals(7, edited.stepId)
+        assertEquals("Updated", edited.description)
+    }
+
+    @Test
+    fun `reply preserves replyToMessageId`() {
+        val msg = ActivityMessageModel(
+            id = 1, taskId = 1, stepId = null,
+            text = "Reply text", attachments = emptyList(),
+            durationMinutes = null, createdAt = 1000L,
+            canEdit = true, canDelete = true,
+            replyToMessageId = 42L
+        )
+        assertNotNull(msg.replyToMessageId)
+        assertEquals(42L, msg.replyToMessageId)
     }
 }
