@@ -45,6 +45,7 @@ import java.util.*
 @Composable
 fun ActivityMessageCard(
     message: ActivityMessageModel,
+    stepName: String? = null,
     repliedToMessage: ActivityMessageModel? = null,
     isSelected: Boolean = false,
     onAction: ((ActivityMessageAction) -> Unit)? = null,
@@ -157,6 +158,12 @@ fun ActivityMessageCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 }
+            }
+
+            // ── Step Tag Chip ──
+            if (stepName != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                ActivityTagChip(name = stepName)
             }
 
             // ── Bottom row: Duration + Timestamp (inline) ──

@@ -599,6 +599,10 @@ private fun TaskDetailActivityContent(
 ) {
     val groups = remember(messages) { groupActivityMessagesByDay(messages) }
     var showFabOptions by remember { mutableStateOf(false) }
+    // Build step name lookup: id → title
+    val stepNameById = remember(steps) {
+        steps.associate { it.id.toLong() to it.title }
+    }
 
     Box(modifier = modifier) {
         LazyColumn(
@@ -608,7 +612,7 @@ private fun TaskDetailActivityContent(
         ) {
             // ── Feed Header ──
             item(key = "feed_header") {
-                ActivityFeedHeader(count = allMessages.size)
+                ActivityFeedHeader(count = messages.size)
             }
 
             // ── Filter Chips ──
@@ -644,6 +648,7 @@ private fun TaskDetailActivityContent(
 
                     ActivityMessageCard(
                         message = message,
+                        stepName = stepNameById[message.stepId],
                         repliedToMessage = repliedTo,
                         isSelected = message.id == selectedMessageId,
                         onAction = onMessageAction,
