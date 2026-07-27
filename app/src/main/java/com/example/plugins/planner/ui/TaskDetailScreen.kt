@@ -105,16 +105,18 @@ fun TaskDetailScreen(
     var scrollToMessageId: Long? by remember { mutableStateOf(null) }
 
     // ── Image picker for direct FAB action ──
+    val context = LocalContext.current
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri: Uri? ->
             if (uri != null) {
-                try {
-                    LocalContext.current.contentResolver.takePersistableUriPermission(
+                // Persist read permission for content:// URIs
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
                         uri,
                         android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
                     )
-                } catch (_: Exception) { }
+                }
                 // Create activity directly with the selected image
                 viewModel.createActivity(
                     ActivityDraft(
@@ -839,32 +841,32 @@ private fun ActivityFab(
                 icon = "⏱️",
                 label = "${RTL}فعالیت دستی",
                 onClick = {
-                    expanded = false
                     onSelectAction(ActivityCreationAction.ManualActivity)
+                    onToggle()
                 }
             )
             FabOption(
                 icon = "📎",
                 label = "${RTL}فایل",
                 onClick = {
-                    expanded = false
                     onSelectAction(ActivityCreationAction.File)
+                    onToggle()
                 }
             )
             FabOption(
                 icon = "📷",
                 label = "${RTL}تصویر",
                 onClick = {
-                    expanded = false
                     onSelectAction(ActivityCreationAction.Image)
+                    onToggle()
                 }
             )
             FabOption(
                 icon = "📝",
                 label = "${RTL}یادداشت",
                 onClick = {
-                    expanded = false
                     onSelectAction(ActivityCreationAction.Note)
+                    onToggle()
                 }
             )
         }
