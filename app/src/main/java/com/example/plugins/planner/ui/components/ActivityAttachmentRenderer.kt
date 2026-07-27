@@ -23,19 +23,14 @@ import com.example.core.util.RTL
 import com.example.plugins.planner.data.ActivityAttachment
 
 /**
- * ActivityAttachmentRenderer — Renders image and file attachments
- * as card-style previews in a Telegram-style message layout.
+ * ActivityAttachmentRenderer — Telegram-style media preview with no JSON/URI leakage.
  *
- * Phase 4.13: Telegram-style Activity UI
+ * Phase 5.6: Telegram-style Activity Message Renderer Polish
  *
- * Each attachment is rendered independently:
- * - IMAGE: AsyncImage with rounded corners, clickable for fullscreen preview
- * - FILE: Card with file icon and filename
- *
- * Usage:
- * ```kotlin
- * ActivityAttachmentRenderer(attachments = message.attachments)
- * ```
+ * Rules:
+ * - Image: max height 240.dp, 16:9 aspect ratio, ContentScale.Crop
+ * - File: compact card with icon + filename
+ * - No URI text or JSON displayed anywhere
  */
 @Composable
 fun ActivityAttachmentRenderer(
@@ -46,7 +41,7 @@ fun ActivityAttachmentRenderer(
 
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         attachments.forEach { attachment ->
             when (attachment) {
@@ -62,36 +57,29 @@ private fun ImageAttachmentPreview(
     image: ActivityAttachment.Image,
     modifier: Modifier = Modifier
 ) {
-    var showViewer by remember { mutableStateOf(false) }
-
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable { showViewer = true },
-        shape = RoundedCornerShape(12.dp),
+            .clip(RoundedCornerShape(10.dp)),
+        shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
+                .heightIn(max = 240.dp)
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(image.uri)
                     .crossfade(true)
                     .build(),
-                contentDescription = "${RTL}تصویر پیوست",
+                contentDescription = "${RTL}تصویر",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
         }
-    }
-
-    if (showViewer) {
-        // TODO: Fullscreen image viewer (Phase 5+)
-        // For now, rely on the clickable surface to trigger Android system viewer
     }
 }
 
@@ -103,19 +91,18 @@ private fun FileAttachmentPreview(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
-        shape = RoundedCornerShape(10.dp)
+        shape = RoundedCornerShape(8.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // File type icon
             Text(
                 text = "📄",
-                fontSize = 18.sp
+                fontSize = 16.sp
             )
 
             Column(modifier = Modifier.weight(1f)) {
@@ -134,9 +121,8 @@ private fun FileAttachmentPreview(
                 )
             }
 
-            // Download icon
             Icon(
-                imageVector = androidx.compose.material.icons.Icons.Default.Download,
+                imageVector = Icons.Default.Download,
                 contentDescription = "${RTL}دانلود",
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(18.dp)

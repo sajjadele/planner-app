@@ -109,16 +109,22 @@ object ActivityMessageMapper {
 
     /**
      * Extract text content from payload or legacy format.
+     *
+     * CRITICAL: When payload is non-null (JSON was successfully decoded),
+     * ONLY use payload.text. Never fall back to raw description string
+     * which may contain JSON, URI, or internal metadata.
      */
     private fun extractText(
         payload: ActivityPayload?,
         description: String?,
         eventType: ActivityEventType
     ): String? {
-        // If payload has text, use it directly
-        payload?.text?.let { return it }
+        // If payload was decoded from JSON, only use payload fields — never raw description
+        if (payload != null) {
+            return payload.text  // null if no text (image-only message), never raw JSON
+        }
 
-        // Legacy format handling
+        // Legacy format handling (description is NOT JSON)
         return when (eventType) {
             ActivityEventType.MANUAL_ACTIVITY -> {
                 // Legacy: "title|duration" — take the title part
@@ -139,14 +145,19 @@ object ActivityMessageMapper {
 
     /**
      * Extract duration in minutes from payload or legacy format.
+     *
+     * CRITICAL: When payload is non-null (JSON was successfully decoded),
+     * ONLY use payload.durationMinutes. Never fall back to raw description.
      */
     private fun extractDuration(
         payload: ActivityPayload?,
         description: String?,
         eventType: ActivityEventType
     ): Int? {
-        // If payload has duration, use it directly
-        payload?.durationMinutes?.let { return it }
+        // If payload was decoded from JSON, only use payload fields
+        if (payload != null) {
+            return payload.durationMinutes
+        }
 
         // Legacy format: "title|duration"
         if (eventType == ActivityEventType.MANUAL_ACTIVITY) {

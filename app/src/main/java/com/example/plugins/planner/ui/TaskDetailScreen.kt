@@ -602,7 +602,7 @@ private fun TaskDetailActivityContent(
     Box(modifier = modifier) {
         LazyColumn(
             state = listState,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
             // ── Feed Header ──
@@ -679,27 +679,27 @@ private fun ActivityFeedHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
             text = "${RTL}فعالیت\u200Cها",
-            fontSize = 16.sp,
+            fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
         if (count > 0) {
             Surface(
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(8.dp),
                 color = MaterialTheme.colorScheme.primaryContainer
             ) {
                 Text(
                     text = "$count",
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
                 )
             }
         }
@@ -944,10 +944,10 @@ private fun ActivityFeedDayHeader(dateKey: Long) {
 
     Text(
         text = label,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Bold,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Medium,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
     )
 }
 
