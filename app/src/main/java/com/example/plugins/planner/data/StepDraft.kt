@@ -1,71 +1,30 @@
 package com.example.plugins.planner.data
 
 /**
- * StepDraft — Domain model for creating a Step.
+ * StepDraft — Domain model for creating a Step (Tag).
  *
- * Phase 4.10.1: Domain Separation
+ * Phase 5.5d: Step is metadata/tag only. No initial activities.
  *
  * Responsibility:
- * - Represents the user's intent to create a Step
- * - Contains step title and optional initial activities
- * - Does NOT contain Activity-specific logic
- *
- * Examples:
- * ```kotlin
- * // Simple step
- * StepDraft(title = "طراحی صفحه اصلی")
- *
- * // Step with initial content
- * StepDraft(
- *     title = "طراحی صفحه اصلی",
- *     initialActivities = listOf(
- *         ActivityDraft(
- *             text = "نمونه اولیه آماده شد",
- *             attachments = listOf(ActivityAttachment.Image("content://..."))
- *         )
- *     )
- * )
- * ```
+ * - Represents the user's intent to create a Step (Tag)
+ * - Contains step title only
+ * - Step is now pure metadata — activities are created independently
  *
  * Flow:
- * ```kotlin
+ * ```
  * StepDraft
  *     ↓
- * StepDraftResolver.resolve()
+ * CreateStepUseCase.execute()
  *     ↓
- * TaskStepEntity + ActivityEventEntity[]
+ * TaskStepEntity + STEP_CREATED event
  * ```
  */
 data class StepDraft(
-    /**
-     * Title of the step. Required.
-     */
-    val title: String,
-
-    /**
-     * Optional initial activities to create with the step.
-     * Each activity will be associated with the step via stepId.
-     */
-    val initialActivities: List<ActivityDraft> = emptyList()
+    /** Title of the step/tag. Required. */
+    val title: String
 ) {
-    /**
-     * Check if this step has initial content.
-     */
-    fun hasInitialContent(): Boolean {
-        return initialActivities.isNotEmpty()
-    }
-
-    /**
-     * Get total attachment count across all initial activities.
-     */
-    fun getTotalAttachmentCount(): Int {
-        return initialActivities.sumOf { it.attachments.size }
-    }
-
     companion object {
-        /**
-         * Empty draft for default state.
-         */
+        /** Empty draft for default state. */
         val EMPTY = StepDraft(title = "")
     }
 }

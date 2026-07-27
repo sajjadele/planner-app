@@ -7,12 +7,9 @@ import com.example.plugins.planner.data.StepDraft
 /**
  * ActivityComposerState — Single source of truth for the unified composer.
  *
- * Phase 4.11.1: Unified Composer State
- *
  * Architecture:
  * - One state object drives the entire composer UI
  * - Mode determines what the user is creating
- * - No UI visibility state (isExpanded flags removed)
  * - Clean conversion to domain models (ActivityDraft or StepDraft)
  *
  * Design Principles:
@@ -37,7 +34,7 @@ import com.example.plugins.planner.data.StepDraft
  * // Submit as activity
  * val activityDraft = state.toActivityDraft()
  *
- * // Submit as step
+ * // Submit as step (tag only, no initial activities)
  * val stepDraft = state.toStepDraft()
  * ```
  */
@@ -55,9 +52,7 @@ data class ActivityComposerState(
 
     /**
      * Convert state to ActivityDraft for submission.
-     * Used when mode == ACTIVITY.
-     *
-     * Creates a simple activity with text, attachments, and duration.
+     * Used when mode == ACTIVITY / EDIT / REPLY.
      */
     fun toActivityDraft(): ActivityDraft = ActivityDraft(
         text = text.ifBlank { null },
@@ -67,45 +62,15 @@ data class ActivityComposerState(
     )
 
     /**
-     * Convert state to StepDraft for submission.
-     * Used when mode == STEP.
+     * Convert to StepDraft — pure tag creation, no initial activities.
      *
-     * The step title comes from the text field.
-     * Initial activities are created from attachments.
-     *
-     * Example:
-     * State:
-     *   text="Design UI"
-     *   attachments=[Image(uri)]
-     *   mode=STEP
-     *
-     * Produces:
-     * StepDraft(
-     *   title="Design UI",
-     *   initialActivities=[
-     *     ActivityDraft(
-     *       attachments=[Image(uri)]
-     *     )
-     *   ]
-     * )
+     * Phase 5.5d: Step is metadata/tag only.
+     * Only the title text is used as the step/tag name.
+     * Attachments and duration are NOT used for tag creation.
      */
     fun toStepDraft(): StepDraft {
-        val initialActivities = mutableListOf<ActivityDraft>()
-
-        // If there are attachments, create an initial activity
-        if (attachments.isNotEmpty()) {
-            initialActivities.add(
-                ActivityDraft(
-                    text = null,  // step title is on the step itself
-                    attachments = attachments,
-                    durationMinutes = durationMinutes
-                )
-            )
-        }
-
         return StepDraft(
-            title = text.ifBlank { "" },
-            initialActivities = initialActivities
+            title = text.ifBlank { "" }
         )
     }
 
@@ -124,31 +89,19 @@ data class ActivityComposerState(
      * Check if the composer can be submitted.
      */
     fun canSubmit(): Boolean {
-        return hasContent()
+        return when (mode) {
+            ComposerMode.STEP -> text.isNotBlank()  // tag only needs a name
+            else -> hasContent()                     // activity needs text/attachments/duration
+        }
     }
 
     // ════════════════════════════════════════════════════════════════
     // Mode Helpers
     // ════════════════════════════════════════════════════════════════
 
-    /**
-     * Check if current mode is STEP.
-     */
     fun isStepMode(): Boolean = mode == ComposerMode.STEP
-
-    /**
-     * Check if current mode is ACTIVITY.
-     */
     fun isActivityMode(): Boolean = mode == ComposerMode.ACTIVITY
-
-    /**
-     * Check if current mode is EDIT.
-     */
     fun isEditMode(): Boolean = mode == ComposerMode.EDIT
-
-    /**
-     * Check if current mode is REPLY.
-     */
     fun isReplyMode(): Boolean = mode == ComposerMode.REPLY
 
     /**
@@ -161,9 +114,6 @@ data class ActivityComposerState(
     )
 
     companion object {
-        /**
-         * Default empty state (ACTIVITY mode).
-         */
         val EMPTY = ActivityComposerState()
     }
 }

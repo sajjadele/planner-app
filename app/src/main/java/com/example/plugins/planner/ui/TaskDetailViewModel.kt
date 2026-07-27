@@ -23,7 +23,7 @@ import com.example.plugins.planner.data.ActivityEventRepository
 import com.example.plugins.planner.data.ActivityEventType
 import com.example.plugins.planner.data.ActivityFeedFilterState
 import com.example.plugins.planner.data.ImageEventParser
-import com.example.plugins.planner.data.CreateStepWithActivitiesUseCase
+import com.example.plugins.planner.data.CreateStepUseCase
 import com.example.plugins.planner.data.StepDraft
 import com.example.plugins.planner.data.StepDraftResolver
 import com.example.plugins.planner.data.TaskDao
@@ -50,7 +50,7 @@ class TaskDetailViewModel(
     private val noteRepository: NoteRepository
     private val taskStepRepository: TaskStepRepository
     private val activityEventRepository: ActivityEventRepository
-    private val createStepWithActivitiesUseCase: CreateStepWithActivitiesUseCase
+    private val createStepUseCase: CreateStepUseCase
 
     init {
         val database = AppDatabase.getDatabase(application)
@@ -59,7 +59,7 @@ class TaskDetailViewModel(
         noteRepository = NoteRepository(database.noteDao())
         taskStepRepository = TaskStepRepository(database.taskStepDao(), database.activityEventDao())
         activityEventRepository = ActivityEventRepository(database.activityEventDao())
-        createStepWithActivitiesUseCase = CreateStepWithActivitiesUseCase(database)
+        createStepUseCase = CreateStepUseCase(database)
     }
 
     /** Loading gate: true once the first Room emission arrives for this task. */
@@ -358,16 +358,14 @@ class TaskDetailViewModel(
     }
 
     /**
-     * Create a Step from a StepDraft.
+     * Create a Step (Tag) from a StepDraft.
      *
-     * Phase 4.10.2: Transaction Pipeline
-     * - Uses CreateStepWithActivitiesUseCase for atomic creation
-     * - Ensures stepId is always assigned to child activities
-     * - Rolls back on failure (no partial data)
+     * Phase 5.5d: Pure tag creation — no initial activities.
+     * Creates TaskStepEntity + STEP_CREATED event only.
      */
     fun createStep(draft: StepDraft) {
         viewModelScope.launch {
-            createStepWithActivitiesUseCase.execute(taskId, draft)
+            createStepUseCase.execute(taskId, draft)
         }
     }
 

@@ -89,8 +89,8 @@ fun UnifiedComposerContent(
             maxLines = 6
         )
 
-        // ── Attachments preview ──
-        if (state.attachments.isNotEmpty()) {
+        // ── Attachments preview (hidden in STEP mode — tags don't have attachments) ──
+        if (state.attachments.isNotEmpty() && !state.isStepMode()) {
             Spacer(modifier = Modifier.height(12.dp))
             AttachmentPreview(
                 attachments = state.attachments,
@@ -100,8 +100,8 @@ fun UnifiedComposerContent(
             )
         }
 
-        // ── Duration chip ──
-        if (state.durationMinutes != null) {
+        // ── Duration chip (hidden in STEP mode — tags don't have durations) ──
+        if (state.durationMinutes != null && !state.isStepMode()) {
             Spacer(modifier = Modifier.height(8.dp))
             DurationChip(
                 durationMinutes = state.durationMinutes,
