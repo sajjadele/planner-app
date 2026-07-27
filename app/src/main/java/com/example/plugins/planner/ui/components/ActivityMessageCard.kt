@@ -90,58 +90,60 @@ fun ActivityMessageCard(
 
     // ── Normal message bubble ──
     Box(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth(maxBubbleWidthFraction)
-                    .combinedClickable(
-                        onClick = { if (showMenu) showMenu = false },
-                        onLongClick = {
-                            if (capability.canEdit || capability.canDelete || capability.canReply) {
-                                showMenu = true
-                            }
-                        }
-                    ),
-                color = backgroundColor,
-                shape = RoundedCornerShape(
-                    topStart = 16.dp, topEnd = 16.dp,
-                    bottomStart = 4.dp, bottomEnd = 16.dp
-                ),
-                shadowElevation = if (isSelected) 3.dp else 0.5.dp
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
             ) {
-                Column(
+                Surface(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 8.dp)
-                ) {
-                    // ── Reply Reference ──
-                    if (message.replyToMessageId != null) {
-                        ReplyReferencePreview(
-                            repliedToMessage = repliedToMessage,
-                            isDeleted = repliedToMessage == null,
-                            onClick = {
-                                if (repliedToMessage != null) {
-                                    onReplyReferenceClick?.invoke(repliedToMessage.id)
+                        .fillMaxWidth(maxBubbleWidthFraction)
+                        .combinedClickable(
+                            onClick = { if (showMenu) showMenu = false },
+                            onLongClick = {
+                                if (capability.canEdit || capability.canDelete || capability.canReply) {
+                                    showMenu = true
                                 }
                             }
+                        ),
+                    color = backgroundColor,
+                    shape = RoundedCornerShape(
+                        topStart = 16.dp, topEnd = 16.dp,
+                        bottomStart = 4.dp, bottomEnd = 16.dp
+                    ),
+                    shadowElevation = if (isSelected) 3.dp else 0.5.dp
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 8.dp)
+                    ) {
+                        // ── Reply Reference ──
+                        if (message.replyToMessageId != null) {
+                            ReplyReferencePreview(
+                                repliedToMessage = repliedToMessage,
+                                isDeleted = repliedToMessage == null,
+                                onClick = {
+                                    if (repliedToMessage != null) {
+                                        onReplyReferenceClick?.invoke(repliedToMessage.id)
+                                    }
+                                }
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+
+                        // ── Message Content ──
+                        MessageContent(
+                            displayContent = displayContent,
+                            onAttachmentClick = onAttachmentClick
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // ── Metadata: edited + timestamp ──
+                        MessageMetadataRow(
+                            isEdited = message.isEdited,
+                            createdAt = message.createdAt
+                        )
                     }
-
-                    // ── Message Content ──
-                    MessageContent(
-                        displayContent = displayContent,
-                        onAttachmentClick = onAttachmentClick
-                    )
-
-                    // ── Metadata: edited + timestamp ──
-                    MessageMetadataRow(
-                        isEdited = message.isEdited,
-                        createdAt = message.createdAt
-                    )
                 }
             }
         }
@@ -214,6 +216,7 @@ private fun MessageContent(
 private fun MessageText(text: String) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Text(
+            modifier = Modifier.fillMaxWidth(),
             text = text,
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurface,
