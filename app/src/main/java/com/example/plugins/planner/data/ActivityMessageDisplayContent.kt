@@ -4,54 +4,38 @@ import com.example.plugins.planner.data.ActivityAttachment.File as FileAttachmen
 import com.example.plugins.planner.data.ActivityAttachment.Image as ImageAttachment
 
 /**
- * ActivityMessageDisplayContent — Classifies the visual composition of a message.
+ * ActivityMessageDisplayContent — Classifies message content for display.
  *
- * Phase 5.6: Telegram-style Activity Message Renderer Polish
- *
- * Responsibility:
- * - Determines how a message should be visually rendered
- * - Separates display logic from ActivityMessageCard
- * - Prevents raw JSON/URI leakage by enforcing content structure
+ * Phase 5.7.1: Three display types only — TextContent, MediaContent, MediaWithText.
+ * No event labels, no step chips, no raw JSON/URI in UI.
  *
  * Types:
- * - [TextOnly]: Single text message (no attachments)
- * - [ImageOnly]: Single image (no text)
- * - [TextWithImages]: Text + one or more images
- * - [FileOnly]: Single file (no text)
- * - [TextWithFiles]: Text + one or more files
- * - [DurationActivity]: Activity with duration (with or without text)
+ * - [TextContent]: Plain text (with optional duration)
+ * - [MediaContent]: Image or file (no text)
+ * - [MediaWithText]: Image/file + text caption
  * - [EmptyMessage]: No displayable content (should not reach UI)
  * - [DeletedMessage]: Soft-deleted message
  */
 sealed class ActivityMessageDisplayContent {
 
-    /** Text-only message (note). */
-    data class TextOnly(val text: String) : ActivityMessageDisplayContent()
-
-    /** Image-only message (no text, no files). */
-    data class ImageOnly(val image: ImageAttachment) : ActivityMessageDisplayContent()
-
-    /** Text + images. */
-    data class TextWithImages(
+    /** Text-only message (note, with optional duration). */
+    data class TextContent(
         val text: String,
-        val images: List<ImageAttachment>,
         val durationMinutes: Int? = null
     ) : ActivityMessageDisplayContent()
 
-    /** File-only message (no text). */
-    data class FileOnly(val file: FileAttachment) : ActivityMessageDisplayContent()
-
-    /** Text + files. */
-    data class TextWithFiles(
-        val text: String,
-        val files: List<FileAttachment>,
-        val durationMinutes: Int? = null
+    /** Media-only (image or file, no text). */
+    data class MediaContent(
+        val attachment: ActivityAttachment,
+        val isImage: Boolean
     ) : ActivityMessageDisplayContent()
 
-    /** Duration activity (with optional text). */
-    data class DurationActivity(
-        val durationMinutes: Int,
-        val text: String? = null
+    /** Media + text caption. */
+    data class MediaWithText(
+        val attachment: ActivityAttachment,
+        val text: String,
+        val isImage: Boolean,
+        val durationMinutes: Int? = null
     ) : ActivityMessageDisplayContent()
 
     /** No displayable content — should never reach UI. */
@@ -64,11 +48,10 @@ sealed class ActivityMessageDisplayContent {
         /**
          * Resolve display content from an ActivityMessageModel.
          *
-         * This is the single entry point for classifying a message.
          * Guarantees: no raw JSON, no URI strings, no event types in UI.
+         * Step/tag metadata is NOT part of display content — it belongs in filter chips.
          */
         fun from(message: ActivityMessageModel): ActivityMessageDisplayContent {
-            // Deleted messages
             if (message.isDeleted) return DeletedMessage
 
             val text = message.text?.ifBlank { null }
@@ -80,44 +63,44 @@ sealed class ActivityMessageDisplayContent {
             val hasFiles = files.isNotEmpty()
             val hasDuration = message.durationMinutes != null
 
-            // Classify by content type
+            // Determine primary attachment (image takes priority)
+            val primaryAttachment: ActivityAttachment? = when {
+                hasImages -> images.first()
+                hasFiles -> files.first()
+                else -> null
+            }
+            val isImage = primaryAttachment is ImageAttachment
+
             return when {
-                // Duration activity (with or without text)
-                hasDuration && !hasImages && !hasFiles ->
-                    DurationActivity(
-                        durationMinutes = message.durationMinutes!!,
-                        text = text
-                    )
-
-                // Image only (no text)
-                hasImages && !hasText && !hasFiles ->
-                    ImageOnly(image = images.first())
-
-                // Text + images
-                hasText && hasImages &&
-                !hasFiles ->
-                    TextWithImages(
+                // Media with text caption
+                primaryAttachment != null && hasText ->
+                    MediaWithText(
+                        attachment = primaryAttachment,
                         text = text!!,
-                        images = images,
-                        durationMinutes = message.durationMinutes
+                        isImage = isImage,
+                        durationMinutes = if (hasDuration) message.durationMinutes else null
                     )
 
-                // File only (no text)
-                hasFiles && !hasText && !hasImages ->
-                    FileOnly(file = files.first())
-
-                // Text + files
-                hasText && hasFiles &&
-                !hasImages ->
-                    TextWithFiles(
-                        text = text!!,
-                        files = files,
-                        durationMinutes = message.durationMinutes
+                // Media only (no text)
+                primaryAttachment != null ->
+                    MediaContent(
+                        attachment = primaryAttachment,
+                        isImage = isImage
                     )
 
-                // Text only
+                // Text (with optional duration)
                 hasText ->
-                    TextOnly(text = text!!)
+                    TextContent(
+                        text = text!!,
+                        durationMinutes = message.durationMinutes
+                    )
+
+                // Duration-only activity (edge case: no text, no media, only duration)
+                hasDuration ->
+                    TextContent(
+                        text = "⏱ ${message.durationMinutes} دقیقه",
+                        durationMinutes = message.durationMinutes
+                    )
 
                 // No recognizable content
                 else -> EmptyMessage

@@ -13,13 +13,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.core.util.RTL
 import com.example.plugins.planner.data.ActivityAttachment
 import com.example.plugins.planner.data.ActivityMessageAction
@@ -30,25 +33,22 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * ActivityMessageCard — Telegram-style message bubble for the Activity Feed.
+ * ActivityMessageCard — Telegram-style message bubble.
  *
- * Phase 5.6: Telegram-style Activity Message Renderer Polish
+ * Phase 5.7.1: Clean message display — no event labels, no step chips, no JSON/URI.
  *
  * Design:
  * - Bubble layout: max 85% width, RTL-aligned
- * - Small padding, compact spacing between messages
- * - Timestamp at bottom-right, inline with duration
- * - No full-width cards, no JSON/URI leakage
+ * - Padding: 10dp horizontal, 8dp vertical
+ * - Corner radius: 14dp (uniform)
+ * - Content order: media first, then text, then metadata
+ * - Step/tag is NOT rendered inside the bubble — it's filter metadata only
  * - Content classified via [ActivityMessageDisplayContent]
- *
- * Bubble shape (Telegram self-message):
- *   topStart=16.dp, topEnd=16.dp, bottomStart=4.dp, bottomEnd=16.dp
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ActivityMessageCard(
     message: ActivityMessageModel,
-    stepName: String? = null,
     repliedToMessage: ActivityMessageModel? = null,
     isSelected: Boolean = false,
     onAction: ((ActivityMessageAction) -> Unit)? = null,
@@ -60,12 +60,10 @@ fun ActivityMessageCard(
     var showMenu by remember { mutableStateOf(false) }
     val capability = remember(message) { message.capability() }
 
-    // Resolve display content
     val displayContent = remember(message) {
         ActivityMessageDisplayContent.from(message)
     }
 
-    // ── Animated selection highlight ──
     val backgroundColor by animateColorAsState(
         targetValue = if (isSelected)
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
@@ -75,13 +73,9 @@ fun ActivityMessageCard(
         label = "cardBg"
     )
 
-    // ── Empty / Deleted messages ──
-    if (displayContent is ActivityMessageDisplayContent.EmptyMessage) {
-        // Should never reach UI — render nothing
-        return
-    }
+    // ── Empty / Deleted ──
+    if (displayContent is ActivityMessageDisplayContent.EmptyMessage) return
     if (displayContent is ActivityMessageDisplayContent.DeletedMessage) {
-        // Render deleted message placeholder
         DeletedMessageBubble(
             modifier = modifier.fillMaxWidth(),
             backgroundColor = backgroundColor,
@@ -95,10 +89,10 @@ fun ActivityMessageCard(
         return
     }
 
-    // ── Normal message bubble ──
+    // ── Normal bubble ──
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End  // RTL: right-aligned
+        horizontalArrangement = Arrangement.End
     ) {
         Surface(
             modifier = Modifier
@@ -112,16 +106,13 @@ fun ActivityMessageCard(
                     }
                 ),
             color = backgroundColor,
-            shape = RoundedCornerShape(
-                topStart = 16.dp, topEnd = 16.dp,
-                bottomStart = 4.dp, bottomEnd = 16.dp
-            ),
+            shape = RoundedCornerShape(14.dp),
             shadowElevation = if (isSelected) 3.dp else 0.5.dp
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .padding(horizontal = 10.dp, vertical = 8.dp)
             ) {
                 // ── Reply Reference ──
                 if (message.replyToMessageId != null) {
@@ -137,21 +128,14 @@ fun ActivityMessageCard(
                     Spacer(modifier = Modifier.height(6.dp))
                 }
 
-                // ── Content (classified by ActivityMessageDisplayContent) ──
+                // ── Message Content (classified by ActivityMessageDisplayContent) ──
                 MessageContent(
                     displayContent = displayContent,
                     onAttachmentClick = onAttachmentClick
                 )
 
-                // ── Step Tag Chip ──
-                if (stepName != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    ActivityTagChip(name = stepName)
-                }
-
-                // ── Bottom metadata row: duration + timestamp ──
+                // ── Metadata row: edited + timestamp ──
                 MessageMetadataRow(
-                    displayContent = displayContent,
                     isEdited = message.isEdited,
                     createdAt = message.createdAt
                 )
@@ -170,7 +154,7 @@ fun ActivityMessageCard(
 }
 
 // ════════════════════════════════════════════════════════════════
-// MessageContent — Renders based on display content type
+// MessageContent — renders based on simplified display types
 // ════════════════════════════════════════════════════════════════
 
 @Composable
@@ -179,66 +163,47 @@ private fun MessageContent(
     onAttachmentClick: ((ActivityAttachment) -> Unit)? = null
 ) {
     when (displayContent) {
-        is ActivityMessageDisplayContent.TextOnly -> {
+        is ActivityMessageDisplayContent.TextContent -> {
             MessageText(text = displayContent.text)
         }
 
-        is ActivityMessageDisplayContent.ImageOnly -> {
-            ClickableImagePreview(
-                image = displayContent.image,
-                onClick = { onAttachmentClick?.invoke(displayContent.image) }
-            )
-        }
-
-        is ActivityMessageDisplayContent.TextWithImages -> {
-            displayContent.images.forEach { image ->
-                ClickableImagePreview(
-                    image = image,
-                    onClick = { onAttachmentClick?.invoke(image) }
+        is ActivityMessageDisplayContent.MediaContent -> {
+            if (displayContent.isImage) {
+                ImagePreview(
+                    image = displayContent.attachment as ActivityAttachment.Image,
+                    onClick = { onAttachmentClick?.invoke(displayContent.attachment) }
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-            }
-            // Text after images (Telegram style)
-            MessageText(text = displayContent.text)
-        }
-
-        is ActivityMessageDisplayContent.FileOnly -> {
-            FilePreview(
-                file = displayContent.file,
-                onClick = { onAttachmentClick?.invoke(displayContent.file) }
-            )
-        }
-
-        is ActivityMessageDisplayContent.TextWithFiles -> {
-            displayContent.files.forEach { file ->
+            } else {
                 FilePreview(
-                    file = file,
-                    onClick = { onAttachmentClick?.invoke(file) }
+                    file = displayContent.attachment as ActivityAttachment.File,
+                    onClick = { onAttachmentClick?.invoke(displayContent.attachment) }
                 )
-                Spacer(modifier = Modifier.height(4.dp))
             }
-            // Text after files (Telegram style)
+        }
+
+        is ActivityMessageDisplayContent.MediaWithText -> {
+            if (displayContent.isImage) {
+                ImagePreview(
+                    image = displayContent.attachment as ActivityAttachment.Image,
+                    onClick = { onAttachmentClick?.invoke(displayContent.attachment) }
+                )
+            } else {
+                FilePreview(
+                    file = displayContent.attachment as ActivityAttachment.File,
+                    onClick = { onAttachmentClick?.invoke(displayContent.attachment) }
+                )
+            }
+            Spacer(modifier = Modifier.height(6.dp))
             MessageText(text = displayContent.text)
         }
 
-        is ActivityMessageDisplayContent.DurationActivity -> {
-            if (displayContent.text != null) {
-                MessageText(text = displayContent.text)
-                Spacer(modifier = Modifier.height(4.dp))
-            }
-            DurationBadge(durationMinutes = displayContent.durationMinutes)
-        }
-
-        // Should never reach UI
         is ActivityMessageDisplayContent.EmptyMessage,
-        is ActivityMessageDisplayContent.DeletedMessage -> {
-            // Handled in parent
-        }
+        is ActivityMessageDisplayContent.DeletedMessage -> {}
     }
 }
 
 // ════════════════════════════════════════════════════════════════
-// Sub-composables
+// Sub-Composables
 // ════════════════════════════════════════════════════════════════
 
 @Composable
@@ -254,19 +219,37 @@ private fun MessageText(text: String) {
 }
 
 @Composable
-private fun ClickableImagePreview(
+private fun ImagePreview(
     image: ActivityAttachment.Image,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
     ) {
-        ActivityAttachmentRenderer(
-            attachments = listOf(ActivityAttachment.Image(image.uri))
-        )
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .heightIn(max = 260.dp)
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(image.uri)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "${RTL}تصویر",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+        }
     }
 }
 
@@ -275,69 +258,67 @@ private fun FilePreview(
     file: ActivityAttachment.File,
     onClick: () -> Unit
 ) {
-    Box(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+        shape = RoundedCornerShape(8.dp)
     ) {
-        ActivityAttachmentRenderer(
-            attachments = listOf(file)
-        )
-    }
-}
-
-@Composable
-private fun DurationBadge(durationMinutes: Int) {
-    Surface(
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-        shape = RoundedCornerShape(6.dp)
-    ) {
-        Text(
-            text = "⏱ $durationMinutes ${RTL}دقیقه",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(text = "📄", fontSize = 16.sp)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = file.name ?: "فایل پیوست",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun MessageMetadataRow(
-    displayContent: ActivityMessageDisplayContent,
     isEdited: Boolean,
     createdAt: Long
 ) {
-    // Duration activities show duration above; others show timestamp
-    val showTimestamp = displayContent !is ActivityMessageDisplayContent.EmptyMessage
-
-    if (showTimestamp) {
-        Spacer(modifier = Modifier.height(4.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.End
-        ) {
-            // Edited indicator
-            if (isEdited) {
-                Text(
-                    text = "✓✓",
-                    fontSize = 9.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                )
-                Spacer(modifier = Modifier.width(3.dp))
-            }
-
-            // Timestamp
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.End
+    ) {
+        if (isEdited) {
             Text(
-                text = formatTimestamp(createdAt),
-                fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                textAlign = TextAlign.End
+                text = "✓✓",
+                fontSize = 9.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
             )
+            Spacer(modifier = Modifier.width(3.dp))
         }
+        Text(
+            text = formatTimestamp(createdAt),
+            fontSize = 10.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            textAlign = TextAlign.End
+        )
     }
 }
+
+// ════════════════════════════════════════════════════════════════
+// Deleted / Context Menu / Reply Reference
+// ════════════════════════════════════════════════════════════════
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -356,9 +337,7 @@ private fun DeletedMessageBubble(
             .fillMaxWidth(0.85f)
             .combinedClickable(
                 onClick = {},
-                onLongClick = {
-                    if (capability.canDelete) onShowMenu()
-                }
+                onLongClick = { if (capability.canDelete) onShowMenu() }
             ),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
         shape = RoundedCornerShape(8.dp)
@@ -377,19 +356,12 @@ private fun DeletedMessageBubble(
             )
         }
     }
-
     if (showMenu) {
-        DropdownMenu(
-            expanded = true,
-            onDismissRequest = onDismissMenu
-        ) {
+        DropdownMenu(expanded = true, onDismissRequest = onDismissMenu) {
             if (capability.canDelete) {
                 DropdownMenuItem(
                     text = { Text("${RTL}حذف", fontSize = 13.sp) },
-                    onClick = {
-                        onDismissMenu()
-                        onAction?.invoke(ActivityMessageAction.Delete(messageId))
-                    },
+                    onClick = { onDismissMenu(); onAction?.invoke(ActivityMessageAction.Delete(messageId)) },
                     leadingIcon = { Text("🗑", fontSize = 14.sp) }
                 )
             }
@@ -413,39 +385,27 @@ private fun ContextMenu(
         if (capability.canReply) {
             DropdownMenuItem(
                 text = { Text("${RTL}پاسخ", fontSize = 13.sp) },
-                onClick = {
-                    onDismiss()
-                    onAction?.invoke(ActivityMessageAction.Reply(messageId))
-                },
+                onClick = { onDismiss(); onAction?.invoke(ActivityMessageAction.Reply(messageId)) },
                 leadingIcon = { Text("↩️", fontSize = 14.sp) }
             )
         }
         if (capability.canEdit) {
             DropdownMenuItem(
                 text = { Text("${RTL}ویرایش", fontSize = 13.sp) },
-                onClick = {
-                    onDismiss()
-                    onAction?.invoke(ActivityMessageAction.Edit(messageId))
-                },
+                onClick = { onDismiss(); onAction?.invoke(ActivityMessageAction.Edit(messageId)) },
                 leadingIcon = { Text("✏️", fontSize = 14.sp) }
             )
         }
         if (capability.canDelete) {
             DropdownMenuItem(
                 text = { Text("${RTL}حذف", fontSize = 13.sp) },
-                onClick = {
-                    onDismiss()
-                    onAction?.invoke(ActivityMessageAction.Delete(messageId))
-                },
+                onClick = { onDismiss(); onAction?.invoke(ActivityMessageAction.Delete(messageId)) },
                 leadingIcon = { Text("🗑", fontSize = 14.sp) }
             )
         }
     }
 }
 
-/**
- * ReplyReferencePreview — Reply reference bar (Telegram style).
- */
 @Composable
 private fun ReplyReferencePreview(
     repliedToMessage: ActivityMessageModel?,
@@ -467,7 +427,6 @@ private fun ReplyReferencePreview(
                 .padding(horizontal = 8.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Vertical reply bar
             Box(
                 modifier = Modifier
                     .width(3.dp)
@@ -476,11 +435,9 @@ private fun ReplyReferencePreview(
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
             )
             Spacer(modifier = Modifier.width(6.dp))
-
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (isDeleted) "${RTL}پیام حذف شده"
-                    else "${RTL}پاسخ به",
+                    text = if (isDeleted) "${RTL}پیام حذف شده" else "${RTL}پاسخ به",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Medium,
                     color = if (isDeleted)
@@ -490,15 +447,11 @@ private fun ReplyReferencePreview(
                 )
                 if (!isDeleted && repliedToMessage != null) {
                     Spacer(modifier = Modifier.height(1.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         val hasImage = repliedToMessage.attachments.any { it is ActivityAttachment.Image }
                         val hasFile = repliedToMessage.attachments.any { it is ActivityAttachment.File }
                         if (hasImage) Text("📷", fontSize = 10.sp)
                         else if (hasFile) Text("📎", fontSize = 10.sp)
-
                         Text(
                             text = repliedToMessage.text ?: "${RTL}پیام",
                             fontSize = 12.sp,

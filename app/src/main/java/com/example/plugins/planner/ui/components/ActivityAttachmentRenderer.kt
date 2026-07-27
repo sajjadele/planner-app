@@ -68,7 +68,7 @@ private fun ImageAttachmentPreview(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .heightIn(max = 240.dp)
+                .heightIn(max = 260.dp)
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)

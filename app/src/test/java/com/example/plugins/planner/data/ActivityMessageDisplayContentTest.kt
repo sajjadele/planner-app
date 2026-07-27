@@ -1,189 +1,157 @@
 package com.example.plugins.planner.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Phase 5.6 — ActivityMessageDisplayContent Tests
+ * Phase 5.7.1 — ActivityMessageDisplayContent Tests
  *
- * Validates that ActivityMessageDisplayContent correctly classifies
- * all message content types and prevents JSON/URI leakage.
+ * Validates the simplified 3-type classification:
+ * TextContent, MediaContent, MediaWithText
  */
 class ActivityMessageDisplayContentTest {
 
     // ════════════════════════════════════════════════════════════════
-    // Text Only
+    // TextContent
     // ════════════════════════════════════════════════════════════════
 
     @Test
-    fun `text only message resolves to TextOnly`() {
+    fun `text only message resolves to TextContent`() {
         val msg = createMessage(text = "Hello, world!")
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue(content is ActivityMessageDisplayContent.TextOnly)
-        assertEquals("Hello, world!", (content as ActivityMessageDisplayContent.TextOnly).text)
+        assertTrue(content is ActivityMessageDisplayContent.TextContent)
+        assertEquals("Hello, world!", (content as ActivityMessageDisplayContent.TextContent).text)
+    }
+
+    @Test
+    fun `duration only resolves to TextContent showing duration text`() {
+        val msg = createMessage(text = null, durationMinutes = 90)
+        val content = ActivityMessageDisplayContent.from(msg)
+        assertTrue(content is ActivityMessageDisplayContent.TextContent)
+        val tc = content as ActivityMessageDisplayContent.TextContent
+        assertTrue(tc.text.contains("90"))
+        assertEquals(90, tc.durationMinutes)
     }
 
     // ════════════════════════════════════════════════════════════════
-    // Image Only
+    // MediaContent (image only)
     // ════════════════════════════════════════════════════════════════
 
     @Test
-    fun `image only message resolves to ImageOnly`() {
+    fun `image only message resolves to MediaContent as image`() {
         val msg = createMessage(
             text = null,
             attachments = listOf(ActivityAttachment.Image("content://test.jpg"))
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue(content is ActivityMessageDisplayContent.ImageOnly)
-        val image = (content as ActivityMessageDisplayContent.ImageOnly).image
-        assertEquals("content://test.jpg", image.uri)
+        assertTrue(content is ActivityMessageDisplayContent.MediaContent)
+        val mc = content as ActivityMessageDisplayContent.MediaContent
+        assertTrue(mc.isImage)
+        assertTrue(mc.attachment is ActivityAttachment.Image)
     }
 
     @Test
-    fun `image only message has no text even if description has JSON`() {
-        // Simulate what happens when description has JSON but no text field
+    fun `JSON-only message never leaks JSON to text`() {
         val msg = ActivityMessageModel(
             id = 1, taskId = 1, stepId = null,
-            text = null, // text is null because mapper now returns null for JSON-without-text
+            text = null,
             attachments = listOf(ActivityAttachment.Image("content://image.jpg")),
             durationMinutes = null, createdAt = 1000L,
             canEdit = true, canDelete = true
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue("JSON-only message should be ImageOnly, not EmptyMessage",
-            content is ActivityMessageDisplayContent.ImageOnly)
-        assertNull("No text should leak from JSON description",
-            (content as? ActivityMessageDisplayContent.TextOnly)?.text)
+        assertTrue(content is ActivityMessageDisplayContent.MediaContent)
     }
 
     // ════════════════════════════════════════════════════════════════
-    // Text + Image
+    // MediaWithText (image + text)
     // ════════════════════════════════════════════════════════════════
 
     @Test
-    fun `text with image resolves to TextWithImages`() {
+    fun `text with image resolves to MediaWithText`() {
         val msg = createMessage(
             text = "Check this out!",
             attachments = listOf(ActivityAttachment.Image("content://pic.jpg"))
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue(content is ActivityMessageDisplayContent.TextWithImages)
-        val tc = content as ActivityMessageDisplayContent.TextWithImages
-        assertEquals("Check this out!", tc.text)
-        assertEquals(1, tc.images.size)
+        assertTrue(content is ActivityMessageDisplayContent.MediaWithText)
+        val mwt = content as ActivityMessageDisplayContent.MediaWithText
+        assertEquals("Check this out!", mwt.text)
+        assertTrue(mwt.isImage)
     }
 
     // ════════════════════════════════════════════════════════════════
-    // File Only
+    // MediaContent (file only)
     // ════════════════════════════════════════════════════════════════
 
     @Test
-    fun `file only message resolves to FileOnly`() {
+    fun `file only message resolves to MediaContent as file`() {
         val msg = createMessage(
             text = null,
-            attachments = listOf(
-                ActivityAttachment.File("content://doc.pdf", "report.pdf")
-            )
+            attachments = listOf(ActivityAttachment.File("content://doc.pdf", "report.pdf"))
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue(content is ActivityMessageDisplayContent.FileOnly)
-        val file = (content as ActivityMessageDisplayContent.FileOnly).file
-        assertEquals("report.pdf", file.name)
+        assertTrue(content is ActivityMessageDisplayContent.MediaContent)
+        val mc = content as ActivityMessageDisplayContent.MediaContent
+        assertFalse(mc.isImage)
+        assertTrue(mc.attachment is ActivityAttachment.File)
     }
 
     // ════════════════════════════════════════════════════════════════
-    // Text + File
+    // MediaWithText (file + text)
     // ════════════════════════════════════════════════════════════════
 
     @Test
-    fun `text with file resolves to TextWithFiles`() {
+    fun `text with file resolves to MediaWithText as file`() {
         val msg = createMessage(
             text = "See attached file",
-            attachments = listOf(
-                ActivityAttachment.File("content://data.csv", "data.csv")
-            )
+            attachments = listOf(ActivityAttachment.File("content://data.csv", "data.csv"))
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue(content is ActivityMessageDisplayContent.TextWithFiles)
-        val tc = content as ActivityMessageDisplayContent.TextWithFiles
-        assertEquals("See attached file", tc.text)
-        assertEquals(1, tc.files.size)
+        assertTrue(content is ActivityMessageDisplayContent.MediaWithText)
+        val mwt = content as ActivityMessageDisplayContent.MediaWithText
+        assertEquals("See attached file", mwt.text)
+        assertFalse(mwt.isImage)
     }
 
     // ════════════════════════════════════════════════════════════════
-    // Duration Activity
+    // Empty / Deleted
     // ════════════════════════════════════════════════════════════════
 
     @Test
-    fun `duration activity without text resolves to DurationActivity`() {
-        val msg = createMessage(
-            text = null,
-            durationMinutes = 90
-        )
-        val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue(content is ActivityMessageDisplayContent.DurationActivity)
-        val d = content as ActivityMessageDisplayContent.DurationActivity
-        assertEquals(90, d.durationMinutes)
-        assertNull(d.text)
-    }
-
-    @Test
-    fun `duration activity with text resolves to DurationActivity`() {
-        val msg = createMessage(
-            text = "Worked on UI",
-            durationMinutes = 45
-        )
-        val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue(content is ActivityMessageDisplayContent.DurationActivity)
-        val d = content as ActivityMessageDisplayContent.DurationActivity
-        assertEquals(45, d.durationMinutes)
-        assertEquals("Worked on UI", d.text)
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    // Empty / No Content
-    // ════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `message with no recognizable content resolves to EmptyMessage`() {
+    fun `empty message resolves to EmptyMessage`() {
         val msg = createMessage(text = null, durationMinutes = null, attachments = emptyList())
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue("Empty message should resolve to EmptyMessage",
-            content is ActivityMessageDisplayContent.EmptyMessage)
+        assertTrue(content is ActivityMessageDisplayContent.EmptyMessage)
     }
-
-    // ════════════════════════════════════════════════════════════════
-    // Deleted Message
-    // ════════════════════════════════════════════════════════════════
 
     @Test
     fun `deleted message resolves to DeletedMessage`() {
-        val msg = createMessage(text = "Original text").copy(isDeleted = true)
+        val msg = createMessage(text = "Original").copy(isDeleted = true)
         val content = ActivityMessageDisplayContent.from(msg)
         assertTrue(content is ActivityMessageDisplayContent.DeletedMessage)
     }
 
     // ════════════════════════════════════════════════════════════════
-    // JSON Fallback Prevention
+    // No event label / step name leakage
     // ════════════════════════════════════════════════════════════════
 
     @Test
-    fun `no Text composable receives raw JSON string`() {
-        // If a message has null text, ActivityMessageCard should NOT show any text
-        // regardless of what's in the description field
-        val msgWithNullText = createMessage(text = null)
-        val content = ActivityMessageDisplayContent.from(msgWithNullText)
-        val textValue = when (content) {
-            is ActivityMessageDisplayContent.TextOnly -> content.text
-            is ActivityMessageDisplayContent.TextWithImages -> content.text
-            is ActivityMessageDisplayContent.TextWithFiles -> content.text
-            is ActivityMessageDisplayContent.DurationActivity -> content.text
-            else -> null
+    fun `stepName is not part of display content`() {
+        val msg = createMessage(text = "A note")
+        val content = ActivityMessageDisplayContent.from(msg)
+        // Ensure content has no stepName property
+        val hasStepName = try {
+            content::class.java.getDeclaredField("stepName")
+            true
+        } catch (_: NoSuchFieldException) {
+            false
         }
-        assertNull("No text should appear for null-text messages", textValue)
+        assertFalse("Display content should not have stepName", hasStepName)
     }
 
     // ════════════════════════════════════════════════════════════════
