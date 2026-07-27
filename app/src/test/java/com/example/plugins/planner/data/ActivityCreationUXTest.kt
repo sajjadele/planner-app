@@ -85,7 +85,6 @@ class ActivityCreationUXTest {
         val mode = ComposerMode.ACTIVITY
         val headerText = when (mode) {
             ComposerMode.ACTIVITY -> "ثبت فعالیت"
-            ComposerMode.STEP -> "ثبت مرحله جدید"
             ComposerMode.EDIT -> "ویرایش فعالیت"
             ComposerMode.REPLY -> "پاسخ به فعالیت"
         }
