@@ -220,7 +220,7 @@ private fun MessageText(text: String) {
             maxLines = 10,
             overflow = TextOverflow.Ellipsis,
             lineHeight = 20.sp,
-            textAlign = TextAlign.Right
+            textAlign = TextAlign.Start
         )
     }
 }

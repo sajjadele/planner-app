@@ -19,7 +19,7 @@ interface ActivityEventDao {
         """
         SELECT * FROM activity_events
         WHERE taskId = :taskId
-        ORDER BY timestamp DESC
+        ORDER BY timestamp ASC
         """
     )
     fun observeByTaskId(taskId: Int): Flow<List<ActivityEventEntity>>

@@ -193,6 +193,17 @@ fun TaskDetailScreen(
         // If target not found and no filter active, the target may not exist — silently ignore
     }
 
+    // ── Scroll to bottom on initial load (Telegram-style: oldest at top, newest at bottom) ──
+    val initialLoadDone = remember { mutableStateOf(false) }
+    LaunchedEffect(filteredActivityMessages) {
+        if (!initialLoadDone.value && filteredActivityMessages.isNotEmpty()) {
+            initialLoadDone.value = true
+            // Delay slightly to ensure layout is measured
+            kotlinx.coroutines.delay(100)
+            activityListState.animateScrollToItem(filteredActivityMessages.size - 1)
+        }
+    }
+
     val handleMessageAction: (ActivityMessageAction) -> Unit = remember(viewModel, activityMessages) { { action ->
         when (action) {
             is ActivityMessageAction.Edit -> {
@@ -902,8 +913,8 @@ private fun groupActivityMessagesByDay(messages: List<ActivityMessageModel>): Li
         JalaliDate.toEpochMs(JalaliDate.fromEpochMs(it.createdAt))
     }
     return grouped.entries
-        .map { ActivityMessageGroup(it.key, it.value.sortedByDescending { m -> m.createdAt }) }
-        .sortedByDescending { it.dateKey }
+        .map { ActivityMessageGroup(it.key, it.value.sortedBy { m -> m.createdAt }) }
+        .sortedBy { it.dateKey }
 }
 
 @Composable
