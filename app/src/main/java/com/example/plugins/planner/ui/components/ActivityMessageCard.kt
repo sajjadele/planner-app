@@ -191,8 +191,6 @@ private fun MessageContent(
         }
 
         is ActivityMessageDisplayContent.TextWithImages -> {
-            MessageText(text = displayContent.text)
-            Spacer(modifier = Modifier.height(6.dp))
             displayContent.images.forEach { image ->
                 ClickableImagePreview(
                     image = image,
@@ -200,6 +198,8 @@ private fun MessageContent(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
             }
+            // Text after images (Telegram style)
+            MessageText(text = displayContent.text)
         }
 
         is ActivityMessageDisplayContent.FileOnly -> {
@@ -210,8 +210,6 @@ private fun MessageContent(
         }
 
         is ActivityMessageDisplayContent.TextWithFiles -> {
-            MessageText(text = displayContent.text)
-            Spacer(modifier = Modifier.height(6.dp))
             displayContent.files.forEach { file ->
                 FilePreview(
                     file = file,
@@ -219,6 +217,8 @@ private fun MessageContent(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
             }
+            // Text after files (Telegram style)
+            MessageText(text = displayContent.text)
         }
 
         is ActivityMessageDisplayContent.DurationActivity -> {
