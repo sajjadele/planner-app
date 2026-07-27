@@ -272,8 +272,7 @@ class ActivityComposerReducerTest {
         val stepDraft = state.toStepDraft()
 
         assertEquals("طراحی صفحه اصلی", stepDraft.title)
-        assertEquals(1, stepDraft.initialActivities.size)
-        assertEquals(1, stepDraft.initialActivities[0].attachments.size)
+        // Phase 5.5d: StepDraft has no initialActivities — pure tag creation
     }
 
     @Test
@@ -282,11 +281,10 @@ class ActivityComposerReducerTest {
         val stepDraft = state.toStepDraft()
 
         assertEquals("", stepDraft.title)
-        assertTrue(stepDraft.initialActivities.isEmpty())
     }
 
     @Test
-    fun `step with text only creates step without activities`() {
+    fun `step with text only creates StepDraft with title`() {
         val state = ActivityComposerState(
             text = "مرحله جدید",
             mode = ComposerMode.STEP
@@ -294,11 +292,10 @@ class ActivityComposerReducerTest {
         val stepDraft = state.toStepDraft()
 
         assertEquals("مرحله جدید", stepDraft.title)
-        assertFalse(stepDraft.hasInitialContent())
     }
 
     @Test
-    fun `step with attachment creates initial activity`() {
+    fun `step with attachment ignores attachments in StepDraft`() {
         val state = ActivityComposerState(
             text = "مرحله جدید",
             attachments = listOf(ActivityAttachment.Image("content://img/1")),
@@ -307,8 +304,8 @@ class ActivityComposerReducerTest {
         val stepDraft = state.toStepDraft()
 
         assertEquals("مرحله جدید", stepDraft.title)
-        assertTrue(stepDraft.hasInitialContent())
-        assertEquals(1, stepDraft.initialActivities.size)
+        // Phase 5.5d: Attachments are NOT mapped to StepDraft
+        // StepDraft is pure tag creation — no initialActivities
     }
 
     // ════════════════════════════════════════════════════════════════

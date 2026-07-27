@@ -77,7 +77,7 @@ class StepTagCreationTest {
     fun `create activity after selecting tag assigns stepId`() {
         // Verify that activity creation with context-aware stepId works
         val draft = ActivityDraft(text = "Design review")
-        val stepId: Long? = 5L
+        val stepId: Int? = 5
 
         // ActivityEventEntity created with stepId from context
         val entity = ActivityEventEntity(
@@ -86,14 +86,14 @@ class StepTagCreationTest {
             description = "Design review", timestamp = 1000L
         )
 
-        assertEquals(5L, entity.stepId)
+        assertEquals(5, entity.stepId)
         assertEquals("Design review", entity.description)
     }
 
     @Test
     fun `create activity without tag has null stepId`() {
         val draft = ActivityDraft(text = "General note")
-        val stepId: Long? = null
+        val stepId: Int? = null
 
         val entity = ActivityEventEntity(
             id = 1, taskId = 1, stepId = stepId,

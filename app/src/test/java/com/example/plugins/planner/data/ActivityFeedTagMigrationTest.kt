@@ -6,7 +6,6 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.reflect.full.memberProperties
 
 /**
  * ActivityFeedTagMigrationTest — Tests for Phase 5.5a Step-as-Tag migration.
@@ -237,7 +236,7 @@ class ActivityFeedTagMigrationTest {
         val message = createMessage(id = 1, stepId = 1L)
         assertTrue(message.stepId is Long)
         // Verify stepId is just metadata — no nested list
-        val props = ActivityMessageModel::class.memberProperties.map { it.name }
+        val props = ActivityMessageModel::class.java.declaredFields.map { it.name }
         assertFalse("Feed model should not have nested messages",
             props.contains("messages"))
     }

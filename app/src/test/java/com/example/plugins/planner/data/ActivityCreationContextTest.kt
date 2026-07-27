@@ -1,6 +1,7 @@
 package com.example.plugins.planner.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -209,7 +210,7 @@ class ActivityCreationContextTest {
         assertEquals(ActivityEventType.NOTE_ADDED.name, updated.eventType)
 
         // Description should be updated
-        val decoded = ActivityPayloadCodec.decode(updatedDraft.text, updated.description)
+        val decoded = ActivityPayloadCodec.decode(updated.description)
         assertEquals("Updated text", decoded?.text)
     }
 

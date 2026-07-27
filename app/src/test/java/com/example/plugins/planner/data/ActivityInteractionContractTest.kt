@@ -179,7 +179,6 @@ class ActivityInteractionContractTest {
     }
 
     @Test
-    @Test
     fun `task-level messages have null stepId and step-level have the correct id`() {
         val all = listOf(
             ActivityEventEntity(1, 1, null, ActivityEventType.NOTE_ADDED.name, "Task level", 1000L),
