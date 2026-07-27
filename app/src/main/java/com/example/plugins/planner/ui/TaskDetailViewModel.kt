@@ -15,6 +15,7 @@ import com.example.plugins.notes.data.NoteRepository
 import com.example.plugins.planner.data.ActivityDraft
 import com.example.plugins.planner.data.ActivityDraftResolver
 import com.example.plugins.planner.data.ActivityAttachment
+import com.example.plugins.planner.data.ActivityCreationContext
 import com.example.plugins.planner.data.ActivityMessageMapper
 import com.example.plugins.planner.data.ActivityMessageModel
 import com.example.plugins.planner.data.ActivityEventEntity
@@ -206,6 +207,29 @@ class TaskDetailViewModel(
     fun isAllFilterActive(): Boolean =
         _filterState.value.selectedStepId == null
 
+    // ════════════════════════════════════════════════════════════════
+    // Phase 5.5b: Context-Aware Activity Creation
+    // ════════════════════════════════════════════════════════════════
+
+    /** Current creation context derived from the active filter state. */
+    val creationContext: StateFlow<ActivityCreationContext> = _filterState
+        .map { filter ->
+            if (filter.selectedStepId != null) {
+                val step = steps.value.find { it.id.toLong() == filter.selectedStepId }
+                ActivityCreationContext(
+                    stepId = filter.selectedStepId,
+                    stepName = step?.title
+                )
+            } else {
+                ActivityCreationContext.DEFAULT
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = ActivityCreationContext.DEFAULT
+        )
+
     /** Timeline navigation range — today's start in epoch ms */
     private val _timelineStartDate = MutableStateFlow(JalaliDate.toEpochMs(JalaliDate.today()))
     val timelineStartDate: StateFlow<Long> = _timelineStartDate.asStateFlow()
@@ -294,7 +318,23 @@ class TaskDetailViewModel(
     // ════════════════════════════════════════════════════════════════
 
     /**
+     * Create an activity in the current context (Phase 5.5b).
+     *
+     * Derives stepId from the active filter/tag selection.
+     * - Tag filter active → new activity inherits that tag
+     * - All/No filter → task-level activity (stepId = null)
+     *
+     * The Composer remains step-agnostic — it never sees stepId.
+     * This is the primary entry point for UI creation flows.
+     */
+    fun createActivity(draft: ActivityDraft) {
+        val contextStepId = _filterState.value.selectedStepId?.toInt()
+        createActivity(draft, contextStepId)
+    }
+
+    /**
      * Create an activity from an ActivityDraft.
+     * Accepts optional explicit stepId for internal use.
      *
      * Phase 4.10.1: Domain Separation
      * - ActivityDraft no longer has intent or stepId
