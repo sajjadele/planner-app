@@ -142,7 +142,7 @@ class ActivityMessageTelegramStyleTest {
             id = 1, taskId = 1, stepId = null,
             text = "Test", attachments = emptyList(),
             durationMinutes = null, createdAt = 1000L,
-            canEdit = true, canDelete = true, canReply = true
+            canEdit = true, canDelete = true
         )
         val capability = msg.capability()
         // Capability exposes which actions are available
