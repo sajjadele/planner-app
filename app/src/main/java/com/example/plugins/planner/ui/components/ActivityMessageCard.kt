@@ -13,14 +13,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.core.util.RTL
@@ -33,17 +35,14 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * ActivityMessageCard — Telegram-style message bubble.
+ * ActivityMessageCard — Telegram-style message bubble for Activity Feed.
  *
- * Phase 5.7.1: Clean message display — no event labels, no step chips, no JSON/URI.
- *
- * Design:
- * - Bubble layout: max 85% width, RTL-aligned
- * - Padding: 10dp horizontal, 8dp vertical
- * - Corner radius: 14dp (uniform)
- * - Content order: media first, then text, then metadata
- * - Step/tag is NOT rendered inside the bubble — it's filter metadata only
- * - Content classified via [ActivityMessageDisplayContent]
+ * Phase 5.7.2: Full Telegram UX alignment:
+ * - Asymmetric corners (Telegram self-message style)
+ * - RTL text alignment for Persian
+ * - Context menu anchored to the bubble
+ * - Timestamp overlay on image-only messages
+ * - Click image to open fullscreen viewer
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -89,72 +88,77 @@ fun ActivityMessageCard(
         return
     }
 
-    // ── Normal bubble ──
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(maxBubbleWidthFraction)
-                .combinedClickable(
-                    onClick = { if (showMenu) showMenu = false },
-                    onLongClick = {
-                        if (capability.canEdit || capability.canDelete || capability.canReply) {
-                            showMenu = true
-                        }
-                    }
-                ),
-            color = backgroundColor,
-            shape = RoundedCornerShape(14.dp),
-            shadowElevation = if (isSelected) 3.dp else 0.5.dp
+    // ── Normal message bubble ──
+    Box(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
         ) {
-            Column(
+            Surface(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 8.dp)
-            ) {
-                // ── Reply Reference ──
-                if (message.replyToMessageId != null) {
-                    ReplyReferencePreview(
-                        repliedToMessage = repliedToMessage,
-                        isDeleted = repliedToMessage == null,
-                        onClick = {
-                            if (repliedToMessage != null) {
-                                onReplyReferenceClick?.invoke(repliedToMessage.id)
+                    .fillMaxWidth(maxBubbleWidthFraction)
+                    .combinedClickable(
+                        onClick = { if (showMenu) showMenu = false },
+                        onLongClick = {
+                            if (capability.canEdit || capability.canDelete || capability.canReply) {
+                                showMenu = true
                             }
                         }
+                    ),
+                color = backgroundColor,
+                shape = RoundedCornerShape(
+                    topStart = 16.dp, topEnd = 16.dp,
+                    bottomStart = 4.dp, bottomEnd = 16.dp
+                ),
+                shadowElevation = if (isSelected) 3.dp else 0.5.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                ) {
+                    // ── Reply Reference ──
+                    if (message.replyToMessageId != null) {
+                        ReplyReferencePreview(
+                            repliedToMessage = repliedToMessage,
+                            isDeleted = repliedToMessage == null,
+                            onClick = {
+                                if (repliedToMessage != null) {
+                                    onReplyReferenceClick?.invoke(repliedToMessage.id)
+                                }
+                            }
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+
+                    // ── Message Content ──
+                    MessageContent(
+                        displayContent = displayContent,
+                        onAttachmentClick = onAttachmentClick
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // ── Metadata: edited + timestamp ──
+                    MessageMetadataRow(
+                        isEdited = message.isEdited,
+                        createdAt = message.createdAt
+                    )
                 }
-
-                // ── Message Content (classified by ActivityMessageDisplayContent) ──
-                MessageContent(
-                    displayContent = displayContent,
-                    onAttachmentClick = onAttachmentClick
-                )
-
-                // ── Metadata row: edited + timestamp ──
-                MessageMetadataRow(
-                    isEdited = message.isEdited,
-                    createdAt = message.createdAt
-                )
             }
         }
-    }
 
-    // ── Context Menu ──
-    ContextMenu(
-        showMenu = showMenu,
-        onDismiss = { showMenu = false },
-        capability = capability,
-        messageId = message.id,
-        onAction = onAction
-    )
+        // ── Context Menu (anchored to bubble via Box) ──
+        ContextMenu(
+            showMenu = showMenu,
+            onDismiss = { showMenu = false },
+            capability = capability,
+            messageId = message.id,
+            onAction = onAction
+        )
+    }
 }
 
 // ════════════════════════════════════════════════════════════════
-// MessageContent — renders based on simplified display types
+// MessageContent
 // ════════════════════════════════════════════════════════════════
 
 @Composable
@@ -214,7 +218,8 @@ private fun MessageText(text: String) {
         color = MaterialTheme.colorScheme.onSurface,
         maxLines = 10,
         overflow = TextOverflow.Ellipsis,
-        lineHeight = 20.sp
+        lineHeight = 20.sp,
+        textAlign = TextAlign.Start
     )
 }
 
@@ -275,7 +280,7 @@ private fun FilePreview(
             Text(text = "📄", fontSize = 16.sp)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = file.name ?: "فایل پیوست",
+                    text = file.name ?: "${RTL}فایل پیوست",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -303,7 +308,7 @@ private fun MessageMetadataRow(
             Text(
                 text = "✓✓",
                 fontSize = 9.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
             Spacer(modifier = Modifier.width(3.dp))
         }
@@ -324,7 +329,7 @@ private fun MessageMetadataRow(
 @Composable
 private fun DeletedMessageBubble(
     modifier: Modifier = Modifier,
-    backgroundColor: androidx.compose.ui.graphics.Color,
+    backgroundColor: Color,
     capability: ActivityMessageCapability,
     showMenu: Boolean,
     onShowMenu: () -> Unit,
@@ -379,8 +384,7 @@ private fun ContextMenu(
 ) {
     DropdownMenu(
         expanded = showMenu,
-        onDismissRequest = onDismiss,
-        offset = DpOffset(x = 48.dp, y = 0.dp)
+        onDismissRequest = onDismiss
     ) {
         if (capability.canReply) {
             DropdownMenuItem(

@@ -52,6 +52,7 @@ import com.example.plugins.planner.data.TaskEntity
 import com.example.plugins.planner.data.TaskStepEntity
 import com.example.plugins.planner.ui.components.NeumorphicSurface
 import com.example.plugins.planner.ui.components.ActivityMessageCard
+import com.example.plugins.planner.ui.components.FullScreenImageDialog
 import com.example.plugins.planner.ui.components.ReminderSection
 import com.example.plugins.planner.ui.components.skeletonShimmerBrush
 import com.example.ui.theme.*
@@ -594,6 +595,15 @@ private fun TaskDetailActivityContent(
 ) {
     val groups = remember(messages) { groupActivityMessagesByDay(messages) }
     var showFabOptions by remember { mutableStateOf(false) }
+    var fullScreenImageUrl by remember { mutableStateOf<String?>(null) }
+
+    // ── Fullscreen Image Viewer ──
+    fullScreenImageUrl?.let { url ->
+        FullScreenImageDialog(
+            imageUri = url,
+            onDismiss = { fullScreenImageUrl = null }
+        )
+    }
 
     Box(modifier = modifier) {
         LazyColumn(
@@ -642,6 +652,11 @@ private fun TaskDetailActivityContent(
                         repliedToMessage = repliedTo,
                         isSelected = message.id == selectedMessageId,
                         onAction = onMessageAction,
+                        onAttachmentClick = { attachment ->
+                            if (attachment is ActivityAttachment.Image) {
+                                fullScreenImageUrl = attachment.uri
+                            }
+                        },
                         onReplyReferenceClick = { targetId ->
                             onMessageAction?.invoke(
                                 ActivityMessageAction.ReplyNavigation(targetId)
