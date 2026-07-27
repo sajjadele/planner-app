@@ -33,18 +33,19 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.core.util.JalaliDate
 import com.example.core.util.RTL
+import androidx.compose.material3.AlertDialog
 import com.example.plugins.planner.data.ActivityEventEntity
+import com.example.plugins.planner.data.ActivityMessageAction
 import com.example.plugins.planner.data.ActivityMessageMapper
-import com.example.plugins.planner.data.StepCardMapper
-import com.example.plugins.planner.data.StepCardModel
+import com.example.plugins.planner.data.ActivityMessageModel
 import com.example.plugins.planner.data.StepDraft
 import com.example.plugins.planner.data.TaskEntity
 import com.example.plugins.planner.data.TaskStepEntity
 import com.example.plugins.planner.ui.components.NeumorphicSurface
 import com.example.plugins.planner.ui.components.ActivityMessageCard
 import com.example.plugins.planner.ui.components.ReminderSection
-import com.example.plugins.planner.ui.components.StepCard
 import com.example.plugins.planner.ui.components.skeletonShimmerBrush
 import com.example.ui.theme.*
 import kotlinx.coroutines.delay
@@ -69,7 +70,6 @@ fun TaskDetailScreen(
     val allGoals by viewModel.allGoals.collectAsState()
     val taskLogs by viewModel.taskLogs.collectAsState()
     val steps by viewModel.steps.collectAsState()
-    val activities by viewModel.activities.collectAsState()
     val activityMessages by viewModel.activityMessages.collectAsState()
     val selectedActivityDate by viewModel.selectedActivityDate.collectAsState()
     val timelineStartDate by viewModel.timelineStartDate.collectAsState()
@@ -83,7 +83,32 @@ fun TaskDetailScreen(
     val activityListState = rememberLazyListState()
     var showTimelineSheet by remember { mutableStateOf(false) }
     var showActivityComposer by remember { mutableStateOf(false) }
-    var selectedStepIdForActivity by remember { mutableIntStateOf(-1) }
+
+    var editingMessage: ActivityMessageModel? by remember { mutableStateOf(null) }
+    var deletingMessageId: Long? by remember { mutableStateOf(null) }
+    var replyingToMessage: ActivityMessageModel? by remember { mutableStateOf(null) }
+
+    val handleMessageAction: (ActivityMessageAction) -> Unit = remember(viewModel, activityMessages) { { action ->
+        when (action) {
+            is ActivityMessageAction.Edit -> {
+                val message = activityMessages.find { it.id == action.messageId }
+                if (message != null) {
+                    editingMessage = message
+                    showActivityComposer = true
+                }
+            }
+            is ActivityMessageAction.Delete -> {
+                deletingMessageId = action.messageId
+            }
+            is ActivityMessageAction.Reply -> {
+                val message = activityMessages.find { it.id == action.messageId }
+                if (message != null) {
+                    replyingToMessage = message
+                    showActivityComposer = true
+                }
+            }
+        }
+    } }
 
     val currentGoalName = remember(task, allGoals) {
         task?.goalId?.let { gid -> allGoals.firstOrNull { it.id == gid }?.title }
@@ -146,17 +171,10 @@ fun TaskDetailScreen(
                     modifier = Modifier
                         .weight(1f)
                         .padding(horizontal = 16.dp),
-                    steps = steps,
-                    activities = activities,
+                    messages = activityMessages,
                     onTapComposer = { showActivityComposer = true },
-                    onToggleStep = { viewModel.toggleStepCompletion(it) },
-                    onDeleteStep = { viewModel.deleteStep(it) },
-                    onAddActivityToStep = { stepId ->
-                        selectedStepIdForActivity = stepId
-                        showActivityComposer = true
-                    },
-                    listState = activityListState,
-                    onOpenTimeline = { showTimelineSheet = true }
+                    onMessageAction = handleMessageAction,
+                    listState = activityListState
                 )
             }
         }
@@ -170,31 +188,60 @@ fun TaskDetailScreen(
             onDismiss = { showTimelineSheet = false },
             onSelectDate = { viewModel.selectActivityDate(it) },
             onGoToToday = { viewModel.goToToday() },
-            onMoveDate = { viewModel.moveActivityDate(it) }
+            onMoveDate = { viewModel.moveActivityDate(it) },
+            onMessageAction = handleMessageAction
         )
 
         if (showActivityComposer) {
             ActivityComposerBottomSheet(
                 onDismiss = { 
                     showActivityComposer = false
-                    selectedStepIdForActivity = -1
+                    editingMessage = null
+                    replyingToMessage = null
                 },
                 onCreateActivity = { draft ->
-                    val stepId = if (selectedStepIdForActivity != -1) {
-                        selectedStepIdForActivity
-                    } else {
-                        null
-                    }
-                    viewModel.createActivity(draft, stepId)
+                    viewModel.createActivity(draft)
                     showActivityComposer = false
-                    selectedStepIdForActivity = -1
+                    editingMessage = null
+                    replyingToMessage = null
                     focusManager.clearFocus()
                 },
                 onCreateStep = { stepDraft ->
                     viewModel.createStep(stepDraft)
                     showActivityComposer = false
-                    selectedStepIdForActivity = -1
+                    editingMessage = null
+                    replyingToMessage = null
                     focusManager.clearFocus()
+                },
+                onUpdateActivity = { messageId, draft ->
+                    viewModel.updateActivity(messageId, draft)
+                    showActivityComposer = false
+                    editingMessage = null
+                    replyingToMessage = null
+                    focusManager.clearFocus()
+                },
+                initialMessage = editingMessage,
+                replyToMessage = replyingToMessage
+            )
+        }
+
+        deletingMessageId?.let { msgId ->
+            AlertDialog(
+                onDismissRequest = { deletingMessageId = null },
+                title = { Text("${RTL}حذف فعالیت") },
+                text = { Text("${RTL}این فعالیت حذف شود؟") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.deleteActivity(msgId)
+                        deletingMessageId = null
+                    }) {
+                        Text("${RTL}حذف", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { deletingMessageId = null }) {
+                        Text("${RTL}لغو")
+                    }
                 }
             )
         }
@@ -419,120 +466,105 @@ private fun TaskDetailOverviewContent(
 }
 
 // ════════════════════════════════════════════════════════════════
-// ACTIVITY — steps structure + timeline preview
+// ACTIVITY FEED — flat message stream (Phase 5.2.1)
 // ════════════════════════════════════════════════════════════════
 
 @Composable
 private fun TaskDetailActivityContent(
     modifier: Modifier = Modifier,
-    steps: List<TaskStepEntity>,
-    activities: List<ActivityEventEntity>,
+    messages: List<ActivityMessageModel>,
     onTapComposer: () -> Unit,
-    onToggleStep: (TaskStepEntity) -> Unit,
-    onDeleteStep: (TaskStepEntity) -> Unit,
-    onAddActivityToStep: (Int) -> Unit,
-    listState: LazyListState = rememberLazyListState(),
-    onOpenTimeline: () -> Unit
+    onMessageAction: ((ActivityMessageAction) -> Unit)? = null,
+    listState: LazyListState = rememberLazyListState()
 ) {
+    val groups = remember(messages) { groupActivityMessagesByDay(messages) }
+
     LazyColumn(
         modifier = modifier,
         state = listState,
         verticalArrangement = Arrangement.spacedBy(6.dp),
         contentPadding = PaddingValues(bottom = 8.dp)
     ) {
-        // ── Steps Header ──
-        item(key = "steps_header") {
-            Text(
-                text = "${RTL}مراحل (${steps.size})",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-            )
-        }
-
-        // ── Steps List or Empty State ──
-        if (steps.isEmpty()) {
-            item(key = "steps_empty") {
+        if (groups.isEmpty()) {
+            item(key = "empty_feed") {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 16.dp),
+                        .padding(vertical = 32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(text = "📝", fontSize = 24.sp)
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "${RTL}هنوز مرحله‌ای تعریف نشده",
-                            fontSize = 12.sp,
+                            text = "${RTL}هنوز فعالیتی ثبت نشده",
+                            fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "${RTL}برای ثبت اولین فعالیت، دکمه + را بزنید",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                     }
                 }
             }
-        } else {
-            items(steps, key = { it.id }) { step ->
-                // Convert step to StepCardModel with its activities
-                val stepActivities = remember(activities, step.id) {
-                    val filtered = activities.filter { it.stepId == step.id }
-                    filtered.mapNotNull { ActivityMessageMapper.toMessage(it) }
-                }
-                val stepCard = remember(step, stepActivities) {
-                    StepCardMapper.toCardModel(step, stepActivities)
-                }
+        }
 
-                StepCard(
-                    model = stepCard,
-                    onToggle = { onToggleStep(step) },
-                    onDelete = { onDeleteStep(step) },
-                    onAddActivity = onAddActivityToStep
+        groups.forEach { group ->
+            item(key = "date_${group.dateKey}") {
+                ActivityFeedDayHeader(dateKey = group.dateKey)
+            }
+
+            items(group.messages, key = { it.id }) { message ->
+                ActivityMessageCard(
+                    message = message,
+                    onAction = onMessageAction
                 )
             }
-        }
-
-        // ── Divider ──
-        item(key = "divider") {
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 8.dp),
-                thickness = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-            )
-        }
-
-        // ── Activity Header ──
-        item(key = "activity_header") {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "${RTL}فعالیت‌ها",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                IconButton(onClick = onTapComposer) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "${RTL}افزودن فعالیت",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-        }
-
-        // ── Timeline Preview Card ──
-        item(key = "timeline_preview") {
-            TimelinePreviewCard(
-                activities = activities,
-                onClick = onOpenTimeline
-            )
         }
     }
+}
+
+private data class ActivityMessageGroup(
+    val dateKey: Long,
+    val messages: List<ActivityMessageModel>
+)
+
+private fun groupActivityMessagesByDay(messages: List<ActivityMessageModel>): List<ActivityMessageGroup> {
+    val grouped = messages.groupBy {
+        JalaliDate.toEpochMs(JalaliDate.fromEpochMs(it.createdAt))
+    }
+    return grouped.entries
+        .map { ActivityMessageGroup(it.key, it.value.sortedByDescending { m -> m.createdAt }) }
+        .sortedByDescending { it.dateKey }
+}
+
+@Composable
+private fun ActivityFeedDayHeader(dateKey: Long) {
+    val todayKey = remember { JalaliDate.toEpochMs(JalaliDate.today()) }
+    val yesterdayDate = remember {
+        val t = JalaliDate.today()
+        JalaliDate.toEpochMs(JalaliDate(t.year, t.month, t.day - 1))
+    }
+
+    val label = when (dateKey) {
+        todayKey -> "${RTL}امروز"
+        yesterdayDate -> "${RTL}دیروز"
+        else -> {
+            val jDate = JalaliDate.fromEpochMs(dateKey)
+            "${RTL}${jDate.day} ${JalaliDate.MONTH_NAMES[jDate.month - 1]} ${jDate.year}"
+        }
+    }
+
+    Text(
+        text = label,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
+    )
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -662,6 +694,8 @@ private fun TimelinePreviewCard(
             }
         }
     }
+}
+
 }
 
 @Composable

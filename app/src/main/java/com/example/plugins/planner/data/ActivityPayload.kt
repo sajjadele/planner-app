@@ -31,5 +31,6 @@ package com.example.plugins.planner.data
 data class ActivityPayload(
     val text: String? = null,
     val attachments: List<ActivityAttachment> = emptyList(),
-    val durationMinutes: Int? = null
+    val durationMinutes: Int? = null,
+    val replyToMessageId: Long? = null
 )

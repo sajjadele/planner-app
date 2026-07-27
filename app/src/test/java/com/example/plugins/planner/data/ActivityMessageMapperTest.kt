@@ -1,6 +1,7 @@
 package com.example.plugins.planner.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -188,7 +189,7 @@ class ActivityMessageMapperTest {
     // ════════════════════════════════════════════════════════════════
 
     @Test
-    fun `legacy image format (uri:::description) still works`() {
+    fun `legacy image format uri triple-colon description still works`() {
         val entity = ActivityEventEntity(
             id = 8,
             taskId = 100,
@@ -208,7 +209,7 @@ class ActivityMessageMapperTest {
     }
 
     @Test
-    fun `legacy manual activity format (title|duration) still works`() {
+    fun `legacy manual activity format title pipe duration still works`() {
         val entity = ActivityEventEntity(
             id = 9,
             taskId = 100,
@@ -434,7 +435,7 @@ class ActivityMessageMapperTest {
     }
 
     @Test
-    fun `canDelete false by default for new messages`() {
+    fun `canDelete true by default for active messages`() {
         val entity = ActivityEventEntity(
             id = 32,
             taskId = 100,
@@ -447,7 +448,7 @@ class ActivityMessageMapperTest {
         val model = ActivityMessageMapper.toMessage(entity)
 
         assertNotNull(model)
-        assertFalse(model!!.canDelete)
+        assertTrue(model!!.canDelete)
     }
 
     @Test
@@ -465,7 +466,7 @@ class ActivityMessageMapperTest {
         val capability = model!!.capability()
 
         assertTrue(capability.canEdit)
-        assertFalse(capability.canDelete)
+        assertTrue(capability.canDelete)
         assertTrue(capability.canReply)
     }
 

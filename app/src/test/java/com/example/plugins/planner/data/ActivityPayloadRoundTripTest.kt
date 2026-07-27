@@ -1,6 +1,7 @@
 package com.example.plugins.planner.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -102,26 +103,7 @@ class ActivityPayloadRoundTripTest {
     }
 
     // ════════════════════════════════════════════════════════════════
-    // Test 5: Step intent
-    // ════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `round trip - step intent`() {
-        val original = ActivityPayload(
-            text = "Create database",
-            intent = ActivityIntent.STEP
-        )
-        val encoded = ActivityPayloadCodec.encode(original)
-        assertNotNull(encoded)
-
-        val decoded = ActivityPayloadCodec.decode(encoded!!)
-        assertNotNull(decoded)
-        assertEquals("Create database", decoded!!.text)
-        assertEquals(ActivityIntent.STEP, decoded.intent)
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    // Test 6: Full payload with all fields
+    // Test 5: Full payload with all fields
     // ════════════════════════════════════════════════════════════════
 
     @Test
@@ -131,8 +113,7 @@ class ActivityPayloadRoundTripTest {
             attachments = listOf(
                 ActivityAttachment.Image("content://image/mockup.jpg")
             ),
-            durationMinutes = 120,
-            intent = ActivityIntent.ACTIVITY
+            durationMinutes = 120
         )
         val encoded = ActivityPayloadCodec.encode(original)
         assertNotNull(encoded)
@@ -142,11 +123,59 @@ class ActivityPayloadRoundTripTest {
         assertEquals("طراحی صفحه اصلی", decoded!!.text)
         assertEquals(1, decoded.attachments.size)
         assertEquals(120, decoded.durationMinutes)
-        assertEquals(ActivityIntent.ACTIVITY, decoded.intent)
+        assertNull(decoded.replyToMessageId)
     }
 
     // ════════════════════════════════════════════════════════════════
-    // Test 7: Draft → Payload → Codec → Decode symmetry
+    // Test 6: Reply reference
+    // ════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `round trip - reply reference`() {
+        val original = ActivityPayload(
+            text = "Reply to your message",
+            replyToMessageId = 42L
+        )
+        val encoded = ActivityPayloadCodec.encode(original)
+        assertNotNull(encoded)
+
+        val decoded = ActivityPayloadCodec.decode(encoded!!)
+        assertNotNull(decoded)
+        assertEquals("Reply to your message", decoded!!.text)
+        assertEquals(42L, decoded.replyToMessageId)
+    }
+
+    @Test
+    fun `round trip - full payload with reply reference`() {
+        val original = ActivityPayload(
+            text = "Full reply with attachments",
+            attachments = listOf(
+                ActivityAttachment.Image("content://image/reply.jpg")
+            ),
+            durationMinutes = 30,
+            replyToMessageId = 99L
+        )
+        val encoded = ActivityPayloadCodec.encode(original)
+        assertNotNull(encoded)
+
+        val decoded = ActivityPayloadCodec.decode(encoded!!)
+        assertNotNull(decoded)
+        assertEquals("Full reply with attachments", decoded!!.text)
+        assertEquals(1, decoded.attachments.size)
+        assertEquals(30, decoded.durationMinutes)
+        assertEquals(99L, decoded.replyToMessageId)
+    }
+
+    @Test
+    fun `decode JSON without replyToMessageId field returns null`() {
+        val payload = ActivityPayloadCodec.decode("""{"text":"No reply ref"}""")
+        assertNotNull(payload)
+        assertEquals("No reply ref", payload!!.text)
+        assertNull(payload.replyToMessageId)
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // Test 10: Draft → Payload → Codec → Decode symmetry
     // ════════════════════════════════════════════════════════════════
 
     @Test
@@ -154,8 +183,7 @@ class ActivityPayloadRoundTripTest {
         val draft = ActivityDraft(
             text = "Review PR",
             attachments = listOf(ActivityAttachment.Image("content://img/screenshot.png")),
-            durationMinutes = 45,
-            intent = ActivityIntent.ACTIVITY
+            durationMinutes = 45
         )
 
         // Draft → Payload
@@ -177,5 +205,14 @@ class ActivityPayloadRoundTripTest {
         assertEquals(draft.text, decoded!!.text)
         assertEquals(draft.attachments.size, decoded.attachments.size)
         assertEquals(draft.durationMinutes, decoded.durationMinutes)
+        assertNull(decoded.replyToMessageId)
+    }
+
+    @Test
+    fun `encode null replyToMessageId omits field`() {
+        val payload = ActivityPayload(text = "Hello", replyToMessageId = null)
+        val encoded = ActivityPayloadCodec.encode(payload)
+        assertNotNull(encoded)
+        assertFalse(encoded!!.contains("replyToMessageId"))
     }
 }

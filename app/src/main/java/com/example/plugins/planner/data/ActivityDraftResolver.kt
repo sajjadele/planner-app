@@ -40,12 +40,13 @@ object ActivityDraftResolver {
      *
      * Encoding strategy:
      * - If draft has attachments → use JSON format
+     * - If draft has replyToMessageId → use JSON format
      * - If draft has duration → use legacy "title|duration" format
      * - Otherwise → use plain text
      */
     fun encodeDescription(draft: ActivityDraft): String? {
-        // For drafts with attachments, use JSON format
-        if (draft.attachments.isNotEmpty()) {
+        // For drafts with complex data, use JSON format
+        if (draft.attachments.isNotEmpty() || draft.replyToMessageId != null) {
             val payload = draftToPayload(draft)
             return ActivityPayloadCodec.encode(payload)
         }
@@ -70,7 +71,8 @@ object ActivityDraftResolver {
         return ActivityPayload(
             text = draft.text,
             attachments = draft.attachments,
-            durationMinutes = draft.durationMinutes
+            durationMinutes = draft.durationMinutes,
+            replyToMessageId = draft.replyToMessageId
         )
     }
 

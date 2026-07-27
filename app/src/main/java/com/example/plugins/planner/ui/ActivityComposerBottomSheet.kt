@@ -22,55 +22,54 @@ import androidx.compose.ui.unit.sp
 import com.example.core.util.RTL
 import com.example.plugins.planner.data.ActivityAttachment
 import com.example.plugins.planner.data.ActivityDraft
+import com.example.plugins.planner.data.ActivityMessageModel
 import com.example.plugins.planner.data.StepDraft
 import com.example.plugins.planner.ui.composer.ActivityComposerAction
 import com.example.plugins.planner.ui.composer.ActivityComposerReducer
 import com.example.plugins.planner.ui.composer.ActivityComposerState
+import com.example.plugins.planner.ui.composer.ComposerMode
 import com.example.plugins.planner.ui.composer.DurationPickerDialog
 import com.example.plugins.planner.ui.composer.UnifiedComposerContent
 
-/**
- * ActivityComposerBottomSheet — Telegram-style unified activity composer.
- *
- * Architecture (Phase 4.7.4):
- * - Single text input for all activity types
- * - Inline attachment previews
- * - Duration picker
- * - Convert to step
- * - State-driven with reducer pattern
- *
- * Layout:
- * ┌─────────────────────────────────────┐
- * │  ثبت مورد جدید                      │
- * │                                     │
- * │  چیزی که انجام دادی...             │
- * │                                     │
- * │  ┌─────────────────────────────┐   │
- * │  │      image preview          │   │
- * │  └─────────────────────────────┘   │
- * │                                     │
- * │  ┌─────────────────────────────┐   │
- * │  │  ⏱️ ۹۰ دقیقه               │   │
- * │  └─────────────────────────────┘   │
- * │                                     │
- * │  📎   🖼   ⏱️   ✓ مرحله     ➤ │
- * └─────────────────────────────────────┘
- */
 @Composable
 fun ActivityComposerBottomSheet(
     onDismiss: () -> Unit,
     onCreateActivity: (ActivityDraft) -> Unit,
-    onCreateStep: (StepDraft) -> Unit
+    onCreateStep: (StepDraft) -> Unit,
+    onUpdateActivity: ((Long, ActivityDraft) -> Unit)? = null,
+    initialMessage: ActivityMessageModel? = null,
+    replyToMessage: ActivityMessageModel? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val focusManager = LocalFocusManager.current
 
-    // ── State-driven composer ──
-    var composerState by remember { mutableStateOf(ActivityComposerState()) }
+    val initialMode = when {
+        initialMessage != null -> ComposerMode.EDIT
+        replyToMessage != null -> ComposerMode.REPLY
+        else -> ComposerMode.ACTIVITY
+    }
+
+    val initialState = remember(initialMessage, replyToMessage) {
+        when {
+            initialMessage != null -> ActivityComposerState(
+                text = initialMessage.text ?: "",
+                attachments = initialMessage.attachments,
+                durationMinutes = initialMessage.durationMinutes,
+                mode = ComposerMode.EDIT,
+                existingMessageId = initialMessage.id
+            )
+            replyToMessage != null -> ActivityComposerState(
+                mode = ComposerMode.REPLY,
+                replyToMessageId = replyToMessage.id
+            )
+            else -> ActivityComposerState()
+        }
+    }
+
+    var composerState by remember { mutableStateOf(initialState) }
     var showDurationPicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    // ── Dispatch helper (use rememberUpdatedState to avoid stale closure) ──
     val currentState by rememberUpdatedState(composerState)
     val dispatch = remember {
         { action: ActivityComposerAction ->
@@ -78,45 +77,49 @@ fun ActivityComposerBottomSheet(
         }
     }
 
-    // ── Image picker launcher ──
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri: Uri? ->
-            Log.d("COMPOSER_DEBUG", "📸 Image picker returned: uri=$uri")
             if (uri != null) {
-                // Take persistable permission so Coil can load the image
                 try {
                     context.contentResolver.takePersistableUriPermission(
                         uri,
                         android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
                     )
-                    Log.d("COMPOSER_DEBUG", "📸 Took persistable URI permission")
-                } catch (e: Exception) {
-                    Log.w("COMPOSER_DEBUG", "📸 Could not take persistable permission: ${e.message}")
-                }
-                
-                Log.d("COMPOSER_DEBUG", "📸 Dispatching AddAttachment action")
+                } catch (_: Exception) { }
                 dispatch(ActivityComposerAction.AddAttachment(ActivityAttachment.Image(uri.toString())))
-                Log.d("COMPOSER_DEBUG", "📸 After dispatch, composerState.attachments.size=${composerState.attachments.size}")
-            } else {
-                Log.d("COMPOSER_DEBUG", "📸 Image picker returned null uri")
             }
         }
     )
 
-    // ── Submit handler ──
     val handleSubmit = remember(composerState) {
         {
             if (composerState.canSubmit()) {
                 focusManager.clearFocus()
-                if (composerState.isStepMode()) {
-                    onCreateStep(composerState.toStepDraft())
-                } else {
-                    onCreateActivity(composerState.toActivityDraft())
+                when {
+                    composerState.isEditMode() && composerState.existingMessageId != null -> {
+                        onUpdateActivity?.invoke(
+                            composerState.existingMessageId!!,
+                            composerState.toActivityDraft()
+                        )
+                    }
+                    composerState.isStepMode() -> {
+                        onCreateStep(composerState.toStepDraft())
+                    }
+                    else -> {
+                        onCreateActivity(composerState.toActivityDraft())
+                    }
                 }
                 dispatch(ActivityComposerAction.Reset)
             }
         }
+    }
+
+    val headerText = when {
+        composerState.isEditMode() -> "${RTL}ویرایش فعالیت"
+        composerState.isReplyMode() -> "${RTL}پاسخ به فعالیت"
+        composerState.isStepMode() -> "${RTL}ثبت مرحله جدید"
+        else -> "${RTL}ثبت مورد جدید"
     }
 
     ModalBottomSheet(
@@ -143,20 +146,18 @@ fun ActivityComposerBottomSheet(
                     .padding(bottom = 16.dp)
                     .verticalScroll(scrollState)
             ) {
-                // ── Header ──
                 Text(
-                    text = "${RTL}ثبت مورد جدید",
+                    text = headerText,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
                 )
 
-                // ── Unified Composer Content ──
                 UnifiedComposerContent(
                     state = composerState,
                     dispatch = dispatch,
                     onSubmit = handleSubmit,
-                    onAddFile = { /* Future: file picker */ },
+                    onAddFile = { },
                     onAddImage = {
                         imagePickerLauncher.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -164,20 +165,21 @@ fun ActivityComposerBottomSheet(
                     },
                     onToggleDuration = { showDurationPicker = true },
                     onToggleStep = {
-                        dispatch(
-                            if (composerState.isStepMode()) {
-                                ActivityComposerAction.ConvertToActivity
-                            } else {
-                                ActivityComposerAction.ConvertToStep
-                            }
-                        )
+                        if (!composerState.isEditMode() && !composerState.isReplyMode()) {
+                            dispatch(
+                                if (composerState.isStepMode()) {
+                                    ActivityComposerAction.ConvertToActivity
+                                } else {
+                                    ActivityComposerAction.ConvertToStep
+                                }
+                            )
+                        }
                     },
                     onShowDurationPicker = { showDurationPicker = true }
                 )
             }
         }
 
-        // ── Duration Picker Dialog ──
         if (showDurationPicker) {
             DurationPickerDialog(
                 onDismiss = { showDurationPicker = false },

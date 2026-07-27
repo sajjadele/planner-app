@@ -4,6 +4,7 @@ package com.example.plugins.planner.ui.composer
  * ActivityComposerReducer — Pure function for state transitions.
  *
  * Phase 4.11.1: Unified Composer State
+ * Phase 4.16: Activity Interaction Foundation (EDIT/REPLY modes)
  *
  * Architecture:
  * - Pure Kotlin, no Android dependencies
@@ -16,6 +17,7 @@ package com.example.plugins.planner.ui.composer
  * - Same input always produces same output
  * - No logging (removed for production)
  * - No side effects (no file I/O, no network)
+ * - EDIT/REPLY transitions are placeholders for Phase 5
  *
  * Usage:
  * ```kotlin
@@ -65,6 +67,24 @@ object ActivityComposerReducer {
 
             is ActivityComposerAction.ConvertToActivity -> {
                 state.copy(mode = ComposerMode.ACTIVITY)
+            }
+
+            is ActivityComposerAction.StartEdit -> {
+                state.copy(
+                    mode = ComposerMode.EDIT,
+                    existingMessageId = action.messageId
+                )
+            }
+
+            is ActivityComposerAction.StartReply -> {
+                state.copy(
+                    mode = ComposerMode.REPLY,
+                    replyToMessageId = action.messageId
+                )
+            }
+
+            is ActivityComposerAction.CancelInteraction -> {
+                state.clearInteraction()
             }
 
             is ActivityComposerAction.Reset -> {

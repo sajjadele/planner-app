@@ -27,6 +27,7 @@ import coil.request.ImageRequest
 import com.example.core.calendar.PersianCalendarDialog
 import com.example.core.util.JalaliDate
 import com.example.core.util.RTL
+import com.example.plugins.planner.data.ActivityMessageAction
 import com.example.plugins.planner.data.ActivityMessageModel
 import com.example.plugins.planner.ui.components.ActivityMessageCard
 import com.example.plugins.planner.ui.components.NeumorphicSurface
@@ -44,7 +45,8 @@ fun TimelineBottomSheet(
     onDismiss: () -> Unit,
     onSelectDate: (Long) -> Unit,
     onGoToToday: () -> Unit,
-    onMoveDate: (Int) -> Unit
+    onMoveDate: (Int) -> Unit,
+    onMessageAction: ((ActivityMessageAction) -> Unit)? = null
 ) {
     if (!visible) return
 
@@ -63,7 +65,8 @@ fun TimelineBottomSheet(
             messages = messages,
             onGoToToday = onGoToToday,
             onMoveDate = onMoveDate,
-            onSelectDate = onSelectDate
+            onSelectDate = onSelectDate,
+            onMessageAction = onMessageAction
         )
     }
 }
@@ -76,7 +79,8 @@ private fun TimelineSheetContent(
     messages: List<ActivityMessageModel>,
     onGoToToday: () -> Unit,
     onMoveDate: (Int) -> Unit,
-    onSelectDate: (Long) -> Unit
+    onSelectDate: (Long) -> Unit,
+    onMessageAction: ((ActivityMessageAction) -> Unit)? = null
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val activityGroups = remember(messages) { groupMessagesByDay(messages) }
@@ -182,7 +186,14 @@ private fun TimelineSheetContent(
                         items = group.messages,
                         key = { it.id }
                     ) { message ->
-                        ActivityMessageCard(message = message)
+                        val repliedTo = message.replyToMessageId?.let { replyId ->
+                            messages.find { it.id == replyId }
+                        }
+                        ActivityMessageCard(
+                            message = message,
+                            repliedToMessage = repliedTo,
+                            onAction = onMessageAction
+                        )
                     }
                 }
             }

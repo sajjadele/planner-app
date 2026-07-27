@@ -138,8 +138,10 @@ class ActivityPayloadCodecTest {
     @Test
     fun `malformed JSON object - graceful failure`() {
         val decoded = ActivityPayloadCodec.decode("{invalid json}")
-        // Should handle gracefully
-        assertNull(decoded)
+        // Should handle gracefully — falls back to legacy text format
+        assertNotNull(decoded)
+        assertEquals("{invalid json}", decoded!!.text)
+        assertTrue(decoded.attachments.isEmpty())
     }
 
     // ════════════════════════════════════════════════════════════════

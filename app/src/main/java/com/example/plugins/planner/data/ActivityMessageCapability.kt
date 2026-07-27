@@ -55,7 +55,11 @@ data class ActivityMessageCapability(
             canReply = true
         )
 
-        /** Default capability for new messages. */
-        val DEFAULT = ActivityMessageCapability()
+        /** Default capability for active messages. */
+        val DEFAULT = ActivityMessageCapability(
+            canEdit = true,
+            canDelete = true,
+            canReply = true
+        )
     }
 }

@@ -111,6 +111,7 @@ dependencies {
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.mockk)
+  testImplementation("org.json:json:20210307")
   testImplementation(libs.turbine)
   testImplementation(libs.robolectric)
   // testImplementation(libs.roborazzi)  // FROZEN

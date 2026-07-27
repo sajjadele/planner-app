@@ -1,7 +1,5 @@
 package com.example.plugins.planner.data
 
-import org.json.JSONObject
-
 /**
  * ActivityMessageMapper — Converts ActivityEventEntity to ActivityMessageModel.
  *
@@ -72,6 +70,7 @@ object ActivityMessageMapper {
         val text = extractText(payload, entity.description, eventType)
         val attachments = payload?.attachments ?: emptyList()
         val durationMinutes = extractDuration(payload, entity.description, eventType)
+        val replyToMessageId = payload?.replyToMessageId
 
         return ActivityMessageModel(
             id = entity.id.toLong(),
@@ -82,9 +81,9 @@ object ActivityMessageMapper {
             durationMinutes = durationMinutes,
             createdAt = entity.timestamp,
             canEdit = true,
-            canDelete = false,
+            canDelete = true,
             isDeleted = false,
-            replyToMessageId = null
+            replyToMessageId = replyToMessageId
         )
     }
 

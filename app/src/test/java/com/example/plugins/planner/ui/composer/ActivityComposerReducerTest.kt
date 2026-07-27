@@ -5,6 +5,7 @@ import com.example.plugins.planner.data.ActivityDraft
 import com.example.plugins.planner.data.StepDraft
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -360,5 +361,89 @@ class ActivityComposerReducerTest {
         val state = ActivityComposerState(mode = ComposerMode.ACTIVITY)
         assertTrue(state.isActivityMode())
         assertFalse(state.isStepMode())
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // Phase 4.16: EDIT/REPLY mode support
+    // ════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `StartEdit sets EDIT mode and stores messageId`() {
+        val state = ActivityComposerState()
+        val newState = ActivityComposerReducer.reduce(
+            state,
+            ActivityComposerAction.StartEdit(42L)
+        )
+        assertEquals(ComposerMode.EDIT, newState.mode)
+        assertEquals(42L, newState.existingMessageId)
+        assertNull(newState.replyToMessageId)
+    }
+
+    @Test
+    fun `StartReply sets REPLY mode and stores messageId`() {
+        val state = ActivityComposerState()
+        val newState = ActivityComposerReducer.reduce(
+            state,
+            ActivityComposerAction.StartReply(99L)
+        )
+        assertEquals(ComposerMode.REPLY, newState.mode)
+        assertEquals(99L, newState.replyToMessageId)
+        assertNull(newState.existingMessageId)
+    }
+
+    @Test
+    fun `CancelInteraction resets mode to ACTIVITY and clears interaction state`() {
+        val state = ActivityComposerState(
+            mode = ComposerMode.EDIT,
+            existingMessageId = 42L,
+            replyToMessageId = 99L
+        )
+        val newState = ActivityComposerReducer.reduce(
+            state,
+            ActivityComposerAction.CancelInteraction
+        )
+        assertEquals(ComposerMode.ACTIVITY, newState.mode)
+        assertNull(newState.existingMessageId)
+        assertNull(newState.replyToMessageId)
+    }
+
+    @Test
+    fun `isEditMode returns true for EDIT`() {
+        val state = ActivityComposerState(mode = ComposerMode.EDIT)
+        assertTrue(state.isEditMode())
+        assertFalse(state.isActivityMode())
+        assertFalse(state.isStepMode())
+        assertFalse(state.isReplyMode())
+    }
+
+    @Test
+    fun `isReplyMode returns true for REPLY`() {
+        val state = ActivityComposerState(mode = ComposerMode.REPLY)
+        assertTrue(state.isReplyMode())
+        assertFalse(state.isActivityMode())
+        assertFalse(state.isStepMode())
+        assertFalse(state.isEditMode())
+    }
+
+    @Test
+    fun `StartEdit preserves existing text`() {
+        val state = ActivityComposerState(text = "Existing text")
+        val newState = ActivityComposerReducer.reduce(
+            state,
+            ActivityComposerAction.StartEdit(42L)
+        )
+        assertEquals("Existing text", newState.text)
+        assertEquals(ComposerMode.EDIT, newState.mode)
+    }
+
+    @Test
+    fun `StartReply preserves existing text`() {
+        val state = ActivityComposerState(text = "Existing text")
+        val newState = ActivityComposerReducer.reduce(
+            state,
+            ActivityComposerAction.StartReply(99L)
+        )
+        assertEquals("Existing text", newState.text)
+        assertEquals(ComposerMode.REPLY, newState.mode)
     }
 }

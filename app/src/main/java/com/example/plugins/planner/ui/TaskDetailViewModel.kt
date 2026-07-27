@@ -248,6 +248,44 @@ class TaskDetailViewModel(
     }
 
     // ════════════════════════════════════════════════════════════════
+    // Phase 5.1: Activity Message Interactions (Edit/Delete/Reply)
+    // ════════════════════════════════════════════════════════════════
+
+    /**
+     * Delete an activity message by its ID.
+     * Removes the entity from the database.
+     * Flow automatically updates the UI.
+     */
+    fun deleteActivity(messageId: Long) {
+        viewModelScope.launch {
+            activityEventRepository.deleteEvent(messageId)
+        }
+    }
+
+    /**
+     * Update an existing activity message with new content.
+     * Updates the description field of the existing entity.
+     * Event type and timestamp are preserved.
+     */
+    fun updateActivity(messageId: Long, draft: ActivityDraft) {
+        viewModelScope.launch {
+            val entity = activityEventRepository.getEventById(messageId) ?: return@launch
+            val description = ActivityDraftResolver.encodeDescription(draft)
+            val updated = entity.copy(description = description)
+            activityEventRepository.updateEvent(updated)
+        }
+    }
+
+    /**
+     * Get a single activity message model by entity ID.
+     * Used for pre-filling the composer during edit.
+     */
+    suspend fun getActivityById(messageId: Long): ActivityMessageModel? {
+        val entity = activityEventRepository.getEventById(messageId) ?: return null
+        return ActivityMessageMapper.toMessage(entity)
+    }
+
+    // ════════════════════════════════════════════════════════════════
     // LEGACY: Keep for backward compatibility (can be removed later)
     // ════════════════════════════════════════════════════════════════
 

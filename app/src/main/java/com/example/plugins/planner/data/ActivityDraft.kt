@@ -40,13 +40,18 @@ data class ActivityDraft(
     /**
      * Duration in minutes (for manual activity tracking).
      */
-    val durationMinutes: Int? = null
+    val durationMinutes: Int? = null,
+
+    /**
+     * ID of the message this replies to. Null for top-level messages.
+     */
+    val replyToMessageId: Long? = null
 ) {
     /**
      * Check if this draft has any content.
      */
     fun hasContent(): Boolean {
-        return text != null || attachments.isNotEmpty() || durationMinutes != null
+        return text != null || attachments.isNotEmpty() || durationMinutes != null || replyToMessageId != null
     }
 
     /**

@@ -45,7 +45,9 @@ data class ActivityComposerState(
     val text: String = "",
     val attachments: List<ActivityAttachment> = emptyList(),
     val durationMinutes: Int? = null,
-    val mode: ComposerMode = ComposerMode.ACTIVITY
+    val mode: ComposerMode = ComposerMode.ACTIVITY,
+    val existingMessageId: Long? = null,
+    val replyToMessageId: Long? = null
 ) {
     // ════════════════════════════════════════════════════════════════
     // Draft Conversion
@@ -60,7 +62,8 @@ data class ActivityComposerState(
     fun toActivityDraft(): ActivityDraft = ActivityDraft(
         text = text.ifBlank { null },
         attachments = attachments,
-        durationMinutes = durationMinutes
+        durationMinutes = durationMinutes,
+        replyToMessageId = replyToMessageId
     )
 
     /**
@@ -137,6 +140,25 @@ data class ActivityComposerState(
      * Check if current mode is ACTIVITY.
      */
     fun isActivityMode(): Boolean = mode == ComposerMode.ACTIVITY
+
+    /**
+     * Check if current mode is EDIT.
+     */
+    fun isEditMode(): Boolean = mode == ComposerMode.EDIT
+
+    /**
+     * Check if current mode is REPLY.
+     */
+    fun isReplyMode(): Boolean = mode == ComposerMode.REPLY
+
+    /**
+     * Clear interaction context when switching away from EDIT/REPLY.
+     */
+    fun clearInteraction(): ActivityComposerState = copy(
+        mode = ComposerMode.ACTIVITY,
+        existingMessageId = null,
+        replyToMessageId = null
+    )
 
     companion object {
         /**

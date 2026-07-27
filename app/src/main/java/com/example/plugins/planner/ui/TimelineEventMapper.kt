@@ -187,7 +187,7 @@ object TimelineEventMapper {
                     val decoded = decodeDescription(event.description)
                     if (decoded.attachments.isNotEmpty()) {
                         // New format: use decoded payload
-                        objectText = decoded.text ?: ""
+                        objectText = decoded.text
                         val imageAttachment = decoded.attachments.firstOrNull { it is ActivityAttachment.Image }
                         if (imageAttachment is ActivityAttachment.Image) {
                             imageUri = imageAttachment.uri

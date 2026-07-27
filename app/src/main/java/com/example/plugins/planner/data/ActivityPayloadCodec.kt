@@ -39,6 +39,7 @@ object ActivityPayloadCodec {
     private const val KEY_TYPE = "type"
     private const val KEY_URI = "uri"
     private const val KEY_NAME = "name"
+    private const val KEY_REPLY_TO = "replyToMessageId"
 
     private const val TYPE_IMAGE = "IMAGE"
     private const val TYPE_FILE = "FILE"
@@ -49,7 +50,7 @@ object ActivityPayloadCodec {
      */
     fun encode(payload: ActivityPayload): String? {
         // Don't encode empty payloads
-        if (payload.text == null && payload.attachments.isEmpty() && payload.durationMinutes == null) {
+        if (payload.text == null && payload.attachments.isEmpty() && payload.durationMinutes == null && payload.replyToMessageId == null) {
             return null
         }
 
@@ -63,6 +64,11 @@ object ActivityPayloadCodec {
         // Duration
         if (payload.durationMinutes != null) {
             json.put(KEY_DURATION, payload.durationMinutes)
+        }
+
+        // Reply reference
+        if (payload.replyToMessageId != null) {
+            json.put(KEY_REPLY_TO, payload.replyToMessageId)
         }
 
         // Attachments
@@ -124,6 +130,7 @@ object ActivityPayloadCodec {
     private fun decodeJsonObject(json: JSONObject): ActivityPayload {
         val text = if (json.has(KEY_TEXT)) json.getString(KEY_TEXT) else null
         val duration = if (json.has(KEY_DURATION)) json.getInt(KEY_DURATION) else null
+        val replyToMessageId = if (json.has(KEY_REPLY_TO)) json.getLong(KEY_REPLY_TO) else null
 
         val attachments = mutableListOf<ActivityAttachment>()
         if (json.has(KEY_ATTACHMENTS)) {
@@ -152,7 +159,8 @@ object ActivityPayloadCodec {
         return ActivityPayload(
             text = text,
             attachments = attachments,
-            durationMinutes = duration
+            durationMinutes = duration,
+            replyToMessageId = replyToMessageId
         )
     }
 

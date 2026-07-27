@@ -22,8 +22,7 @@ class StepCardMapperTest {
             id = 1,
             taskId = 100,
             title = "Empty step",
-            isCompleted = false,
-            order = 0
+            isCompleted = false
         )
 
         val model = StepCardMapper.toCardModel(step)
@@ -46,15 +45,14 @@ class StepCardMapperTest {
             id = 2,
             taskId = 100,
             title = "Design homepage",
-            isCompleted = false,
-            order = 1
+            isCompleted = false
         )
 
         val activities = listOf(
             ActivityMessageModel(
-                id = 1,
+                id = 1, taskId = 100L, stepId = 2L,
                 text = "Initial design",
-                createdAt = 1000L
+                durationMinutes = null, createdAt = 1000L
             )
         )
 
@@ -75,16 +73,15 @@ class StepCardMapperTest {
             id = 3,
             taskId = 100,
             title = "Add mockup",
-            isCompleted = false,
-            order = 2
+            isCompleted = false
         )
 
         val activities = listOf(
             ActivityMessageModel(
-                id = 1,
+                id = 1, taskId = 100L, stepId = 3L,
                 text = "Mockup added",
                 attachments = listOf(ActivityAttachment.Image("content://img/mockup.png")),
-                createdAt = 1000L
+                durationMinutes = null, createdAt = 1000L
             )
         )
 
@@ -105,19 +102,19 @@ class StepCardMapperTest {
             id = 4,
             taskId = 100,
             title = "Multiple files",
-            isCompleted = false,
-            order = 3
+            isCompleted = false
         )
 
         val activities = listOf(
             ActivityMessageModel(
-                id = 1,
+                id = 1, taskId = 100L, stepId = 4L,
+                text = null,
                 attachments = listOf(
                     ActivityAttachment.Image("content://img/1.jpg"),
                     ActivityAttachment.Image("content://img/2.jpg"),
                     ActivityAttachment.File("content://file/doc.pdf", "doc.pdf")
                 ),
-                createdAt = 1000L
+                durationMinutes = null, createdAt = 1000L
             )
         )
 
@@ -138,19 +135,18 @@ class StepCardMapperTest {
             id = 5,
             taskId = 100,
             title = "Coding session",
-            isCompleted = false,
-            order = 4
+            isCompleted = false
         )
 
         val activities = listOf(
             ActivityMessageModel(
-                id = 1,
+                id = 1, taskId = 100L, stepId = 5L,
                 text = "Morning coding",
                 durationMinutes = 60,
                 createdAt = 1000L
             ),
             ActivityMessageModel(
-                id = 2,
+                id = 2, taskId = 100L, stepId = 5L,
                 text = "Afternoon coding",
                 durationMinutes = 45,
                 createdAt = 2000L
@@ -173,15 +169,14 @@ class StepCardMapperTest {
             id = 6,
             taskId = 100,
             title = "Test step",
-            isCompleted = false,
-            order = 5
+            isCompleted = false
         )
 
         val activities = listOf(
             ActivityMessageModel(
-                id = 1,
+                id = 1, taskId = 100L, stepId = 6L,
                 text = null,
-                createdAt = 1000L
+                durationMinutes = null, createdAt = 1000L
             )
         )
 
@@ -202,14 +197,13 @@ class StepCardMapperTest {
             id = 7,
             taskId = 100,
             title = "Sorted step",
-            isCompleted = false,
-            order = 6
+            isCompleted = false
         )
 
         val activities = listOf(
-            ActivityMessageModel(id = 1, text = "Second", createdAt = 2000L),
-            ActivityMessageModel(id = 2, text = "First", createdAt = 1000L),
-            ActivityMessageModel(id = 3, text = "Third", createdAt = 3000L)
+            ActivityMessageModel(id = 1, taskId = 100L, stepId = 7L, text = "Second", durationMinutes = null, createdAt = 2000L),
+            ActivityMessageModel(id = 2, taskId = 100L, stepId = 7L, text = "First", durationMinutes = null, createdAt = 1000L),
+            ActivityMessageModel(id = 3, taskId = 100L, stepId = 7L, text = "Third", durationMinutes = null, createdAt = 3000L)
         )
 
         val model = StepCardMapper.toCardModel(step, activities)
@@ -226,13 +220,13 @@ class StepCardMapperTest {
     @Test
     fun `toCardModels converts list correctly`() {
         val steps = listOf(
-            TaskStepEntity(1, 100, "Step 1", false, 0),
-            TaskStepEntity(2, 100, "Step 2", true, 1)
+            TaskStepEntity(id = 1, taskId = 100, title = "Step 1", isCompleted = false),
+            TaskStepEntity(id = 2, taskId = 100, title = "Step 2", isCompleted = true)
         )
 
         val activitiesMap = mapOf(
             1 to listOf(
-                ActivityMessageModel(id = 1, text = "Note", createdAt = 1000L)
+                ActivityMessageModel(id = 1, taskId = 100L, stepId = 1L, text = "Note", durationMinutes = null, createdAt = 1000L)
             )
         )
 
@@ -255,8 +249,8 @@ class StepCardMapperTest {
             id = 1,
             title = "Test",
             messages = listOf(
-                ActivityMessageModel(id = 1, createdAt = 1000L),
-                ActivityMessageModel(id = 2, createdAt = 2000L)
+                ActivityMessageModel(id = 1, taskId = 1L, stepId = 1L, text = null, durationMinutes = null, createdAt = 1000L),
+                ActivityMessageModel(id = 2, taskId = 1L, stepId = 1L, text = null, durationMinutes = null, createdAt = 2000L)
             ),
             attachmentCount = 3,
             totalDurationMinutes = 90,
@@ -274,7 +268,7 @@ class StepCardMapperTest {
         val model = StepCardModel(
             id = 1,
             title = "Test",
-            messages = listOf(ActivityMessageModel(id = 1, createdAt = 1000L)),
+            messages = listOf(ActivityMessageModel(id = 1, taskId = 1L, stepId = 1L, text = null, durationMinutes = null, createdAt = 1000L)),
             createdAt = System.currentTimeMillis()
         )
         assertTrue(model.hasRichContent())

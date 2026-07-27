@@ -58,10 +58,20 @@ fun UnifiedComposerContent(
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
     ) {
-        // ── Step indicator ──
-        if (state.isStepMode()) {
-            StepIndicator()
-            Spacer(modifier = Modifier.height(8.dp))
+        // ── Mode indicator ──
+        when {
+            state.isEditMode() -> {
+                EditIndicator()
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            state.isReplyMode() -> {
+                ReplyIndicator()
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            state.isStepMode() -> {
+                StepIndicator()
+                Spacer(modifier = Modifier.height(8.dp))
+            }
         }
 
         // ── Text input ──
@@ -133,6 +143,58 @@ fun UnifiedComposerContent(
             onToggleStep = onToggleStep,
             onSubmit = onSubmit
         )
+    }
+}
+
+@Composable
+private fun EditIndicator() {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(text = "✏️", fontSize = 14.sp)
+            Text(
+                text = "${RTL}ویرایش فعالیت",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.tertiary
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReplyIndicator() {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(text = "↩", fontSize = 14.sp)
+            Text(
+                text = "${RTL}پاسخ به فعالیت",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
     }
 }
 
