@@ -358,6 +358,19 @@ class TaskDetailViewModel(
     }
 
     /**
+     * Create a Tag (دسته/برچسب) — standalone tag creation.
+     *
+     * Phase 5.9.2: Dedicated Tag Creation UX.
+     * Creates TaskStepEntity + STEP_CREATED event only.
+     * No ActivityEventEntity for activities — tags are metadata only.
+     */
+    fun createTag(name: String) {
+        viewModelScope.launch {
+            createStepUseCase.execute(taskId, StepDraft(title = name))
+        }
+    }
+
+    /**
      * Create a Step (Tag) from a StepDraft.
      *
      * Phase 5.5d: Pure tag creation — no initial activities.

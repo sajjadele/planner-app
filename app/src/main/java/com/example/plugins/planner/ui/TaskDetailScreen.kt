@@ -51,6 +51,7 @@ import com.example.plugins.planner.data.TaskEntity
 import com.example.plugins.planner.data.TaskStepEntity
 import com.example.plugins.planner.ui.components.NeumorphicSurface
 import com.example.plugins.planner.ui.components.ActivityMessageCard
+import com.example.plugins.planner.ui.components.AddTagDialog
 import com.example.plugins.planner.ui.components.FullScreenImageDialog
 import com.example.plugins.planner.ui.components.ReminderSection
 import com.example.plugins.planner.ui.components.skeletonShimmerBrush
@@ -93,6 +94,7 @@ fun TaskDetailScreen(
     var showTimelineSheet by remember { mutableStateOf(false) }
     var showActivityComposer by remember { mutableStateOf(false) }
     var initialComposerDuration by remember { mutableStateOf<Int?>(null) }
+    var showAddTagDialog by remember { mutableStateOf(false) }
 
     var editingMessage: ActivityMessageModel? by remember { mutableStateOf(null) }
     var deletingMessageId: Long? by remember { mutableStateOf(null) }
@@ -302,6 +304,7 @@ fun TaskDetailScreen(
                     onMessageAction = handleMessageAction,
                     onShowAll = { viewModel.showAllActivities() },
                     onFilterByStep = { stepId -> viewModel.filterByStep(stepId) },
+                    onAddTag = { showAddTagDialog = true },
                     listState = activityListState
                 )
             }
@@ -393,6 +396,14 @@ fun TaskDetailScreen(
                         Text("${RTL}لغو")
                     }
                 }
+            )
+        }
+
+        // ── Tag Creation Dialog ──
+        if (showAddTagDialog) {
+            AddTagDialog(
+                onDismiss = { showAddTagDialog = false },
+                onCreateTag = { name -> viewModel.createTag(name) }
             )
         }
     }
@@ -632,6 +643,7 @@ private fun TaskDetailActivityContent(
     onMessageAction: ((ActivityMessageAction) -> Unit)? = null,
     onShowAll: () -> Unit = {},
     onFilterByStep: (Long) -> Unit = {},
+    onAddTag: () -> Unit = {},
     listState: LazyListState = rememberLazyListState()
 ) {
     val groups = remember(messages) { groupActivityMessagesByDay(messages) }
@@ -663,7 +675,8 @@ private fun TaskDetailActivityContent(
                         steps = steps,
                         selectedStepId = filterState.selectedStepId,
                         onShowAll = onShowAll,
-                        onFilterByStep = onFilterByStep
+                        onFilterByStep = onFilterByStep,
+                        onAddTag = onAddTag
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                 }
@@ -791,6 +804,7 @@ private fun ActivityFeedFilterChips(
     selectedStepId: Long?,
     onShowAll: () -> Unit,
     onFilterByStep: (Long) -> Unit,
+    onAddTag: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -838,6 +852,28 @@ private fun ActivityFeedFilterChips(
                     selectedLabelColor = MaterialTheme.colorScheme.onSecondary
                 )
             )
+        }
+
+        // ── Add Tag button ──
+        Surface(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .clickable(onClick = onAddTag),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "+",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
 }
