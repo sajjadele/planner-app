@@ -339,6 +339,7 @@ private fun MessageMetadataRow(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DeletedMessageBubble(
     modifier: Modifier = Modifier,
