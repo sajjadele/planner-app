@@ -73,10 +73,12 @@ val defaultTagColor: Color = Color(0xFF6366F1) // indigo
 fun AddTagDialog(
     onDismiss: () -> Unit,
     onCreateTag: (name: String, colorHex: String?) -> Unit,
+    initialName: String? = null,
+    initialColorHex: String? = null,
     modifier: Modifier = Modifier
 ) {
-    var tagName by remember { mutableStateOf("") }
-    var selectedColor by remember { mutableStateOf<String?>(null) }
+    var tagName by remember { mutableStateOf(initialName ?: "") }
+    var selectedColor by remember { mutableStateOf<String?>(initialColorHex) }
     val isValid = tagName.isNotBlank()
 
     Dialog(
@@ -119,7 +121,7 @@ fun AddTagDialog(
                     )
                 )
 
-                // ── Color palette ──
+                // Color palette — full box with selected indication
                 Text(
                     text = "${RTL}رنگ:",
                     fontSize = 12.sp,
@@ -156,6 +158,7 @@ fun AddTagDialog(
                         onClick = {
                             if (isValid) {
                                 onCreateTag(tagName.trim(), selectedColor)
+                                onDismiss()
                             }
                         },
                         enabled = isValid,
@@ -181,42 +184,35 @@ private fun TagColorSwatch(
     modifier: Modifier = Modifier
 ) {
     val bgColor = if (colorHex != null) parseColorHex(colorHex) ?: defaultTagColor
-        else defaultTagColor.copy(alpha = 0.2f)
+        else defaultTagColor.copy(alpha = 0.15f)
 
-    val borderModifier = if (isSelected) {
-        Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
-    } else {
-        Modifier
-    }
-
-    Box(
+    Surface(
         modifier = modifier
-            .size(28.dp)
-            .clip(CircleShape)
-            .then(borderModifier)
-            .background(bgColor, CircleShape)
+            .size(32.dp)
+            .clip(RoundedCornerShape(6.dp))
             .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
+        color = bgColor,
+        shape = RoundedCornerShape(6.dp),
+        border = if (isSelected) BorderStroke(
+            width = 2.dp,
+            color = MaterialTheme.colorScheme.primary
+        ) else BorderStroke(0.dp, Color.Transparent)
     ) {
         if (colorHex == null) {
-            // Default swatch: a small circle outline indicating "no color"
+            // Default swatch: subtle pattern indicating "no color"
             Box(
-                modifier = Modifier
-                    .size(12.dp)
-                    .border(2.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), CircleShape)
-            )
-        } else if (isSelected) {
-            Text(
-                text = "✓",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = android.graphics.Color.parseColor("#$colorHex")
-                    .let { Color(it) }
-                    .let { c ->
-                        val luminance = 0.299f * c.red + 0.587f * c.green + 0.114f * c.blue
-                        if (luminance > 0.5f) Color.Black else Color.White
-                    }
-            )
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "A",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Light,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                )
+            }
+        } else {
+            // Filled color — entire box is the color
         }
     }
 }

@@ -372,6 +372,16 @@ class TaskDetailViewModel(
     }
 
     /**
+     * Rename an existing tag (Step). Only title changed — color preserved.
+     */
+    fun renameStep(step: TaskStepEntity, newTitle: String) {
+        viewModelScope.launch {
+            val updated = step.copy(title = newTitle)
+            taskStepRepository.updateStep(updated)
+        }
+    }
+
+    /**
      * Create a Step (Tag) from a StepDraft.
      *
      * Phase 5.5d: Pure tag creation — no initial activities.

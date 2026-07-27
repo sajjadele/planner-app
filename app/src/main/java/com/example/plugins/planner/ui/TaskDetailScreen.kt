@@ -7,6 +7,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -98,6 +99,9 @@ fun TaskDetailScreen(
     var showActivityComposer by remember { mutableStateOf(false) }
     var initialComposerDuration by remember { mutableStateOf<Int?>(null) }
     var showAddTagDialog by remember { mutableStateOf(false) }
+    var showTagActionMenu by remember { mutableStateOf(false) }
+    var selectedTagForAction: TaskStepEntity? by remember { mutableStateOf(null) }
+    var editingTag: TaskStepEntity? by remember { mutableStateOf(null) }
 
     var editingMessage: ActivityMessageModel? by remember { mutableStateOf(null) }
     var deletingMessageId: Long? by remember { mutableStateOf(null) }
@@ -308,6 +312,10 @@ fun TaskDetailScreen(
                     onShowAll = { viewModel.showAllActivities() },
                     onFilterByStep = { stepId -> viewModel.filterByStep(stepId) },
                     onAddTag = { showAddTagDialog = true },
+                    onTagLongPress = { tag ->
+                        selectedTagForAction = tag
+                        showTagActionMenu = true
+                    },
                     listState = activityListState
                 )
             }
@@ -405,8 +413,79 @@ fun TaskDetailScreen(
         // ── Tag Creation Dialog ──
         if (showAddTagDialog) {
             AddTagDialog(
-                onDismiss = { showAddTagDialog = false },
-                onCreateTag = { name, colorHex -> viewModel.createTag(name, colorHex) }
+                onDismiss = {
+                    showAddTagDialog = false
+                    editingTag = null
+                },
+                onCreateTag = { name, colorHex ->
+                    if (editingTag != null) {
+                        // Editing existing tag — rename title, keep color if not changed
+                        val tag = editingTag!!
+                        val newColor = colorHex ?: tag.colorHex
+                        if (name != tag.title || newColor != tag.colorHex) {
+                            // Title changed or color changed — full recreate
+                            viewModel.deleteStep(tag)
+                            viewModel.createTag(name, newColor)
+                        } else {
+                            // Only title changed
+                            viewModel.renameStep(tag, name)
+                        }
+                    } else {
+                        viewModel.createTag(name, colorHex)
+                    }
+                },
+                initialName = editingTag?.title,
+                initialColorHex = editingTag?.colorHex
+            )
+        }
+
+        // ── Tag Action Menu (Edit / Delete) ──
+        if (showTagActionMenu && selectedTagForAction != null) {
+            val tag = selectedTagForAction!!
+            AlertDialog(
+                onDismissRequest = {
+                    showTagActionMenu = false
+                    selectedTagForAction = null
+                },
+                title = { Text("${RTL}${tag.title}") },
+                text = {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TextButton(
+                            onClick = {
+                                showTagActionMenu = false
+                                editingTag = tag
+                                showAddTagDialog = true
+                            }
+                        ) {
+                            Text("${RTL}✏️  ویرایش اسم", fontWeight = FontWeight.Medium)
+                        }
+                        TextButton(
+                            onClick = {
+                                viewModel.deleteStep(tag)
+                                showTagActionMenu = false
+                                selectedTagForAction = null
+                            }
+                        ) {
+                            Text(
+                                "${RTL}🗑️  حذف دسته",
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showTagActionMenu = false
+                            selectedTagForAction = null
+                        }
+                    ) {
+                        Text("${RTL}لغو")
+                    }
+                }
             )
         }
     }
@@ -813,6 +892,7 @@ private fun ActivityFeedFilterChips(
     onShowAll: () -> Unit,
     onFilterByStep: (Long) -> Unit,
     onAddTag: () -> Unit,
+    onTagLongPress: (TaskStepEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -864,13 +944,20 @@ private fun ActivityFeedFilterChips(
                         )
                     )
 
-                    // Step filter chips with color
+                    // Step filter chips with color + long-press menu
                     steps.forEach { step ->
                         val stepId = step.id.toLong()
-                        FilterChip(
-                            selected = selectedStepId == stepId,
-                            onClick = { onFilterByStep(stepId) },
-                            label = {
+                        Box(
+                            modifier = Modifier.pointerInput(stepId) {
+                                detectTapGestures(
+                                    onLongPress = { onTagLongPress(step) }
+                                )
+                            }
+                        ) {
+                            FilterChip(
+                                selected = selectedStepId == stepId,
+                                onClick = { onFilterByStep(stepId) },
+                                label = {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -901,6 +988,9 @@ private fun ActivityFeedFilterChips(
                     }
                 }
             }
+        }
+    }
+}
 
 // ════════════════════════════════════════════════════════════════
 // ENHANCED EMPTY STATE
