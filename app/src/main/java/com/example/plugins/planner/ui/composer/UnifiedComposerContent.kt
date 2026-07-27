@@ -73,7 +73,7 @@ fun UnifiedComposerContent(
             onValueChange = { dispatch(ActivityComposerAction.TextChanged(it)) },
             placeholder = {
                 Text(
-                    "${RTL}چیزی که انجام دادی...",
+                    "${RTL}متن فعالیت",
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -118,7 +118,7 @@ fun ActivityComposerBottomSheet(
         composerState.isEditMode() -> "${RTL}ویرایش فعالیت"
         composerState.isReplyMode() -> "${RTL}پاسخ به فعالیت"
         composerState.isStepMode() -> "${RTL}ثبت مرحله جدید"
-        else -> "${RTL}ثبت مورد جدید"
+        else -> "${RTL}ثبت فعالیت"
     }
 
     ModalBottomSheet(

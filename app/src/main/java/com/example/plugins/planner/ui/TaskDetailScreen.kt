@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -594,8 +593,8 @@ private fun TaskDetailActivityContent(
     listState: LazyListState = rememberLazyListState()
 ) {
     val groups = remember(messages) { groupActivityMessagesByDay(messages) }
-    var showFabOptions by remember { mutableStateOf(false) }
     var fullScreenImageUrl by remember { mutableStateOf<String?>(null) }
+    var showCreationSheet by remember { mutableStateOf(false) }
 
     // ── Fullscreen Image Viewer ──
     fullScreenImageUrl?.let { url ->
@@ -605,15 +604,25 @@ private fun TaskDetailActivityContent(
         )
     }
 
+    // ── Activity Creation Sheet ──
+    if (showCreationSheet) {
+        ActivityCreationSheet(
+            onDismiss = { showCreationSheet = false },
+            onSelectAction = onSelectAction
+        )
+    }
+
     Box(modifier = modifier) {
         LazyColumn(
             state = listState,
             verticalArrangement = Arrangement.spacedBy(2.dp),
-            contentPadding = PaddingValues(bottom = 80.dp)
+            contentPadding = PaddingValues(bottom = 16.dp)
         ) {
             // ── Feed Header ──
             item(key = "feed_header") {
-                ActivityFeedHeader(count = messages.size)
+                ActivityFeedHeader(onSelectAction = { action ->
+                    showCreationSheet = true
+                })
             }
 
             // ── Filter Chips ──
@@ -666,24 +675,16 @@ private fun TaskDetailActivityContent(
                 }
             }
         }
-
-        // ── FAB with Options ──
-        ActivityFab(
-            expanded = showFabOptions,
-            onToggle = { showFabOptions = !showFabOptions },
-            onSelectAction = onSelectAction,
-            modifier = Modifier.align(Alignment.BottomEnd)
-        )
     }
 }
 
 // ════════════════════════════════════════════════════════════════
-// FEED HEADER
+// FEED HEADER with creation action button
 // ════════════════════════════════════════════════════════════════
 
 @Composable
 private fun ActivityFeedHeader(
-    count: Int,
+    onSelectAction: (ActivityCreationAction) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -699,19 +700,15 @@ private fun ActivityFeedHeader(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
-        if (count > 0) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.primaryContainer
-            ) {
-                Text(
-                    text = "$count",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
-                )
-            }
+        IconButton(
+            onClick = { onSelectAction(ActivityCreationAction.Note) },
+            modifier = Modifier.size(28.dp)
+        ) {
+            Text(
+                text = "✚",
+                fontSize = 18.sp,
+                color = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }
@@ -829,97 +826,6 @@ private fun ActivityFeedEmptyState(
     }
 }
 
-// ════════════════════════════════════════════════════════════════
-// FAB WITH ACTIVITY OPTIONS
-// ════════════════════════════════════════════════════════════════
-
-@Composable
-private fun ActivityFab(
-    expanded: Boolean,
-    onToggle: () -> Unit,
-    onSelectAction: (ActivityCreationAction) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.padding(end = 8.dp, bottom = 16.dp),
-        horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        // Expanded options
-        if (expanded) {
-            FabOption(
-                icon = "⏱️",
-                label = "${RTL}فعالیت دستی",
-                onClick = {
-                    onSelectAction(ActivityCreationAction.ManualActivity)
-                    onToggle()
-                }
-            )
-            FabOption(
-                icon = "📎",
-                label = "${RTL}فایل",
-                onClick = {
-                    onSelectAction(ActivityCreationAction.File)
-                    onToggle()
-                }
-            )
-            FabOption(
-                icon = "📷",
-                label = "${RTL}تصویر",
-                onClick = {
-                    onSelectAction(ActivityCreationAction.Image)
-                    onToggle()
-                }
-            )
-            FabOption(
-                icon = "📝",
-                label = "${RTL}یادداشت",
-                onClick = {
-                    onSelectAction(ActivityCreationAction.Note)
-                    onToggle()
-                }
-            )
-        }
-
-        // Main FAB
-        FloatingActionButton(
-            onClick = onToggle,
-            shape = CircleShape,
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
-        ) {
-            Icon(
-                imageVector = if (expanded) Icons.Default.Close else Icons.Default.Add,
-                contentDescription = if (expanded) "${RTL}بستن" else "${RTL}فعالیت جدید"
-            )
-        }
-    }
-}
-
-@Composable
-private fun FabOption(
-    icon: String,
-    label: String,
-    onClick: () -> Unit
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
-            .clickable(onClick = onClick)
-            .padding(start = 10.dp, end = 14.dp, top = 8.dp, bottom = 8.dp)
-    ) {
-        Text(text = icon, fontSize = 14.sp)
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
 
 private data class ActivityMessageGroup(
     val dateKey: Long,

@@ -16,13 +16,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.platform.CompositionLocalProvider
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.core.util.RTL
@@ -212,15 +215,17 @@ private fun MessageContent(
 
 @Composable
 private fun MessageText(text: String) {
-    Text(
-        text = text,
-        fontSize = 14.sp,
-        color = MaterialTheme.colorScheme.onSurface,
-        maxLines = 10,
-        overflow = TextOverflow.Ellipsis,
-        lineHeight = 20.sp,
-        textAlign = TextAlign.Start
-    )
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        Text(
+            text = text.replace("\u200F", ""),
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 10,
+            overflow = TextOverflow.Ellipsis,
+            lineHeight = 20.sp,
+            textAlign = TextAlign.Right
+        )
+    }
 }
 
 @Composable
