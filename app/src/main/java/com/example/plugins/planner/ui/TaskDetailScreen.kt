@@ -52,6 +52,8 @@ import com.example.plugins.planner.data.TaskStepEntity
 import com.example.plugins.planner.ui.components.NeumorphicSurface
 import com.example.plugins.planner.ui.components.ActivityMessageCard
 import com.example.plugins.planner.ui.components.AddTagDialog
+import com.example.plugins.planner.ui.components.defaultTagColor
+import com.example.plugins.planner.ui.components.parseColorHex
 import com.example.plugins.planner.ui.components.FullScreenImageDialog
 import com.example.plugins.planner.ui.components.ReminderSection
 import com.example.plugins.planner.ui.components.skeletonShimmerBrush
@@ -403,7 +405,7 @@ fun TaskDetailScreen(
         if (showAddTagDialog) {
             AddTagDialog(
                 onDismiss = { showAddTagDialog = false },
-                onCreateTag = { name -> viewModel.createTag(name) }
+                onCreateTag = { name, colorHex -> viewModel.createTag(name, colorHex) }
             )
         }
     }
@@ -798,6 +800,11 @@ private fun ActivityFeedHeader(
 // FILTER CHIPS
 // ════════════════════════════════════════════════════════════════
 
+/**
+ * ActivityFeedFilterChips — Horizontal filter chips for tag-based filtering.
+ *
+ * Phase 5.9.3: "+" action at index 0 + colored dots.
+ */
 @Composable
 private fun ActivityFeedFilterChips(
     steps: List<TaskStepEntity>,
@@ -808,75 +815,91 @@ private fun ActivityFeedFilterChips(
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        // All filter chip
-        FilterChip(
-            selected = selectedStepId == null,
-            onClick = onShowAll,
-            label = {
-                Text(
-                    text = "${RTL}همه",
-                    fontSize = 12.sp,
-                    fontWeight = if (selectedStepId == null) FontWeight.Bold else FontWeight.Normal
-                )
-            },
-            shape = RoundedCornerShape(16.dp),
-            colors = FilterChipDefaults.filterChipColors(
-                selectedContainerColor = MaterialTheme.colorScheme.primary,
-                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-            )
-        )
+                    modifier = modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // ── Add Tag action (always at index 0) ──
+                    Surface(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable(onClick = onAddTag),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "+",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
 
-        // Step filter chips
-        steps.forEach { step ->
-            val stepId = step.id.toLong()
-            FilterChip(
-                selected = selectedStepId == stepId,
-                onClick = { onFilterByStep(stepId) },
-                label = {
-                    Text(
-                        text = "${RTL}${step.title}",
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        fontWeight = if (selectedStepId == stepId) FontWeight.Bold else FontWeight.Normal
+                    // "All" chip
+                    FilterChip(
+                        selected = selectedStepId == null,
+                        onClick = onShowAll,
+                        label = {
+                            Text(
+                                text = "${RTL}همه",
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                fontWeight = if (selectedStepId == null) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.secondary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onSecondary
+                        )
                     )
-                },
-                shape = RoundedCornerShape(16.dp),
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.secondary,
-                    selectedLabelColor = MaterialTheme.colorScheme.onSecondary
-                )
-            )
-        }
 
-        // ── Add Tag button ──
-        Surface(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .clickable(onClick = onAddTag),
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "+",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                    // Step filter chips with color
+                    steps.forEach { step ->
+                        val stepId = step.id.toLong()
+                        FilterChip(
+                            selected = selectedStepId == stepId,
+                            onClick = { onFilterByStep(stepId) },
+                            label = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    // Color dot
+                                    val chipColor = parseColorHex(step.colorHex) ?: defaultTagColor
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(chipColor, CircleShape)
+                                    )
+                                    Text(
+                                        text = "${RTL}${step.title}",
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        fontWeight = if (selectedStepId == stepId) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.secondary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onSecondary
+                            )
+                        )
+                    }
+                }
             }
-        }
-    }
-}
 
 // ════════════════════════════════════════════════════════════════
 // ENHANCED EMPTY STATE

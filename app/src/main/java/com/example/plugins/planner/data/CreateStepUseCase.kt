@@ -42,7 +42,8 @@ class CreateStepUseCase(
             val stepTitle = StepDraftResolver.getStepTitle(draft)
             val stepEntity = TaskStepEntity(
                 taskId = taskId,
-                title = stepTitle
+                title = stepTitle,
+                colorHex = draft.colorHex
             )
             val stepId = database.taskStepDao().insert(stepEntity).toInt()
 

@@ -38,7 +38,7 @@ import com.example.plugins.planner.data.TaskStepEntity
         ActivityEventEntity::class,
         TaskStepEntity::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -278,6 +278,21 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v14 → v15: Phase 5.9.3 — Tag Color Support.
+         *
+         * Additive, non-destructive column on `task_steps`:
+         * - `colorHex TEXT` (optional hex color for tag display; nullable)
+         *
+         * Existing tags receive NULL (default color applied in UI layer).
+         * No data backfill needed — nullable default handles it.
+         */
+        private val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE task_steps ADD COLUMN colorHex TEXT")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -294,7 +309,8 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_10_11,
                     MIGRATION_11_12,
                     MIGRATION_12_13,
-                    MIGRATION_13_14
+                    MIGRATION_13_14,
+                    MIGRATION_14_15
                 )
                 .fallbackToDestructiveMigration()
                 .build()

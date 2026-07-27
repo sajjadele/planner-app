@@ -361,12 +361,13 @@ class TaskDetailViewModel(
      * Create a Tag (دسته/برچسب) — standalone tag creation.
      *
      * Phase 5.9.2: Dedicated Tag Creation UX.
+     * Phase 5.9.3: Optional colorHex for tag display.
      * Creates TaskStepEntity + STEP_CREATED event only.
      * No ActivityEventEntity for activities — tags are metadata only.
      */
-    fun createTag(name: String) {
+    fun createTag(name: String, colorHex: String? = null) {
         viewModelScope.launch {
-            createStepUseCase.execute(taskId, StepDraft(title = name))
+            createStepUseCase.execute(taskId, StepDraft(title = name, colorHex = colorHex))
         }
     }
 
