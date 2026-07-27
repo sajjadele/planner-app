@@ -21,6 +21,18 @@ import com.example.plugins.planner.data.ActivityMessageModel
 import java.text.SimpleDateFormat
 import java.util.*
 
+/**
+ * ActivityMessageCard — Enhanced Telegram-style message card.
+ *
+ * Phase 5.2.2: Activity Feed UX Layer
+ *
+ * Visual improvements:
+ * - Telegram-like bubble with proper padding
+ * - Timestamp positioned at bottom-right
+ * - Better spacing between content elements
+ * - Clean handling of image-only messages
+ * - No visible JSON/URI/event type in UI
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ActivityMessageCard(
@@ -44,13 +56,13 @@ fun ActivityMessageCard(
                 }
             ),
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 4.dp),
         shadowElevation = 1.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             // ── Reply Reference ──
             repliedToMessage?.let { replied ->
@@ -59,25 +71,22 @@ fun ActivityMessageCard(
             }
 
             // ── Text Content ──
-            message.text?.let { text ->
-                if (text.isNotBlank()) {
-                    Text(
-                        text = text,
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 8,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = 22.sp
-                    )
-                    if (hasMediaContent(message)) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                }
+            val hasText = !message.text.isNullOrBlank()
+            if (hasText) {
+                Text(
+                    text = message.text!!,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 8,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 22.sp
+                )
             }
 
             // ── Image Attachments ──
             val images = message.attachments.filterIsInstance<ActivityAttachment.Image>()
             if (images.isNotEmpty()) {
+                if (hasText) Spacer(modifier = Modifier.height(8.dp))
                 ActivityAttachmentRenderer(
                     attachments = listOf(ActivityAttachment.Image(images.first().uri))
                 )
@@ -89,14 +98,12 @@ fun ActivityMessageCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 }
-                if (hasOtherContentAfterMedia(message)) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
             }
 
-            // ── File Attachments ──
+            // ── File Attachments (only show if no images) ──
             val files = message.attachments.filterIsInstance<ActivityAttachment.File>()
             if (files.isNotEmpty() && images.isEmpty()) {
+                if (hasText) Spacer(modifier = Modifier.height(8.dp))
                 ActivityAttachmentRenderer(attachments = listOf(files.first()))
                 if (files.size > 1) {
                     Spacer(modifier = Modifier.height(4.dp))
@@ -108,7 +115,7 @@ fun ActivityMessageCard(
                 }
             }
 
-            // ── Duration ──
+            // ── Duration (inline before timestamp) ──
             message.durationMinutes?.let { duration ->
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
@@ -125,13 +132,18 @@ fun ActivityMessageCard(
                 }
             }
 
-            // ── Timestamp ──
+            // ── Timestamp (bottom-right, Telegram style) ──
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = formatTimestamp(message.createdAt),
-                fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Text(
+                    text = formatTimestamp(message.createdAt),
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
+            }
         }
     }
 
@@ -208,14 +220,6 @@ private fun ReplyReference(repliedToMessage: ActivityMessageModel) {
             }
         }
     }
-}
-
-private fun hasMediaContent(message: ActivityMessageModel): Boolean {
-    return message.attachments.isNotEmpty()
-}
-
-private fun hasOtherContentAfterMedia(message: ActivityMessageModel): Boolean {
-    return message.text.isNullOrBlank().not() || message.durationMinutes != null
 }
 
 private fun formatTimestamp(timestamp: Long): String {

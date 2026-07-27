@@ -1,20 +1,10 @@
 package com.example.plugins.planner.ui.composer
 
-import android.util.Log
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.layout.positionInWindow
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.util.RTL
@@ -98,26 +88,13 @@ fun UnifiedComposerContent(
 
         // ── Attachments preview ──
         if (state.attachments.isNotEmpty()) {
-            Log.d("COMPOSER_DEBUG", "🎨 Rendering AttachmentPreview section")
             Spacer(modifier = Modifier.height(12.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.Green.copy(alpha = 0.2f)) // DEBUG: visible background
-                    .onGloballyPositioned { coordinates ->
-                        val posInWindow = coordinates.positionInWindow()
-                        val posInRoot = coordinates.positionInRoot()
-                        Log.d("COMPOSER_DEBUG", "🎨 AttachmentPreview container posInWindow=(${posInWindow.x.toInt()},${posInWindow.y.toInt()}) posInRoot=(${posInRoot.x.toInt()},${posInRoot.y.toInt()}) size=${coordinates.size.width}x${coordinates.size.height}")
-                    }
-            ) {
-                AttachmentPreview(
-                    attachments = state.attachments,
-                    onRemoveAttachment = { attachment ->
-                        dispatch(ActivityComposerAction.RemoveAttachment(attachment))
-                    }
-                )
-            }
-            Log.d("COMPOSER_DEBUG", "🎨 AttachmentPreview section DONE")
+            AttachmentPreview(
+                attachments = state.attachments,
+                onRemoveAttachment = { attachment ->
+                    dispatch(ActivityComposerAction.RemoveAttachment(attachment))
+                }
+            )
         }
 
         // ── Duration chip ──

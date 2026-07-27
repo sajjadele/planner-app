@@ -15,11 +15,13 @@ import com.example.plugins.notes.data.NoteEntity
 import com.example.plugins.notes.data.NoteRepository
 import com.example.plugins.planner.data.ActivityDraft
 import com.example.plugins.planner.data.ActivityDraftResolver
+import com.example.plugins.planner.data.ActivityAttachment
 import com.example.plugins.planner.data.ActivityMessageMapper
 import com.example.plugins.planner.data.ActivityMessageModel
 import com.example.plugins.planner.data.ActivityEventEntity
 import com.example.plugins.planner.data.ActivityEventRepository
 import com.example.plugins.planner.data.ActivityEventType
+import com.example.plugins.planner.data.ActivityFeedFilterState
 import com.example.plugins.planner.data.ImageEventParser
 import com.example.plugins.planner.data.CreateStepWithActivitiesUseCase
 import com.example.plugins.planner.data.StepDraft
@@ -32,6 +34,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
@@ -121,6 +124,88 @@ class TaskDetailViewModel(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+
+    // ════════════════════════════════════════════════════════════════
+    // Phase 5.2.2: Activity Feed Filtering
+    // ════════════════════════════════════════════════════════════════
+
+    /** Current filter state for the activity feed */
+    private val _filterState = MutableStateFlow(ActivityFeedFilterState.DEFAULT)
+    val filterState: StateFlow<ActivityFeedFilterState> = _filterState.asStateFlow()
+
+    /** Filtered activity messages — combines raw messages with current filter */
+    val filteredActivityMessages: StateFlow<List<ActivityMessageModel>> = combine(
+        activityMessages, _filterState
+    ) { messages, filter ->
+        applyFilter(messages, filter)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    /**
+     * Apply the current filter to a list of messages.
+     *
+     * - No filter (همه): shows everything
+     * - Step filter: only messages matching stepId
+     * - Image/file filters: for future use
+     */
+    private fun applyFilter(
+        messages: List<ActivityMessageModel>,
+        filter: ActivityFeedFilterState
+    ): List<ActivityMessageModel> {
+        var result = messages
+
+        // Step filter
+        if (filter.selectedStepId != null) {
+            result = result.filter { it.stepId == filter.selectedStepId }
+        }
+
+        // Media type filters (future-ready)
+        if (filter.showImagesOnly) {
+            result = result.filter { it.attachments.any { a -> a is ActivityAttachment.Image } }
+        }
+        if (filter.showFilesOnly) {
+            result = result.filter { it.attachments.any { a -> a is ActivityAttachment.File } }
+        }
+
+        return result
+    }
+
+    /** Set the filter to show all activities */
+    fun showAllActivities() {
+        _filterState.value = _filterState.value.copy(selectedStepId = null)
+    }
+
+    /** Filter activities by step ID */
+    fun filterByStep(stepId: Long) {
+        _filterState.value = _filterState.value.copy(selectedStepId = stepId)
+    }
+
+    /** Set image-only filter */
+    fun setImageFilter(enabled: Boolean) {
+        _filterState.value = _filterState.value.copy(
+            showImagesOnly = enabled,
+            showFilesOnly = if (enabled) false else _filterState.value.showFilesOnly
+        )
+    }
+
+    /** Set file-only filter */
+    fun setFileFilter(enabled: Boolean) {
+        _filterState.value = _filterState.value.copy(
+            showFilesOnly = enabled,
+            showImagesOnly = if (enabled) false else _filterState.value.showImagesOnly
+        )
+    }
+
+    /** Check if a step filter is currently active */
+    fun isStepFilterActive(stepId: Long): Boolean =
+        _filterState.value.selectedStepId == stepId
+
+    /** Check if "همه" filter is active */
+    fun isAllFilterActive(): Boolean =
+        _filterState.value.selectedStepId == null
 
     /** Timeline navigation range — today's start in epoch ms */
     private val _timelineStartDate = MutableStateFlow(JalaliDate.toEpochMs(JalaliDate.today()))

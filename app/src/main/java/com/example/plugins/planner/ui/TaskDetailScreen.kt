@@ -3,11 +3,14 @@ package com.example.plugins.planner.ui
 import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -27,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,6 +41,7 @@ import com.example.core.util.JalaliDate
 import com.example.core.util.RTL
 import androidx.compose.material3.AlertDialog
 import com.example.plugins.planner.data.ActivityEventEntity
+import com.example.plugins.planner.data.ActivityFeedFilterState
 import com.example.plugins.planner.data.ActivityMessageAction
 import com.example.plugins.planner.data.ActivityMessageMapper
 import com.example.plugins.planner.data.ActivityMessageModel
@@ -71,6 +76,8 @@ fun TaskDetailScreen(
     val taskLogs by viewModel.taskLogs.collectAsState()
     val steps by viewModel.steps.collectAsState()
     val activityMessages by viewModel.activityMessages.collectAsState()
+    val filteredActivityMessages by viewModel.filteredActivityMessages.collectAsState()
+    val filterState by viewModel.filterState.collectAsState()
     val selectedActivityDate by viewModel.selectedActivityDate.collectAsState()
     val timelineStartDate by viewModel.timelineStartDate.collectAsState()
     val timelineEndDate by viewModel.timelineEndDate.collectAsState()
@@ -171,9 +178,14 @@ fun TaskDetailScreen(
                     modifier = Modifier
                         .weight(1f)
                         .padding(horizontal = 16.dp),
-                    messages = activityMessages,
+                    messages = filteredActivityMessages,
+                    allMessages = activityMessages,
+                    steps = steps,
+                    filterState = filterState,
                     onTapComposer = { showActivityComposer = true },
                     onMessageAction = handleMessageAction,
+                    onShowAll = { viewModel.showAllActivities() },
+                    onFilterByStep = { stepId -> viewModel.filterByStep(stepId) },
                     listState = activityListState
                 )
             }
@@ -466,64 +478,328 @@ private fun TaskDetailOverviewContent(
 }
 
 // ════════════════════════════════════════════════════════════════
-// ACTIVITY FEED — flat message stream (Phase 5.2.1)
+// ACTIVITY FEED — Phase 5.2.2 UX Layer
 // ════════════════════════════════════════════════════════════════
 
 @Composable
 private fun TaskDetailActivityContent(
     modifier: Modifier = Modifier,
     messages: List<ActivityMessageModel>,
+    allMessages: List<ActivityMessageModel>,
+    steps: List<TaskStepEntity>,
+    filterState: ActivityFeedFilterState,
     onTapComposer: () -> Unit,
     onMessageAction: ((ActivityMessageAction) -> Unit)? = null,
+    onShowAll: () -> Unit = {},
+    onFilterByStep: (Long) -> Unit = {},
     listState: LazyListState = rememberLazyListState()
 ) {
     val groups = remember(messages) { groupActivityMessagesByDay(messages) }
+    var showFabOptions by remember { mutableStateOf(false) }
 
-    LazyColumn(
-        modifier = modifier,
-        state = listState,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        contentPadding = PaddingValues(bottom = 8.dp)
-    ) {
-        if (groups.isEmpty()) {
-            item(key = "empty_feed") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = "📝", fontSize = 24.sp)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "${RTL}هنوز فعالیتی ثبت نشده",
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "${RTL}برای ثبت اولین فعالیت، دکمه + را بزنید",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        )
-                    }
+    Box(modifier = modifier) {
+        LazyColumn(
+            state = listState,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            contentPadding = PaddingValues(bottom = 80.dp)
+        ) {
+            // ── Feed Header ──
+            item(key = "feed_header") {
+                ActivityFeedHeader(count = allMessages.size)
+            }
+
+            // ── Filter Chips ──
+            if (steps.isNotEmpty()) {
+                item(key = "filter_chips") {
+                    ActivityFeedFilterChips(
+                        steps = steps,
+                        selectedStepId = filterState.selectedStepId,
+                        onShowAll = onShowAll,
+                        onFilterByStep = onFilterByStep
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
+
+            // ── Empty State ──
+            if (groups.isEmpty()) {
+                item(key = "empty_feed") {
+                    ActivityFeedEmptyState(onTapComposer = onTapComposer)
+                }
+            }
+
+            // ── Message Groups ──
+            groups.forEach { group ->
+                item(key = "date_${group.dateKey}") {
+                    ActivityFeedDayHeader(dateKey = group.dateKey)
+                }
+
+                items(group.messages, key = { it.id }) { message ->
+                    ActivityMessageCard(
+                        message = message,
+                        onAction = onMessageAction
+                    )
                 }
             }
         }
 
-        groups.forEach { group ->
-            item(key = "date_${group.dateKey}") {
-                ActivityFeedDayHeader(dateKey = group.dateKey)
-            }
+        // ── FAB with Options ──
+        ActivityFab(
+            expanded = showFabOptions,
+            onToggle = { showFabOptions = !showFabOptions },
+            onSelectNote = {
+                showFabOptions = false
+                onTapComposer()
+            },
+            onSelectImage = {
+                showFabOptions = false
+                onTapComposer()
+            },
+            onSelectFile = {
+                showFabOptions = false
+                onTapComposer()
+            },
+            onSelectManualActivity = {
+                showFabOptions = false
+                onTapComposer()
+            },
+            modifier = Modifier.align(Alignment.BottomEnd)
+        )
+    }
+}
 
-            items(group.messages, key = { it.id }) { message ->
-                ActivityMessageCard(
-                    message = message,
-                    onAction = onMessageAction
+// ════════════════════════════════════════════════════════════════
+// FEED HEADER
+// ════════════════════════════════════════════════════════════════
+
+@Composable
+private fun ActivityFeedHeader(
+    count: Int,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = "${RTL}فعالیت\u200Cها",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        if (count > 0) {
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Text(
+                    text = "$count",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                 )
             }
         }
+    }
+}
+
+// ════════════════════════════════════════════════════════════════
+// FILTER CHIPS
+// ════════════════════════════════════════════════════════════════
+
+@Composable
+private fun ActivityFeedFilterChips(
+    steps: List<TaskStepEntity>,
+    selectedStepId: Long?,
+    onShowAll: () -> Unit,
+    onFilterByStep: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // All filter chip
+        FilterChip(
+            selected = selectedStepId == null,
+            onClick = onShowAll,
+            label = {
+                Text(
+                    text = "${RTL}همه",
+                    fontSize = 12.sp,
+                    fontWeight = if (selectedStepId == null) FontWeight.Bold else FontWeight.Normal
+                )
+            },
+            shape = RoundedCornerShape(16.dp),
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+            )
+        )
+
+        // Step filter chips
+        steps.forEach { step ->
+            val stepId = step.id.toLong()
+            FilterChip(
+                selected = selectedStepId == stepId,
+                onClick = { onFilterByStep(stepId) },
+                label = {
+                    Text(
+                        text = "${RTL}${step.title}",
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontWeight = if (selectedStepId == stepId) FontWeight.Bold else FontWeight.Normal
+                    )
+                },
+                shape = RoundedCornerShape(16.dp),
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.secondary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onSecondary
+                )
+            )
+        }
+    }
+}
+
+// ════════════════════════════════════════════════════════════════
+// ENHANCED EMPTY STATE
+// ════════════════════════════════════════════════════════════════
+
+@Composable
+private fun ActivityFeedEmptyState(
+    onTapComposer: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 48.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 32.dp)
+        ) {
+            Text(
+                text = "✨",
+                fontSize = 36.sp
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "${RTL}هنوز فعالیتی ثبت نکردی",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${RTL}یادداشت\u200Cها، تصاویر، فایل\u200Cها و\nاتفاقات مسیر اینجا ذخیره می\u200Cشوند.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center,
+                lineHeight = 20.sp
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            FilledTonalButton(
+                onClick = onTapComposer,
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Text(
+                    text = "${RTL}➕ ثبت فعالیت",
+                    fontSize = 13.sp
+                )
+            }
+        }
+    }
+}
+
+// ════════════════════════════════════════════════════════════════
+// FAB WITH ACTIVITY OPTIONS
+// ════════════════════════════════════════════════════════════════
+
+@Composable
+private fun ActivityFab(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onSelectNote: () -> Unit,
+    onSelectImage: () -> Unit,
+    onSelectFile: () -> Unit,
+    onSelectManualActivity: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(end = 8.dp, bottom = 16.dp),
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Expanded options
+        if (expanded) {
+            FabOption(
+                icon = "⏱️",
+                label = "${RTL}فعالیت دستی",
+                onClick = onSelectManualActivity
+            )
+            FabOption(
+                icon = "📎",
+                label = "${RTL}فایل",
+                onClick = onSelectFile
+            )
+            FabOption(
+                icon = "📷",
+                label = "${RTL}تصویر",
+                onClick = onSelectImage
+            )
+            FabOption(
+                icon = "📝",
+                label = "${RTL}یادداشت",
+                onClick = onSelectNote
+            )
+        }
+
+        // Main FAB
+        FloatingActionButton(
+            onClick = onToggle,
+            shape = CircleShape,
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
+        ) {
+            Icon(
+                imageVector = if (expanded) Icons.Default.Close else Icons.Default.Add,
+                contentDescription = if (expanded) "${RTL}بستن" else "${RTL}فعالیت جدید"
+            )
+        }
+    }
+}
+
+@Composable
+private fun FabOption(
+    icon: String,
+    label: String,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+            .clickable(onClick = onClick)
+            .padding(start = 10.dp, end = 14.dp, top = 8.dp, bottom = 8.dp)
+    ) {
+        Text(text = icon, fontSize = 14.sp)
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 
