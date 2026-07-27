@@ -212,7 +212,10 @@ private fun TagColorSwatch(
                 fontWeight = FontWeight.Bold,
                 color = android.graphics.Color.parseColor("#$colorHex")
                     .let { Color(it) }
-                    .let { c -> if (c.luminance() > 0.5f) Color.Black else Color.White }
+                    .let { c ->
+                        val luminance = 0.299f * c.red + 0.587f * c.green + 0.114f * c.blue
+                        if (luminance > 0.5f) Color.Black else Color.White
+                    }
             )
         }
     }
