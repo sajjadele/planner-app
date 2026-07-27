@@ -1,8 +1,6 @@
 package com.example.plugins.planner.ui.composer
 
 import android.net.Uri
-import android.util.Log
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -16,8 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.positionInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,13 +39,8 @@ fun AttachmentPreview(
     onRemoveAttachment: (ActivityAttachment) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Log.d("COMPOSER_DEBUG", "🖼 AttachmentPreview called with ${attachments.size} attachments")
-    if (attachments.isEmpty()) {
-        Log.d("COMPOSER_DEBUG", "🖼 AttachmentPreview: returning early (empty)")
-        return
-    }
+    if (attachments.isEmpty()) return
 
-    Log.d("COMPOSER_DEBUG", "🖼 AttachmentPreview: rendering ${attachments.size} attachments")
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -80,35 +71,16 @@ private fun ImageAttachmentPreview(
     uri: String,
     onRemove: () -> Unit
 ) {
-    Log.d("COMPOSER_DEBUG", "🖼 ImageAttachmentPreview COMPOSING: uri=$uri")
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(160.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.Red.copy(alpha = 0.3f))
-            .onGloballyPositioned { coordinates ->
-                val posInWindow = coordinates.positionInWindow()
-                val size = coordinates.size
-                Log.d("COMPOSER_DEBUG", "🖼 Box posInWindow=(${posInWindow.x.toInt()},${posInWindow.y.toInt()}) size=${size.width}x${size.height}")
-            }
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(Uri.parse(uri))
-                .listener(
-                    onStart = {
-                        Log.d("COMPOSER_DEBUG", "🖼 Coil STARTED loading")
-                        null
-                    },
-                    onError = { _, errorResult ->
-                        Log.e("COMPOSER_DEBUG", "🖼 Coil ERROR: ${errorResult.throwable?.message}", errorResult.throwable)
-                    },
-                    onSuccess = { _, _ ->
-                        Log.d("COMPOSER_DEBUG", "🖼 Coil SUCCESS: image loaded")
-                    }
-                )
+                .crossfade(true)
                 .build(),
             contentDescription = "${RTL}پیش‌نمایش تصویر",
             modifier = Modifier.fillMaxSize(),

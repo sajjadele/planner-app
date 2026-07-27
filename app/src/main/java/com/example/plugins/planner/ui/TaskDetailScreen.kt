@@ -1,6 +1,10 @@
 package com.example.plugins.planner.ui
 
 import android.app.Application
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -41,6 +45,9 @@ import com.example.core.util.JalaliDate
 import com.example.core.util.RTL
 import androidx.compose.material3.AlertDialog
 import com.example.plugins.planner.data.ActivityEventEntity
+import com.example.plugins.planner.data.ActivityCreationAction
+import com.example.plugins.planner.data.ActivityDraft
+import com.example.plugins.planner.data.ActivityAttachment
 import com.example.plugins.planner.data.ActivityFeedFilterState
 import com.example.plugins.planner.data.ActivityMessageAction
 import com.example.plugins.planner.data.ActivityMessageMapper
@@ -97,15 +104,62 @@ fun TaskDetailScreen(
     var selectedMessageId: Long? by remember { mutableStateOf(null) }
     var scrollToMessageId: Long? by remember { mutableStateOf(null) }
 
+    // ── Image picker for direct FAB action ──
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri: Uri? ->
+            if (uri != null) {
+                try {
+                    LocalContext.current.contentResolver.takePersistableUriPermission(
+                        uri,
+                        android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                } catch (_: Exception) { }
+                // Create activity directly with the selected image
+                viewModel.createActivity(
+                    ActivityDraft(
+                        attachments = listOf(
+                            ActivityAttachment.Image(uri.toString())
+                        )
+                    )
+                )
+            }
+        }
+    )
+
+    // ── Handle FAB creation actions ──
+    val handleCreationAction: (ActivityCreationAction) -> Unit = remember { { action ->
+        when (action) {
+            ActivityCreationAction.Image -> {
+                imagePickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            }
+            else -> {
+                // Note, File, and ManualActivity open the composer
+                showActivityComposer = true
+            }
+        }
+    } }
+
     // ── Scroll to message on ReplyNavigation ──
-    LaunchedEffect(scrollToMessageId) {
+    // Uses filteredActivityMessages for correct LazyColumn index.
+    // If target is hidden by an active filter, clears filter and retries.
+    LaunchedEffect(scrollToMessageId, filteredActivityMessages) {
         val targetId = scrollToMessageId ?: return@LaunchedEffect
         val index = filteredActivityMessages.indexOfFirst { it.id == targetId }
         if (index >= 0) {
+            // Target is visible in the current filtered view
             activityListState.animateScrollToItem(index)
             selectedMessageId = targetId
+            scrollToMessageId = null
+        } else if (filterState.selectedStepId != null) {
+            // Target is hidden by a step filter — clear it to reveal all messages
+            viewModel.showAllActivities()
+            // Keep scrollToMessageId set; the next LaunchedEffect emission will find
+            // the target now that the filter is cleared (filteredActivityMessages updated)
         }
-        scrollToMessageId = null
+        // If target not found and no filter active, the target may not exist — silently ignore
     }
 
     val handleMessageAction: (ActivityMessageAction) -> Unit = remember(viewModel, activityMessages) { { action ->
@@ -202,6 +256,7 @@ fun TaskDetailScreen(
                     filterState = filterState,
                     selectedMessageId = selectedMessageId,
                     onTapComposer = { showActivityComposer = true },
+                    onSelectAction = handleCreationAction,
                     onMessageAction = handleMessageAction,
                     onShowAll = { viewModel.showAllActivities() },
                     onFilterByStep = { stepId -> viewModel.filterByStep(stepId) },
@@ -534,6 +589,7 @@ private fun TaskDetailActivityContent(
     filterState: ActivityFeedFilterState,
     selectedMessageId: Long? = null,
     onTapComposer: () -> Unit,
+    onSelectAction: (ActivityCreationAction) -> Unit,
     onMessageAction: ((ActivityMessageAction) -> Unit)? = null,
     onShowAll: () -> Unit = {},
     onFilterByStep: (Long) -> Unit = {},
@@ -603,22 +659,7 @@ private fun TaskDetailActivityContent(
         ActivityFab(
             expanded = showFabOptions,
             onToggle = { showFabOptions = !showFabOptions },
-            onSelectNote = {
-                showFabOptions = false
-                onTapComposer()
-            },
-            onSelectImage = {
-                showFabOptions = false
-                onTapComposer()
-            },
-            onSelectFile = {
-                showFabOptions = false
-                onTapComposer()
-            },
-            onSelectManualActivity = {
-                showFabOptions = false
-                onTapComposer()
-            },
+            onSelectAction = onSelectAction,
             modifier = Modifier.align(Alignment.BottomEnd)
         )
     }
@@ -784,10 +825,7 @@ private fun ActivityFeedEmptyState(
 private fun ActivityFab(
     expanded: Boolean,
     onToggle: () -> Unit,
-    onSelectNote: () -> Unit,
-    onSelectImage: () -> Unit,
-    onSelectFile: () -> Unit,
-    onSelectManualActivity: () -> Unit,
+    onSelectAction: (ActivityCreationAction) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -800,22 +838,34 @@ private fun ActivityFab(
             FabOption(
                 icon = "⏱️",
                 label = "${RTL}فعالیت دستی",
-                onClick = onSelectManualActivity
+                onClick = {
+                    expanded = false
+                    onSelectAction(ActivityCreationAction.ManualActivity)
+                }
             )
             FabOption(
                 icon = "📎",
                 label = "${RTL}فایل",
-                onClick = onSelectFile
+                onClick = {
+                    expanded = false
+                    onSelectAction(ActivityCreationAction.File)
+                }
             )
             FabOption(
                 icon = "📷",
                 label = "${RTL}تصویر",
-                onClick = onSelectImage
+                onClick = {
+                    expanded = false
+                    onSelectAction(ActivityCreationAction.Image)
+                }
             )
             FabOption(
                 icon = "📝",
                 label = "${RTL}یادداشت",
-                onClick = onSelectNote
+                onClick = {
+                    expanded = false
+                    onSelectAction(ActivityCreationAction.Note)
+                }
             )
         }
 

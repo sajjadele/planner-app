@@ -1,6 +1,5 @@
 package com.example.plugins.planner.ui
 
-import android.util.Log
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
