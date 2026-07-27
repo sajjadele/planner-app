@@ -158,8 +158,8 @@ class ActivityCreationUXTest {
     }
 
     @Test
-    fun `ActivityCreationSheet has all four options`() {
-        // The creation sheet lists: Note, Image, File, ManualActivity
+    fun `all four creation options exist in quick menu`() {
+        // The quick menu provides: Note, Image, File, ManualActivity
         val options = mapOf(
             "📝" to "یادداشت",
             "📷" to "تصویر",

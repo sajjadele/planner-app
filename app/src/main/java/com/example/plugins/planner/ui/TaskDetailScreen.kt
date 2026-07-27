@@ -92,6 +92,7 @@ fun TaskDetailScreen(
     val activityListState = rememberLazyListState()
     var showTimelineSheet by remember { mutableStateOf(false) }
     var showActivityComposer by remember { mutableStateOf(false) }
+    var initialComposerDuration by remember { mutableStateOf<Int?>(null) }
 
     var editingMessage: ActivityMessageModel? by remember { mutableStateOf(null) }
     var deletingMessageId: Long? by remember { mutableStateOf(null) }
@@ -124,16 +125,49 @@ fun TaskDetailScreen(
         }
     )
 
-    // ── Handle FAB creation actions ──
-    val handleCreationAction: (ActivityCreationAction) -> Unit = remember { { action ->
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+        onResult = { uri: Uri? ->
+            if (uri != null) {
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                }
+                // Derive file name from URI
+                val fileName = uri.lastPathSegment ?: "فایل"
+                // Create activity directly with the selected file
+                viewModel.createActivity(
+                    ActivityDraft(
+                        attachments = listOf(
+                            ActivityAttachment.File(uri.toString(), fileName)
+                        )
+                    )
+                )
+            }
+        }
+    )
+
+    // ── Handle creation actions ──
+    val handleCreationAction: (ActivityCreationAction) -> Unit = remember(viewModel, context) { { action ->
         when (action) {
             ActivityCreationAction.Image -> {
                 imagePickerLauncher.launch(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                 )
             }
+            ActivityCreationAction.File -> {
+                filePickerLauncher.launch("*/*")
+            }
+            ActivityCreationAction.ManualActivity -> {
+                // Open composer with duration pre-enabled
+                initialComposerDuration = 30
+                showActivityComposer = true
+            }
             else -> {
-                // Note, File, and ManualActivity open the composer
+                // Note opens composer
+                initialComposerDuration = null
                 showActivityComposer = true
             }
         }
@@ -281,12 +315,14 @@ fun TaskDetailScreen(
                     showActivityComposer = false
                     editingMessage = null
                     replyingToMessage = null
+                    initialComposerDuration = null
                 },
                 onCreateActivity = { draft ->
                     viewModel.createActivity(draft)
                     showActivityComposer = false
                     editingMessage = null
                     replyingToMessage = null
+                    initialComposerDuration = null
                     focusManager.clearFocus()
                 },
                 onCreateStep = { stepDraft ->
@@ -294,6 +330,7 @@ fun TaskDetailScreen(
                     showActivityComposer = false
                     editingMessage = null
                     replyingToMessage = null
+                    initialComposerDuration = null
                     focusManager.clearFocus()
                 },
                 onUpdateActivity = { messageId, draft ->
@@ -301,10 +338,12 @@ fun TaskDetailScreen(
                     showActivityComposer = false
                     editingMessage = null
                     replyingToMessage = null
+                    initialComposerDuration = null
                     focusManager.clearFocus()
                 },
                 initialMessage = editingMessage,
-                replyToMessage = replyingToMessage
+                replyToMessage = replyingToMessage,
+                initialDurationMinutes = initialComposerDuration
             )
         }
 
@@ -594,21 +633,12 @@ private fun TaskDetailActivityContent(
 ) {
     val groups = remember(messages) { groupActivityMessagesByDay(messages) }
     var fullScreenImageUrl by remember { mutableStateOf<String?>(null) }
-    var showCreationSheet by remember { mutableStateOf(false) }
 
     // ── Fullscreen Image Viewer ──
     fullScreenImageUrl?.let { url ->
         FullScreenImageDialog(
             imageUri = url,
             onDismiss = { fullScreenImageUrl = null }
-        )
-    }
-
-    // ── Activity Creation Sheet ──
-    if (showCreationSheet) {
-        ActivityCreationSheet(
-            onDismiss = { showCreationSheet = false },
-            onSelectAction = onSelectAction
         )
     }
 
@@ -620,9 +650,7 @@ private fun TaskDetailActivityContent(
         ) {
             // ── Feed Header ──
             item(key = "feed_header") {
-                ActivityFeedHeader(onSelectAction = { action ->
-                    showCreationSheet = true
-                })
+                ActivityFeedHeader(onSelectAction = onSelectAction)
             }
 
             // ── Filter Chips ──
@@ -679,7 +707,7 @@ private fun TaskDetailActivityContent(
 }
 
 // ════════════════════════════════════════════════════════════════
-// FEED HEADER with creation action button
+// FEED HEADER with dropdown quick action menu
 // ════════════════════════════════════════════════════════════════
 
 @Composable
@@ -687,6 +715,8 @@ private fun ActivityFeedHeader(
     onSelectAction: (ActivityCreationAction) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showMenu by remember { mutableStateOf(false) }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -700,15 +730,50 @@ private fun ActivityFeedHeader(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
-        IconButton(
-            onClick = { onSelectAction(ActivityCreationAction.Note) },
-            modifier = Modifier.size(28.dp)
-        ) {
-            Text(
-                text = "✚",
-                fontSize = 18.sp,
-                color = MaterialTheme.colorScheme.primary
-            )
+        Box {
+            IconButton(
+                onClick = { showMenu = true },
+                modifier = Modifier.size(28.dp)
+            ) {
+                Text(
+                    text = "✚",
+                    fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("${RTL}📝  یادداشت", fontSize = 13.sp) },
+                    onClick = {
+                        showMenu = false
+                        onSelectAction(ActivityCreationAction.Note)
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("${RTL}📷  تصویر", fontSize = 13.sp) },
+                    onClick = {
+                        showMenu = false
+                        onSelectAction(ActivityCreationAction.Image)
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("${RTL}📎  فایل", fontSize = 13.sp) },
+                    onClick = {
+                        showMenu = false
+                        onSelectAction(ActivityCreationAction.File)
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("${RTL}⏱️  فعالیت دستی", fontSize = 13.sp) },
+                    onClick = {
+                        showMenu = false
+                        onSelectAction(ActivityCreationAction.ManualActivity)
+                    }
+                )
+            }
         }
     }
 }

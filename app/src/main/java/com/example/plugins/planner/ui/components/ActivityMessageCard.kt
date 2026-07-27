@@ -214,7 +214,7 @@ private fun MessageContent(
 private fun MessageText(text: String) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Text(
-            text = text.replace("\u200F", ""),
+            text = text,
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 10,
@@ -463,7 +463,8 @@ private fun ReplyReferencePreview(
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Right
                         )
                     }
                 }

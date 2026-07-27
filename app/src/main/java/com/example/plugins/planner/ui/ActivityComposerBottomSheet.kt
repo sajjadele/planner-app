@@ -37,7 +37,8 @@ fun ActivityComposerBottomSheet(
     onCreateStep: (StepDraft) -> Unit,
     onUpdateActivity: ((Long, ActivityDraft) -> Unit)? = null,
     initialMessage: ActivityMessageModel? = null,
-    replyToMessage: ActivityMessageModel? = null
+    replyToMessage: ActivityMessageModel? = null,
+    initialDurationMinutes: Int? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val focusManager = LocalFocusManager.current
@@ -48,7 +49,7 @@ fun ActivityComposerBottomSheet(
         else -> ComposerMode.ACTIVITY
     }
 
-    val initialState = remember(initialMessage, replyToMessage) {
+    val initialState = remember(initialMessage, replyToMessage, initialDurationMinutes) {
         when {
             initialMessage != null -> ActivityComposerState(
                 text = initialMessage.text ?: "",
@@ -61,7 +62,9 @@ fun ActivityComposerBottomSheet(
                 mode = ComposerMode.REPLY,
                 replyToMessageId = replyToMessage.id
             )
-            else -> ActivityComposerState()
+            else -> ActivityComposerState(
+                durationMinutes = initialDurationMinutes
+            )
         }
     }
 
