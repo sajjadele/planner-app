@@ -68,11 +68,19 @@ class ActivityFeedFilterTest {
 
     private fun applyFilter(
         messages: List<ActivityMessageModel>,
-        filter: ActivityFeedFilterState
+        filter: ActivityFeedFilterState,
+        selectedDate: Long? = null
     ): List<ActivityMessageModel> {
         var result = messages
         if (filter.selectedStepId != null) {
             result = result.filter { it.stepId == filter.selectedStepId }
+        }
+        if (selectedDate != null) {
+            result = result.filter { msg ->
+                com.example.core.util.JalaliDate.toEpochMs(
+                    com.example.core.util.JalaliDate.fromEpochMs(msg.createdAt)
+                ) == selectedDate
+            }
         }
         if (filter.showImagesOnly) {
             result = result.filter { it.attachments.any { a -> a is ActivityAttachment.Image } }

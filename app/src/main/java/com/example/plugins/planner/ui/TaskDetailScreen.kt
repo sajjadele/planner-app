@@ -5,6 +5,11 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -25,13 +30,15 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -40,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.core.calendar.PersianCalendarDialog
 import com.example.core.util.JalaliDate
 import com.example.core.util.RTL
 import androidx.compose.material3.AlertDialog
@@ -96,7 +104,7 @@ fun TaskDetailScreen(
     val focusManager = LocalFocusManager.current
     var selectedTab by remember { mutableIntStateOf(0) }
     val activityListState = rememberLazyListState()
-    var showTimelineSheet by remember { mutableStateOf(false) }
+    var showActivityDateCalendar by remember { mutableStateOf(false) }
     var showActivityComposer by remember { mutableStateOf(false) }
     var initialComposerDuration by remember { mutableStateOf<Int?>(null) }
     var showAddTagDialog by remember { mutableStateOf(false) }
@@ -214,6 +222,14 @@ fun TaskDetailScreen(
         }
     }
 
+    // ── Scroll to top when date filter changes (Phase 6.0.6) ──
+    LaunchedEffect(selectedActivityDate) {
+        if (selectedActivityDate != null && initialLoadDone.value) {
+            kotlinx.coroutines.delay(150)
+            activityListState.animateScrollToItem(0)
+        }
+    }
+
     val handleMessageAction: (ActivityMessageAction) -> Unit = remember(viewModel, activityMessages) { { action ->
         when (action) {
             is ActivityMessageAction.Edit -> {
@@ -307,6 +323,9 @@ fun TaskDetailScreen(
                     steps = steps,
                     filterState = filterState,
                     selectedMessageId = selectedMessageId,
+                    selectedDate = selectedActivityDate,
+                    timelineStartDate = timelineStartDate,
+                    timelineEndDate = timelineEndDate,
                     onTapComposer = { showActivityComposer = true },
                     onSelectAction = handleCreationAction,
                     onMessageAction = handleMessageAction,
@@ -317,23 +336,14 @@ fun TaskDetailScreen(
                         selectedTagForAction = tag
                         showTagActionMenu = true
                     },
+                    onOpenCalendar = { showActivityDateCalendar = true },
+                    onGoToToday = { viewModel.goToToday() },
+                    onMoveDate = { days -> viewModel.moveActivityDate(days) },
+                    onClearDate = { viewModel.clearDateFilter() },
                     listState = activityListState
                 )
             }
         }
-
-        TimelineBottomSheet(
-            visible = showTimelineSheet,
-            selectedDate = selectedActivityDate,
-            timelineStartDate = timelineStartDate,
-            timelineEndDate = timelineEndDate,
-            messages = activityMessages,
-            onDismiss = { showTimelineSheet = false },
-            onSelectDate = { viewModel.selectActivityDate(it) },
-            onGoToToday = { viewModel.goToToday() },
-            onMoveDate = { viewModel.moveActivityDate(it) },
-            onMessageAction = handleMessageAction
-        )
 
         if (showActivityComposer) {
             ActivityComposerBottomSheet(
@@ -489,10 +499,26 @@ fun TaskDetailScreen(
                 }
             )
         }
+
+        // ── Activity Date Calendar Dialog (Phase 6.0.6) ──
+        if (showActivityDateCalendar) {
+            PersianCalendarDialog(
+                selectedDateEpochMs = selectedActivityDate ?: timelineStartDate,
+                onDateSelected = { date ->
+                    viewModel.selectActivityDate(date)
+                    showActivityDateCalendar = false
+                },
+                onDismiss = { showActivityDateCalendar = false },
+                minSelectableDate = timelineStartDate,
+                maxSelectableDate = timelineEndDate,
+                confirmButtonText = "${RTL}انتخاب",
+                showConfirmButton = true
+            )
+        }
     }
 }
 
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 // TOP BAR
 // ════════════════════════════════════════════════════════════════
 
@@ -721,6 +747,9 @@ private fun TaskDetailActivityContent(
     steps: List<TaskStepEntity>,
     filterState: ActivityFeedFilterState,
     selectedMessageId: Long? = null,
+    selectedDate: Long? = null,
+    timelineStartDate: Long = 0L,
+    timelineEndDate: Long = 0L,
     onTapComposer: () -> Unit,
     onSelectAction: (ActivityCreationAction) -> Unit,
     onMessageAction: ((ActivityMessageAction) -> Unit)? = null,
@@ -728,6 +757,10 @@ private fun TaskDetailActivityContent(
     onFilterByStep: (Long) -> Unit = {},
     onAddTag: () -> Unit = {},
     onTagLongPress: (TaskStepEntity) -> Unit = {},
+    onOpenCalendar: () -> Unit = {},
+    onGoToToday: () -> Unit = {},
+    onMoveDate: (Int) -> Unit = {},
+    onClearDate: () -> Unit = {},
     listState: LazyListState = rememberLazyListState()
 ) {
     val groups = remember(messages) { groupActivityMessagesByDay(messages) }
@@ -749,7 +782,10 @@ private fun TaskDetailActivityContent(
         ) {
             // ── Feed Header ──
             item(key = "feed_header") {
-                ActivityFeedHeader(onSelectAction = onSelectAction)
+                ActivityFeedHeader(
+                    onSelectAction = onSelectAction,
+                    onOpenCalendar = onOpenCalendar
+                )
             }
 
             // ── Filter Chips ──
@@ -764,6 +800,22 @@ private fun TaskDetailActivityContent(
                         onTagLongPress = onTagLongPress
                     )
                     Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
+
+            // ── Date Navigator (Phase 6.0.6: collapsed-first, only when date selected) ──
+            if (selectedDate != null) {
+                item(key = "date_navigator") {
+                    ActivityFeedDateNavigator(
+                        selectedDate = selectedDate,
+                        timelineStartDate = timelineStartDate,
+                        timelineEndDate = timelineEndDate,
+                        onOpenCalendar = onOpenCalendar,
+                        onGoToToday = onGoToToday,
+                        onMoveDate = onMoveDate,
+                        onClearDate = onClearDate,
+                        onSelectDate = { /* handled by calendar dialog */ }
+                    )
                 }
             }
 
@@ -812,6 +864,7 @@ private fun TaskDetailActivityContent(
 @Composable
 private fun ActivityFeedHeader(
     onSelectAction: (ActivityCreationAction) -> Unit,
+    onOpenCalendar: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -829,18 +882,35 @@ private fun ActivityFeedHeader(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
-        Box {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            // Calendar icon — opens date picker
             IconButton(
-                onClick = { showMenu = true },
+                onClick = onOpenCalendar,
                 modifier = Modifier.size(28.dp)
             ) {
-                Text(
-                    text = "✚",
-                    fontSize = 18.sp,
-                    color = MaterialTheme.colorScheme.primary
+                Icon(
+                    imageVector = Icons.Default.DateRange,
+                    contentDescription = "${RTL}فیلتر تاریخ",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
                 )
             }
-            DropdownMenu(
+            // Add activity menu
+            Box {
+                IconButton(
+                    onClick = { showMenu = true },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Text(
+                        text = "✚",
+                        fontSize = 18.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                DropdownMenu(
                 expanded = showMenu,
                 onDismissRequest = { showMenu = false }
             ) {
@@ -877,7 +947,7 @@ private fun ActivityFeedHeader(
     }
 }
 
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 // FILTER CHIPS
 // ════════════════════════════════════════════════════════════════
 
@@ -993,9 +1063,185 @@ private fun ActivityFeedFilterChips(
     }
 }
 
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// DATE NAVIGATOR — Phase 6.0.6 Collapsed-First Design
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * ActivityFeedDateNavigator — Compact date indicator for the activity feed.
+ *
+ * Phase 6.0.6: Collapsed-first UX.
+ * - No date selected → hidden (consumes no space)
+ * - Date selected → collapsed single-row chip (date + expand arrow)
+ * - Expanded → reveals prev/next/today navigation controls
+ *
+ * Target heights:
+ *   Collapsed: ~40dp (single row)
+ *   Expanded:  ~90dp max (row + navigation controls)
+ */
+@Composable
+private fun ActivityFeedDateNavigator(
+    selectedDate: Long?,
+    timelineStartDate: Long,
+    timelineEndDate: Long,
+    onOpenCalendar: () -> Unit,
+    onSelectDate: (Long) -> Unit,
+    onGoToToday: () -> Unit,
+    onMoveDate: (Int) -> Unit,
+    onClearDate: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (selectedDate == null) return
+
+    var isExpanded by remember { mutableStateOf(false) }
+
+    val jalali = remember(selectedDate) { JalaliDate.fromEpochMs(selectedDate) }
+    val dateText = remember(jalali) {
+        "${RTL}${jalali.day} ${JalaliDate.MONTH_NAMES[jalali.month - 1]} ${jalali.year}"
+    }
+
+    val canMovePrevious = selectedDate > timelineStartDate
+    val canMoveNext = selectedDate < timelineEndDate
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        // ── Collapsed Row: date chip + expand/collapse arrow ──
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Left: calendar icon + date text (tappable → open calendar)
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onOpenCalendar)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DateRange,
+                    contentDescription = "${RTL}انتخاب تاریخ",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    text = dateText,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            // Right: expand/collapse arrow + clear button
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                // Clear date filter
+                IconButton(
+                    onClick = onClearDate,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "${RTL}حذف فیلتر تاریخ",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+                // Expand/collapse toggle
+                IconButton(
+                    onClick = { isExpanded = !isExpanded },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = if (isExpanded) "${RTL}بستن" else "${RTL}باز کردن",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(18.dp)
+                            .graphicsLayer {
+                                rotationZ = if (isExpanded) 180f else 0f
+                            }
+                    )
+                }
+            }
+        }
+
+        // ── Expanded Navigation Controls ──
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Previous day
+                IconButton(
+                    onClick = { if (canMovePrevious) onMoveDate(-1) },
+                    modifier = Modifier.size(32.dp),
+                    enabled = canMovePrevious
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = "${RTL}روز قبل",
+                        tint = if (canMovePrevious)
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                        modifier = Modifier
+                            .size(18.dp)
+                            .graphicsLayer { rotationZ = 90f }
+                    )
+                }
+
+                // Today button
+                AssistChip(
+                    onClick = onGoToToday,
+                    label = {
+                        Text(
+                            text = "${RTL}امروز",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    },
+                    shape = RoundedCornerShape(8.dp)
+                )
+
+                // Next day
+                IconButton(
+                    onClick = { if (canMoveNext) onMoveDate(1) },
+                    modifier = Modifier.size(32.dp),
+                    enabled = canMoveNext
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = "${RTL}روز بعد",
+                        tint = if (canMoveNext)
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                        modifier = Modifier
+                            .size(18.dp)
+                            .graphicsLayer { rotationZ = -90f }
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
 // ENHANCED EMPTY STATE
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 
 @Composable
 private fun ActivityFeedEmptyState(

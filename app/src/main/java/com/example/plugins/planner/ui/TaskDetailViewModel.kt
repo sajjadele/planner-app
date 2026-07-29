@@ -133,11 +133,11 @@ class TaskDetailViewModel(
     private val _filterState = MutableStateFlow(ActivityFeedFilterState.DEFAULT)
     val filterState: StateFlow<ActivityFeedFilterState> = _filterState.asStateFlow()
 
-    /** Filtered activity messages — combines raw messages with current filter */
+    /** Filtered activity messages — combines raw messages with current filter (tag + date) */
     val filteredActivityMessages: StateFlow<List<ActivityMessageModel>> = combine(
-        activityMessages, _filterState
-    ) { messages, filter ->
-        applyFilter(messages, filter)
+        activityMessages, _filterState, _selectedActivityDate
+    ) { messages, filter, selectedDate ->
+        applyFilter(messages, filter, selectedDate)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -149,17 +149,26 @@ class TaskDetailViewModel(
      *
      * - No filter (همه): shows everything
      * - Step filter: only messages matching stepId
+     * - Date filter: only messages on the selected day (epoch ms, normalized)
      * - Image/file filters: for future use
      */
     private fun applyFilter(
         messages: List<ActivityMessageModel>,
-        filter: ActivityFeedFilterState
+        filter: ActivityFeedFilterState,
+        selectedDate: Long?
     ): List<ActivityMessageModel> {
         var result = messages
 
         // Step filter
         if (filter.selectedStepId != null) {
             result = result.filter { it.stepId == filter.selectedStepId }
+        }
+
+        // Date filter — match messages whose createdAt falls on the same Jalali day
+        if (selectedDate != null) {
+            result = result.filter { msg ->
+                normalizeToDayStart(msg.createdAt) == selectedDate
+            }
         }
 
         // Media type filters (future-ready)
@@ -238,9 +247,9 @@ class TaskDetailViewModel(
     private val _timelineEndDate = MutableStateFlow(_timelineStartDate.value)
     val timelineEndDate: StateFlow<Long> = _timelineEndDate.asStateFlow()
 
-    /** Currently selected date in the Activity timeline — clamped to [timelineStartDate, timelineEndDate]. */
-    private val _selectedActivityDate = MutableStateFlow(_timelineStartDate.value)
-    val selectedActivityDate: StateFlow<Long> = _selectedActivityDate.asStateFlow()
+    /** Currently selected date in the Activity timeline — null means "show all dates". */
+    private val _selectedActivityDate = MutableStateFlow<Long?>(null)
+    val selectedActivityDate: StateFlow<Long?> = _selectedActivityDate.asStateFlow()
 
     private fun normalizeToDayStart(epochMs: Long): Long =
         JalaliDate.toEpochMs(JalaliDate.fromEpochMs(epochMs))
@@ -256,7 +265,9 @@ class TaskDetailViewModel(
                 if (t != null) {
                     val end = normalizeToDayStart(t.dateEpochMs)
                     _timelineEndDate.value = end
-                    _selectedActivityDate.value = clampToTimelineRange(_selectedActivityDate.value)
+                    _selectedActivityDate.value?.let { sel ->
+                        _selectedActivityDate.value = clampToTimelineRange(sel)
+                    }
                 }
             }
         }
@@ -264,6 +275,11 @@ class TaskDetailViewModel(
 
     fun selectActivityDate(dateEpochMs: Long) {
         _selectedActivityDate.value = clampToTimelineRange(dateEpochMs)
+    }
+
+    /** Clear the date filter — show all activities regardless of date. */
+    fun clearDateFilter() {
+        _selectedActivityDate.value = null
     }
 
     fun goToToday() {
