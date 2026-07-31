@@ -10,8 +10,10 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 
 import androidx.compose.foundation.horizontalScroll
@@ -978,6 +980,7 @@ private fun ActivityFeedHeader(
  *
  * Phase 5.9.3: "+" action at index 0 + colored dots.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ActivityFeedFilterChips(
     steps: List<TaskStepEntity>,
@@ -1039,16 +1042,16 @@ private fun ActivityFeedFilterChips(
             val stepId = step.id.toLong()
             val isSelected = selectedStepId == stepId
             val chipColor = parseColorHex(step.colorHex) ?: defaultTagColor
-            Box(
-                modifier = Modifier.pointerInput(stepId) {
-                    detectTapGestures(
-                        onLongPress = { onTagLongPress(step) }
+            Box {
+                Box(
+                    modifier = Modifier.combinedClickable(
+                        onClick = { onFilterByStep(stepId) },
+                        onLongClick = { onTagLongPress(step) }
                     )
-                }
-            ) {
-                FilterChip(
-                    selected = isSelected,
-                    onClick = { onFilterByStep(stepId) },
+                ) {
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = {},
                     label = {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
