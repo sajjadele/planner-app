@@ -1084,6 +1084,7 @@ private fun ActivityFeedFilterChips(
                     )
                 )
             }
+            }
         }
     }
 }
