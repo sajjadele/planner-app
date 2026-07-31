@@ -1042,48 +1042,37 @@ private fun ActivityFeedFilterChips(
             val stepId = step.id.toLong()
             val isSelected = selectedStepId == stepId
             val chipColor = parseColorHex(step.colorHex) ?: defaultTagColor
-            Box {
-                Box(
-                    modifier = Modifier.combinedClickable(
-                        onClick = { onFilterByStep(stepId) },
-                        onLongClick = { onTagLongPress(step) }
-                    )
+            Surface(
+                modifier = Modifier.combinedClickable(
+                    onClick = { onFilterByStep(stepId) },
+                    onLongClick = { onTagLongPress(step) }
+                ),
+                shape = RoundedCornerShape(16.dp),
+                color = chipColor.copy(alpha = if (isSelected) 0.25f else 0.08f),
+                border = if (isSelected) BorderStroke(1.dp, chipColor.copy(alpha = 0.4f)) else null
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = {},
-                    label = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            if (isSelected) {
-                                Text(
-                                    text = "✓",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = chipColor
-                                )
-                            }
-                            Text(
-                                text = "${RTL}${step.title}",
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = chipColor
-                            )
-                        }
-                    },
-                    shape = RoundedCornerShape(16.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = chipColor.copy(alpha = 0.25f),
-                        containerColor = chipColor.copy(alpha = 0.08f),
-                        selectedLabelColor = chipColor,
-                        labelColor = chipColor
+                    if (isSelected) {
+                        Text(
+                            text = "✓",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = chipColor
+                        )
+                    }
+                    Text(
+                        text = "${RTL}${step.title}",
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        color = chipColor
                     )
-                )
-            }
+                }
             }
         }
     }
