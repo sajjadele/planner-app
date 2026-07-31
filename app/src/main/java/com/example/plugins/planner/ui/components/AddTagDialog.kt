@@ -127,7 +127,8 @@ fun AddTagDialog(
                 Text(
                     text = "${RTL}رنگ:",
                     fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth()
                 )
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -197,15 +198,23 @@ private fun TagColorSwatch(
         shape = RoundedCornerShape(6.dp),
         border = if (isSelected) BorderStroke(
                 width = 2.dp,
-                color = bgColor
+                color = MaterialTheme.colorScheme.onSurface
             ) else BorderStroke(0.dp, Color.Transparent)
     ) {
-        if (colorHex == null) {
-            // Default swatch: subtle pattern indicating "no color"
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isSelected) {
+                // Checkmark for selected color
+                Text(
+                    text = "✓",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            } else if (colorHex == null) {
+                // Default swatch: "A" indicating system color
                 Text(
                     text = "A",
                     fontSize = 10.sp,
@@ -213,8 +222,6 @@ private fun TagColorSwatch(
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                 )
             }
-        } else {
-            // Filled color — entire box is the color
         }
     }
 }
