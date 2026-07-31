@@ -59,4 +59,11 @@ interface ActivityEventDao {
         """
     )
     suspend fun getEventsByStepId(stepId: Int): List<ActivityEventEntity>
+
+    /**
+     * Nullify stepId for all activity events referencing a given step.
+     * Called before deleting a tag so activities are preserved but unlinked.
+     */
+    @Query("UPDATE activity_events SET stepId = NULL WHERE stepId = :stepId")
+    suspend fun clearStepId(stepId: Int)
 }

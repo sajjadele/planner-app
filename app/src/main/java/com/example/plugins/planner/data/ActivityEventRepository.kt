@@ -27,4 +27,11 @@ class ActivityEventRepository(private val dao: ActivityEventDao) {
 
     suspend fun getEventsByStepId(stepId: Int): List<ActivityEventEntity> =
         dao.getEventsByStepId(stepId)
+
+    /**
+     * Nullify stepId for all activity events referencing a given step.
+     * Called before deleting a tag so activities are preserved but unlinked.
+     */
+    suspend fun clearStepId(stepId: Int) =
+        dao.clearStepId(stepId)
 }

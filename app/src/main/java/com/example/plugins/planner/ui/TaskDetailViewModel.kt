@@ -398,6 +398,19 @@ class TaskDetailViewModel(
     }
 
     /**
+     * Update an existing tag in-place — preserves stepId so linked activities stay connected.
+     *
+     * Phase 5.9.4: In-place tag update (no delete+recreate).
+     * This is the ONLY correct way to edit a tag — never delete+create.
+     */
+    fun updateTag(tag: TaskStepEntity, newTitle: String, newColorHex: String?) {
+        viewModelScope.launch {
+            val updated = tag.copy(title = newTitle, colorHex = newColorHex)
+            taskStepRepository.updateStep(updated)
+        }
+    }
+
+    /**
      * Create a Step (Tag) from a StepDraft.
      *
      * Phase 5.5d: Pure tag creation — no initial activities.
@@ -563,15 +576,14 @@ class TaskDetailViewModel(
         }
     }
 
-    /** Delete a step and log the activity event */
-    @Deprecated(
-        "Step deletion as container behavior is removed. " +
-        "Steps are now tags/metadata only. " +
-        "Use the Activity Feed for managing activities.",
-        level = DeprecationLevel.WARNING
-    )
+    /** Delete a step (tag) and log the activity event.
+     *
+     * Phase 5.9.4: Before deleting the tag, all activity events referencing
+     * this step get their stepId nullified — activities are preserved but unlinked.
+     */
     fun deleteStep(step: TaskStepEntity) {
         viewModelScope.launch {
+            // 1. Log the deletion event
             activityEventRepository.addEvent(
                 ActivityEventEntity(
                     taskId = taskId,
@@ -580,6 +592,9 @@ class TaskDetailViewModel(
                     description = step.title
                 )
             )
+            // 2. Unlink activities from this tag (set stepId = NULL)
+            activityEventRepository.clearStepId(step.id)
+            // 3. Delete the tag itself
             taskStepRepository.deleteStep(step.id)
         }
     }

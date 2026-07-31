@@ -76,6 +76,7 @@ fun AddTagDialog(
     onCreateTag: (name: String, colorHex: String?) -> Unit,
     initialName: String? = null,
     initialColorHex: String? = null,
+    isEditing: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var tagName by remember { mutableStateOf(initialName ?: "") }
@@ -102,7 +103,7 @@ fun AddTagDialog(
             ) {
                 // ── Title ──
                 Text(
-                    text = "${RTL}ایجاد دسته جدید",
+                    text = "${RTL}${if (isEditing) "ویرایش دسته" else "ایجاد دسته جدید"}",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface

@@ -112,6 +112,7 @@ fun TaskDetailScreen(
     var showTagActionMenu by remember { mutableStateOf(false) }
     var selectedTagForAction: TaskStepEntity? by remember { mutableStateOf(null) }
     var editingTag: TaskStepEntity? by remember { mutableStateOf(null) }
+    var deletingTag: TaskStepEntity? by remember { mutableStateOf(null) }
 
     var editingMessage: ActivityMessageModel? by remember { mutableStateOf(null) }
     var deletingMessageId: Long? by remember { mutableStateOf(null) }
@@ -431,23 +432,17 @@ fun TaskDetailScreen(
                 },
                 onCreateTag = { name, colorHex ->
                     if (editingTag != null) {
-                        // Editing existing tag — rename title, keep color if not changed
+                        // Editing existing tag — in-place update, preserve stepId
                         val tag = editingTag!!
                         val newColor = colorHex ?: tag.colorHex
-                        if (name != tag.title || newColor != tag.colorHex) {
-                            // Title changed or color changed — full recreate
-                            viewModel.deleteStep(tag)
-                            viewModel.createTag(name, newColor)
-                        } else {
-                            // Only title changed
-                            viewModel.renameStep(tag, name)
-                        }
+                        viewModel.updateTag(tag, name, newColor)
                     } else {
                         viewModel.createTag(name, colorHex)
                     }
                 },
                 initialName = editingTag?.title,
-                initialColorHex = editingTag?.colorHex
+                initialColorHex = editingTag?.colorHex,
+                isEditing = editingTag != null
             )
         }
 
@@ -475,9 +470,8 @@ fun TaskDetailScreen(
                         }
                         TextButton(
                             onClick = {
-                                viewModel.deleteStep(tag)
                                 showTagActionMenu = false
-                                selectedTagForAction = null
+                                deletingTag = tag
                             }
                         ) {
                             Text(
@@ -495,6 +489,54 @@ fun TaskDetailScreen(
                             selectedTagForAction = null
                         }
                     ) {
+                        Text("${RTL}لغو")
+                    }
+                }
+            )
+        }
+
+        // ── Tag Delete Confirmation Dialog ──
+        deletingTag?.let { tag ->
+            AlertDialog(
+                onDismissRequest = { deletingTag = null },
+                title = {
+                    Text(
+                        "${RTL}حذف دسته؟",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            "${RTL}با حذف این دسته، فعالیت‌های قبلی حذف نمی‌شوند",
+                            fontSize = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "${RTL}اما این دسته‌بندی از آن‌ها حذف خواهد شد.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.deleteStep(tag)
+                            deletingTag = null
+                            selectedTagForAction = null
+                        }
+                    ) {
+                        Text(
+                            "${RTL}حذف",
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { deletingTag = null }) {
                         Text("${RTL}لغو")
                     }
                 }
@@ -995,6 +1037,8 @@ private fun ActivityFeedFilterChips(
 
         steps.forEach { step ->
             val stepId = step.id.toLong()
+            val isSelected = selectedStepId == stepId
+            val chipColor = parseColorHex(step.colorHex) ?: defaultTagColor
             Box(
                 modifier = Modifier.pointerInput(stepId) {
                     detectTapGestures(
@@ -1003,33 +1047,37 @@ private fun ActivityFeedFilterChips(
                 }
             ) {
                 FilterChip(
-                    selected = selectedStepId == stepId,
+                    selected = isSelected,
                     onClick = { onFilterByStep(stepId) },
                     label = {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            val chipColor = parseColorHex(step.colorHex) ?: defaultTagColor
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(chipColor, CircleShape)
-                            )
+                            if (isSelected) {
+                                Text(
+                                    text = "✓",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = chipColor
+                                )
+                            }
                             Text(
                                 text = "${RTL}${step.title}",
                                 fontSize = 12.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                fontWeight = if (selectedStepId == stepId) FontWeight.Bold else FontWeight.Normal
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = chipColor
                             )
                         }
                     },
                     shape = RoundedCornerShape(16.dp),
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.secondary,
-                        selectedLabelColor = MaterialTheme.colorScheme.onSecondary
+                        selectedContainerColor = chipColor.copy(alpha = 0.25f),
+                        containerColor = chipColor.copy(alpha = 0.08f),
+                        selectedLabelColor = chipColor,
+                        labelColor = chipColor
                     )
                 )
             }
