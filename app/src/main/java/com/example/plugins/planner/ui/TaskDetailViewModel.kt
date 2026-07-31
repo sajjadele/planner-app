@@ -125,6 +125,10 @@ class TaskDetailViewModel(
             initialValue = emptyList()
         )
 
+    /** Currently selected date in the Activity timeline — defaults to today. */
+    private val _selectedActivityDate = MutableStateFlow<Long?>(JalaliDate.toEpochMs(JalaliDate.today()))
+    val selectedActivityDate: StateFlow<Long?> = _selectedActivityDate.asStateFlow()
+
     // ════════════════════════════════════════════════════════════════
     // Phase 5.2.2: Activity Feed Filtering
     // ════════════════════════════════════════════════════════════════
@@ -247,10 +251,6 @@ class TaskDetailViewModel(
     private val _timelineEndDate = MutableStateFlow(_timelineStartDate.value)
     val timelineEndDate: StateFlow<Long> = _timelineEndDate.asStateFlow()
 
-    /** Currently selected date in the Activity timeline — null means "show all dates". */
-    private val _selectedActivityDate = MutableStateFlow<Long?>(null)
-    val selectedActivityDate: StateFlow<Long?> = _selectedActivityDate.asStateFlow()
-
     private fun normalizeToDayStart(epochMs: Long): Long =
         JalaliDate.toEpochMs(JalaliDate.fromEpochMs(epochMs))
 
@@ -287,7 +287,7 @@ class TaskDetailViewModel(
     }
 
     fun moveActivityDate(days: Int) {
-        val current = _selectedActivityDate.value
+        val current = _selectedActivityDate.value ?: _timelineStartDate.value
         val next = current + days * DAY_MILLIS
         _selectedActivityDate.value = clampToTimelineRange(next)
     }

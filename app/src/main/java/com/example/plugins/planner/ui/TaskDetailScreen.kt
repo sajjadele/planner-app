@@ -13,7 +13,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.pointerInput
+
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -783,40 +784,35 @@ private fun TaskDetailActivityContent(
             // ── Feed Header ──
             item(key = "feed_header") {
                 ActivityFeedHeader(
-                    onSelectAction = onSelectAction,
-                    onOpenCalendar = onOpenCalendar
+                    onSelectAction = onSelectAction
                 )
             }
 
-            // ── Filter Chips ──
-            if (steps.isNotEmpty()) {
-                item(key = "filter_chips") {
-                    ActivityFeedFilterChips(
-                        steps = steps,
-                        selectedStepId = filterState.selectedStepId,
-                        onShowAll = onShowAll,
-                        onFilterByStep = onFilterByStep,
-                        onAddTag = onAddTag,
-                        onTagLongPress = onTagLongPress
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
+            // ── Date Control (Phase 6.1: always visible, above tags) ──
+            item(key = "date_control") {
+                ActivityFeedDateNavigator(
+                    selectedDate = selectedDate,
+                    timelineStartDate = timelineStartDate,
+                    timelineEndDate = timelineEndDate,
+                    onOpenCalendar = onOpenCalendar,
+                    onGoToToday = onGoToToday,
+                    onMoveDate = onMoveDate,
+                    onClearDate = onClearDate,
+                    onSelectDate = { /* handled by calendar dialog */ }
+                )
             }
 
-            // ── Date Navigator (Phase 6.0.6: collapsed-first, only when date selected) ──
-            if (selectedDate != null) {
-                item(key = "date_navigator") {
-                    ActivityFeedDateNavigator(
-                        selectedDate = selectedDate,
-                        timelineStartDate = timelineStartDate,
-                        timelineEndDate = timelineEndDate,
-                        onOpenCalendar = onOpenCalendar,
-                        onGoToToday = onGoToToday,
-                        onMoveDate = onMoveDate,
-                        onClearDate = onClearDate,
-                        onSelectDate = { /* handled by calendar dialog */ }
-                    )
-                }
+            // ── Filter Chips (always visible — shows [+] and [همه] even with zero tags) ──
+            item(key = "filter_chips") {
+                ActivityFeedFilterChips(
+                    steps = steps,
+                    selectedStepId = filterState.selectedStepId,
+                    onShowAll = onShowAll,
+                    onFilterByStep = onFilterByStep,
+                    onAddTag = onAddTag,
+                    onTagLongPress = onTagLongPress
+                )
+                Spacer(modifier = Modifier.height(4.dp))
             }
 
             // ── Empty State ──
@@ -852,19 +848,20 @@ private fun TaskDetailActivityContent(
                                 ActivityMessageAction.ReplyNavigation(targetId)
                             )
                         }
-                    }
+                    )
                 }
             }
+        }
+    }
 }
 
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 // ENHANCED EMPTY STATE
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 
 @Composable
 private fun ActivityFeedHeader(
     onSelectAction: (ActivityCreationAction) -> Unit,
-    onOpenCalendar: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -882,35 +879,18 @@ private fun ActivityFeedHeader(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            // Calendar icon — opens date picker
+        Box {
             IconButton(
-                onClick = onOpenCalendar,
+                onClick = { showMenu = true },
                 modifier = Modifier.size(28.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.DateRange,
-                    contentDescription = "${RTL}فیلتر تاریخ",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
+                Text(
+                    text = "✚",
+                    fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
-            // Add activity menu
-            Box {
-                IconButton(
-                    onClick = { showMenu = true },
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Text(
-                        text = "✚",
-                        fontSize = 18.sp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-                DropdownMenu(
+            DropdownMenu(
                 expanded = showMenu,
                 onDismissRequest = { showMenu = false }
             ) {
@@ -949,7 +929,7 @@ private fun ActivityFeedHeader(
 
 // ══════════════════════════════════════════════════════════════
 // FILTER CHIPS
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 
 /**
  * ActivityFeedFilterChips — Horizontal filter chips for tag-based filtering.
@@ -967,117 +947,111 @@ private fun ActivityFeedFilterChips(
     modifier: Modifier = Modifier
 ) {
     Row(
-                    modifier = modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // ── Add Tag action (always at index 0) ──
-                    Surface(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .clickable(onClick = onAddTag),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "+",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .clickable(onClick = onAddTag),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "+",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
 
-                    // "All" chip
-                    FilterChip(
-                        selected = selectedStepId == null,
-                        onClick = onShowAll,
-                        label = {
+        FilterChip(
+            selected = selectedStepId == null,
+            onClick = onShowAll,
+            label = {
+                Text(
+                    text = "${RTL}همه",
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontWeight = if (selectedStepId == null) FontWeight.Bold else FontWeight.Normal
+                )
+            },
+            shape = RoundedCornerShape(16.dp),
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = MaterialTheme.colorScheme.secondary,
+                selectedLabelColor = MaterialTheme.colorScheme.onSecondary
+            )
+        )
+
+        steps.forEach { step ->
+            val stepId = step.id.toLong()
+            Box(
+                modifier = Modifier.pointerInput(stepId) {
+                    detectTapGestures(
+                        onLongPress = { onTagLongPress(step) }
+                    )
+                }
+            ) {
+                FilterChip(
+                    selected = selectedStepId == stepId,
+                    onClick = { onFilterByStep(stepId) },
+                    label = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            val chipColor = parseColorHex(step.colorHex) ?: defaultTagColor
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(chipColor, CircleShape)
+                            )
                             Text(
-                                text = "${RTL}همه",
+                                text = "${RTL}${step.title}",
                                 fontSize = 12.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                fontWeight = if (selectedStepId == null) FontWeight.Bold else FontWeight.Normal
+                                fontWeight = if (selectedStepId == stepId) FontWeight.Bold else FontWeight.Normal
                             )
-                        },
-                        shape = RoundedCornerShape(16.dp),
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.secondary,
-                            selectedLabelColor = MaterialTheme.colorScheme.onSecondary
-                        )
+                        }
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.secondary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onSecondary
                     )
-
-                    // Step filter chips with color + long-press menu
-                    steps.forEach { step ->
-                        val stepId = step.id.toLong()
-                        Box(
-                            modifier = Modifier.pointerInput(stepId) {
-                                detectTapGestures(
-                                    onLongPress = { onTagLongPress(step) }
-                                )
-                            }
-                        ) {
-                            FilterChip(
-                                selected = selectedStepId == stepId,
-                                onClick = { onFilterByStep(stepId) },
-                                label = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    // Color dot
-                                    val chipColor = parseColorHex(step.colorHex) ?: defaultTagColor
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .clip(CircleShape)
-                                            .background(chipColor, CircleShape)
-                                    )
-                                    Text(
-                                        text = "${RTL}${step.title}",
-                                        fontSize = 12.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        fontWeight = if (selectedStepId == stepId) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                }
-                            },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.secondary,
-                                selectedLabelColor = MaterialTheme.colorScheme.onSecondary
-                            )
-                        )
-                    }
-                }
+                )
             }
         }
     }
 }
 
 // ══════════════════════════════════════════════════════════════
-// DATE NAVIGATOR — Phase 6.0.6 Collapsed-First Design
+// DATE CONTROL — Phase 6.1 Always-Visible Compact Design
 // ══════════════════════════════════════════════════════════════
 
 /**
- * ActivityFeedDateNavigator — Compact date indicator for the activity feed.
+ * ActivityFeedDateNavigator — Compact date control for the activity feed.
  *
- * Phase 6.0.6: Collapsed-first UX.
- * - No date selected → hidden (consumes no space)
- * - Date selected → collapsed single-row chip (date + expand arrow)
- * - Expanded → reveals prev/next/today navigation controls
+ * Phase 6.1: Always-visible design.
+ * - Always renders (date defaults to today)
+ * - Collapsed: single-row chip (📅 date ▼)
+ * - Expanded: reveals prev/next/today navigation controls
  *
  * Target heights:
- *   Collapsed: ~40dp (single row)
- *   Expanded:  ~90dp max (row + navigation controls)
+ *   Collapsed: ~36dp (single row)
+ *   Expanded:  ~80dp max (row + navigation controls)
  */
 @Composable
 private fun ActivityFeedDateNavigator(
@@ -1091,17 +1065,16 @@ private fun ActivityFeedDateNavigator(
     onClearDate: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (selectedDate == null) return
-
     var isExpanded by remember { mutableStateOf(false) }
 
-    val jalali = remember(selectedDate) { JalaliDate.fromEpochMs(selectedDate) }
+    val dateToShow = selectedDate ?: timelineStartDate
+    val jalali = remember(dateToShow) { JalaliDate.fromEpochMs(dateToShow) }
     val dateText = remember(jalali) {
         "${RTL}${jalali.day} ${JalaliDate.MONTH_NAMES[jalali.month - 1]} ${jalali.year}"
     }
 
-    val canMovePrevious = selectedDate > timelineStartDate
-    val canMoveNext = selectedDate < timelineEndDate
+    val canMovePrevious = dateToShow > timelineStartDate
+    val canMoveNext = dateToShow < timelineEndDate
 
     Column(modifier = modifier.fillMaxWidth()) {
         // ── Collapsed Row: date chip + expand/collapse arrow ──
@@ -1135,39 +1108,21 @@ private fun ActivityFeedDateNavigator(
                 )
             }
 
-            // Right: expand/collapse arrow + clear button
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            // Right: expand/collapse arrow
+            IconButton(
+                onClick = { isExpanded = !isExpanded },
+                modifier = Modifier.size(24.dp)
             ) {
-                // Clear date filter
-                IconButton(
-                    onClick = onClearDate,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "${RTL}حذف فیلتر تاریخ",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-                // Expand/collapse toggle
-                IconButton(
-                    onClick = { isExpanded = !isExpanded },
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowDropDown,
-                        contentDescription = if (isExpanded) "${RTL}بستن" else "${RTL}باز کردن",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .size(18.dp)
-                            .graphicsLayer {
-                                rotationZ = if (isExpanded) 180f else 0f
-                            }
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = if (isExpanded) "${RTL}بستن" else "${RTL}باز کردن",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .size(18.dp)
+                        .graphicsLayer {
+                            rotationZ = if (isExpanded) 180f else 0f
+                        }
+                )
             }
         }
 

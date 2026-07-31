@@ -196,7 +196,7 @@ private fun TagColorSwatch(
         shape = RoundedCornerShape(6.dp),
         border = if (isSelected) BorderStroke(
                 width = 2.dp,
-                color = chipColor
+                color = bgColor
             ) else BorderStroke(0.dp, Color.Transparent)
     ) {
         if (colorHex == null) {
