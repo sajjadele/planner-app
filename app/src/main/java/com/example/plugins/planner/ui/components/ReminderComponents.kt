@@ -518,8 +518,16 @@ private fun CompactClockDial(
                 val itemRad = Math.toRadians(itemAngle.toDouble())
 
                 val isSelected = when {
-                    isMinuteMode -> (minute / 5) % 12 == index
-                    else -> hour % 12 == index
+                    isMinuteMode -> (minute / 5) == index
+                    else -> {
+                        // Convert 24h to 12h clock position
+                        val clockHour = when (hour) {
+                            0 -> 12
+                            in 1..12 -> hour
+                            else -> hour - 12
+                        }
+                        clockHour == (if (index == 0) 12 else index)
+                    }
                 }
 
                 val displayNum = if (!isMinuteMode && num == 0) 12 else num
@@ -539,7 +547,12 @@ private fun CompactClockDial(
                         .clip(RoundedCornerShape(16.dp))
                         .background(if (isSelected) selectorColor else Color.Transparent)
                         .clickable {
-                            if (isMinuteMode) onMinuteChange(num) else onHourChange(num)
+                            if (isMinuteMode) {
+                                onMinuteChange(num)
+                            } else {
+                                // Clicking 12 (num=0) should set hour to 12, not 0
+                                onHourChange(if (num == 0) 12 else num)
+                            }
                         },
                     contentAlignment = Alignment.Center
                 ) {
