@@ -188,8 +188,6 @@ fun TaskDetailScreen(
                 filePickerLauncher.launch("*/*")
             }
             ActivityCreationAction.ManualActivity -> {
-                // Open composer with duration pre-enabled
-                initialComposerDuration = 30
                 showActivityComposer = true
             }
             else -> {
