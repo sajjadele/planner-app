@@ -50,9 +50,7 @@ fun SearchDialog(
             dismissOnClickOutside = true
         )
     ) {
-        // Force RTL layout direction for Persian support
-        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-            Box(
+        Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.background)
@@ -224,7 +222,6 @@ fun SearchDialog(
                     }
                 }
             }
-        }
     }
 }
 
