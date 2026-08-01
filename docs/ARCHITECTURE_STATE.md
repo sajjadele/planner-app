@@ -31,12 +31,13 @@
 
 | Item | Value |
 |------|-------|
-| Schema version | **11** |
-| Latest migration | `MIGRATION_10_11` (Phase 5.4: additive indexes) |
-| Tables | `goals`, `goal_events`, `goal_progress_snapshot`, `behavior_snapshot`, `tasks`, `task_events`, `notes`, `module_settings` |
+| Schema version | **15** |
+| Latest migration | `MIGRATION_14_15` |
+| Tables | `goals`, `goal_events`, `goal_progress_snapshot`, `behavior_snapshot`, `tasks`, `task_events`, `activity_events`, `task_steps`, `notes`, `module_settings` |
 
-Phase 5.4 added three secondary indexes (no column change, fully non-destructive):
-`tasks(dateEpochMs)`, `task_events(eventType)`, `goals(status)`.
+Migration history: v5→v6 (dayIndex→dateEpochMs), v10→v11 (additive indexes:
+`tasks(dateEpochMs)`, `task_events(eventType)`, `goals(status)`), v11→v12
+(`tasks.deadlineEpochMs`), v12→v13, v13→v14, v14→v15 (see `AppDatabase.kt` for details).
 
 Projection tables (`goal_progress_snapshot`, `behavior_snapshot`) are rebuildable from `tasks` + `task_events`.
 
@@ -49,6 +50,9 @@ Projection tables (`goal_progress_snapshot`, `behavior_snapshot`) are rebuildabl
 | `domain.insight` | Implemented | Streak, rate, velocity, procrastination, neglected-goal math |
 | `domain.snapshot` | Implemented | Daily goal progress + behavior projection math |
 | `domain.mirror` | Implemented | Pattern heuristics + neutral feedback generation |
+| `domain.attention` | Implemented | Attention score (date pressure / staleness / avoidance) for graph positioning |
+| `domain.graph` | Implemented | Goal→Task polar layout, density modes (SIMPLE/CLUSTERED/SUMMARY) |
+| `domain.goal` | Implemented | Goal progress calculator, sort, activity formatter |
 
 Domain packages are pure Kotlin (no Android imports), host-JVM testable.
 
@@ -131,52 +135,18 @@ Snapshots are inputs for Mirror analysis, not only storage/reporting.
 | Help/Legend | Mandatory Help button in sheet header → `AlertDialog` metaphor legend |
 | Drift/Decay (V2) | Deferred — no new query yet |
 | Deadline Warning | Legend present as V2 placeholder (greyed); no radius change yet |
-| Tests | `GoalGraphBuilderTest` (9, passing) |
+| Tests | `GoalGraphBuilderTest`, `AdaptiveDensityModeTest`, `VisibilityResolverTest`, `GraphVisibilityIntegrationTest` |
 
-**Phase 6.1 implementation status (audited & aligned):**
-- ✅ Domain layer `domain.graph` (`GoalGraphModels`, `GoalGraphBuilder`, `GraphGeometry`) — pure Kotlin, **zero Android/Room/Compose imports** (host-JVM testable, verified). Computes a deterministic polar layout: HIGH inner / MEDIUM middle / LOW outer lanes; priority controls distance **and** node size; completed tasks become faded outer "memory" points; Boulder flag (rescheduleCount ≥ 2) drives UI wobble; `GoalProgress.overall` surfaces as the central Ring Tide glow.
-- ✅ Data flow: `TaskEntity`/`GoalEntity` → Repositories → `GoalDetailViewModel` (`combine(goal, tasks, rescheduleCounts, goalProgress)`) → `GoalGraphBuilder.build` → `StateFlow<GoalGraph?>` → Canvas renderer. No Composable touches a DAO.
-- ✅ UI: `GoalGraphSheetContent` renders sun + Ring Tide, 3 lane rings, gravity edges, task satellites, tap-to-select Persian label, deterministic Boulder wobble.
-- ✅ Help/Legend button + dialog (V2 deadline item greyed as placeholder).
+**Current implementation (post-6.x):**
+- Domain layer `domain.graph` (`GoalGraphModels`, `GoalGraphBuilder`) — pure Kotlin, zero Android/Room/Compose imports, deterministic polar layout: HIGH inner / MEDIUM middle / LOW outer lanes; priority controls distance **and** node size; completed tasks fade to outer "memory" points; Boulder flag (rescheduleCount ≥ 2) drives UI wobble; `GoalProgress.overall` drives the central Ring Tide glow.
+- Density modes via `GraphDensityMode { SIMPLE, CLUSTERED, SUMMARY }` (6.5.6): active-task count ≤6 → individual satellites, 7–20 → four deterministic priority clusters (tap to expand in-view), >20 → SUMMARY with capped member sample + "و N بیشتر" hint. Cluster positions deterministic (no `Random`).
+- Data flow: `TaskEntity`/`GoalEntity` → Repositories → `GoalDetailViewModel` (`combine(goal, tasks, rescheduleCounts, goalProgress)`) → `GoalGraphBuilder.build` → `StateFlow<GoalGraph?>` → Canvas renderer. No Composable touches a DAO.
+- UI: `GoalGraphSheetContent` renders sun + Ring Tide + 3 priority rings, satellites via `colorForRole` (GOAL=AccentGold, HIGH=AccentRed, MEDIUM=AccentFire, LOW=AccentGreen, COMPLETED=onSurfaceVariant), tap-to-select Persian label, deterministic Boulder wobble, staged entrance + breathing shimmer (no orbital motion — ADR-0006/0008).
+- Help/Legend button + first-time education gate (Phase 5.5).
+- `TaskInput.deadlineEpochMs` plumbed and populated since DB v12 (ADR-0013); urgency-radius mapping (V2) still not implemented.
+- Tests: `GoalGraphBuilderTest`, `AdaptiveDensityModeTest`, `VisibilityResolverTest`, `GraphVisibilityIntegrationTest`.
 
-**Architectural decisions (6.1):**
-- Model naming diverges from the original spec's `TaskNode`/`OrbitPosition`/`TaskVisualState`: we keep a single `GoalGraphNode` (with `NodeKind.GOAL|TASK`) carrying computed absolute `(cx,cy)`. Intentional — no behavioral difference, avoids churn. Documented in ADR-0005.
-- `TaskInput.deadlineEpochMs` is plumbed but currently passed as `null` (TaskEntity has no deadline field). Retained for the V2 urgency-radius mapping.
-
-**Remaining work:** V2 deadline-aware radius + drift/decay; Phase 7 (AI) depends on Mirror + Graph readiness.
-
-**Phase 6.4 — Solar System Motion & Animation (done):**
-- Staged one-shot entrance: sun → rings → satellites/clusters (3 `Animatable`s, `FastOutSlowInEasing`).
-- Gentle breathing shimmer on satellites (±3% scale / ±0.06 alpha, deterministic per-`id` phase; completed nodes quieter). No orbital movement (honors ADR-0006).
-- Sun Ring Tide pulse amplitude raised (0.04→0.05), still tied to `goalProgressOverall`.
-- Cluster expand/collapse via `expandProgress` `Animatable` (320ms fade+scale, no spring); non-expanded clusters dim.
-- Motion language documented in `docs/ADR/ADR-0008-solar-system-motion.md`. Display-only; 6.1/6.2/6.3 tests unaffected.
-
-**Phase 6.3 — Adaptive Visualization (done):**
-- `domain.graph` extended **additively**: `GraphMode` (INDIVIDUAL/CLUSTER), `ClusterType`, `TaskClusterNode(id, clusterType, taskCount, position, visualSize, priorityLevel, memberIds)`; `GoalGraph` gains `mode` + `clusters`. `GoalGraphNode` preserved.
-- Adaptive threshold `MAX_VISIBLE_TASKS = 8` (active task count). ≤8 → individual satellites (6.2 behavior); >8 → four deterministic clusters (ACTIVE_HIGH/MEDIUM/LOW + COMPLETED) with count labels.
-- Cluster positions deterministic (fixed lane angles, no Random); `visualSize` clamped below sun. Expansion is in-view: tap cluster → its `memberIds` drawn as satellites, others dim; tap task → highlight; tap sun → collapse. No navigation/detail popup.
-- Display-only renderer change; ViewModel/flow untouched; 9 existing builder tests + 10 new `AdaptiveGraphModeTest` cases green.
-- Decision record: `docs/ADR/ADR-0007-adaptive-solar-system.md`.
-
-**Phase 6.2 — Visual Language Foundation (done):**
-- Goal Sun redesigned: dominant gold disc (`AccentGold`) + **progress ring** (arc filled by `GoalProgress.overall`, cyan tint) + **title + %** drawn on the sun + Ring Tide glow that strengthens with progress (no fake values). (Corrected in 6.5.1: an earlier draft said purple; implementation has always used gold.)
-- Orbit lanes weighted by visual importance (HIGH brightest/thickest → LOW faintest); deterministic layout unchanged.
-- Satellites: HIGH gets a soft outer glow for stronger presence; LOW quieter; completed stay faded outer "memory" points. Tap-to-highlight + Persian label kept as passive aid.
-- Color system stabilized via `ColorRole` → UI colors (GOAL=AccentGold, HIGH=AccentRed, MEDIUM=AccentFire, LOW=AccentGreen, COMPLETED=onSurfaceVariant, BOULDER=AccentRed). Domain stays color-free. (Corrected in 6.5.1: an earlier draft said AccentPurple; implementation has always used AccentGold — see `ui/theme/Color.kt:32`.)
-- Header subtitle → "وضعیت هدف در یک نگاه"; Help/Legend copy updated (🔥 High Priority, ● Active Task, ○ Completed, ☀ Goal) with temporal/deadline shown as a greyed **future** item.
-- Minimal one-shot entrance fade on open (sun→rings→nodes); no physics/random orbit motion.
-- Display-only; no architecture/domain/ViewModel changes; 9 builder tests still green.
-
-**Phase 6.3.1 — Solar Identity Refinement (done):**
-- Goal title moved above Sun body with max-width constraint + ellipsis (1-line, 13sp), title–Sun gap increased (8dp→12dp).
-- Sun body enlarged 1.6×→1.75× for stronger celestial presence; Ring Tide halo tightened (1.35+tide×0.9 → 1.25+tide×0.7) so glow hugs the disc.
-- Progress ring repositioned: gap from Sun body increased 22%→35% for clear separation; stroke thickened 4dp→5dp for stronger progress read.
-- Satellite visual hierarchy sharpened: HIGH nodes get +15% visual size multiplier, glow alphas strengthened (0.22/0.35→0.28/0.42); MEDIUM halo quieted (0.14→0.10); LOW unchanged (calm); COMPLETED stays ghosted.
-- Orbit rings retuned with subtle priority tints: HIGH α0.40/w2dp (warm red), MEDIUM α0.18/w1.5dp (fire), LOW α0.08/w1dp (green) — main language remains solar system, not dashboard.
-- Zero domain/data/ViewModel changes — Compose Canvas only. `compileDebugKotlin` + `testDebugUnitTest --tests "com.example.domain.*"` + `assembleDebug` SUCCESS.
-
-Decision history: `docs/ADR/ADR-0002-graph-architecture.md`, `docs/ADR/ADR-0004-graph-solar-system.md`, `docs/ADR/ADR-0005-behavioral-solar-system.md`, `docs/ADR/ADR-0006-graph-visual-language.md`
+Decision history: `docs/ADR/ADR-0002-graph-architecture.md`, `ADR-0004-solar-system.md`, `ADR-0005-behavioral-solar-system.md`, `ADR-0006-graph-visual-language.md`, `ADR-0007-adaptive-solar-system.md`, `ADR-0008-solar-system-motion.md`, `ADR-0011-graph-visual-foundation.md`
 
 ---
 
@@ -220,195 +190,20 @@ Decision history: `docs/ADR/ADR-0002-graph-architecture.md`, `docs/ADR/ADR-0004-
 
 ---
 
-## 11. Performance Audit — Phase 5.4
+## 11. Performance & UX History (5.4 / 5.5 / 6.5)
 
-**ADR:** `docs/ADR/ADR-0009-performance-audit-5.4.md`. Scope: speed / responsiveness / stability only —
-no new features, no behavior change, no UI redesign.
+Historical optimization and polish work — full details live in their ADRs, not here:
 
-### Discovered bottlenecks (verified by read-only audit)
-| # | Area | Finding | Severity |
-|---|------|---------|----------|
-| B1 | VM/DB | `enrichAndSort` N+1: 2×N `first()` per-goal queries per tab emission | High |
-| B2 | Compose/VM | Per-`GoalCard` flow fan-out (`progressFor` built a fresh `combine().stateIn()` per card) | High |
-| B3 | DB | Missing indexes: `tasks.dateEpochMs`, `task_events.eventType`, `goals.status` | High/Med |
-| B4 | Graph/Anim | 60fps breathing redraw + `textMeasurer.measure` every frame | Med/High |
-| B5 | VM | `refreshMirror()` re-launched on every `goalRate` emission | Med |
-| B6 | Compose | `GoalCard` took `viewModel` param + reallocated 6 lambdas per item → defeated skippability | Med |
-| B7 | Compose | `SearchDialog` LazyColumn items had no `key` | Med |
-| B8 | VM | Suspected duplicate `PlannerViewModel` → **verified non-issue** (nested composable shares owner) | Low/none |
+- **Phase 5.4 — Performance & UX Stability Audit** — `docs/ADR/ADR-0009-performance-audit-5.4.md`.
+  Eliminated dashboard N+1 (bulk `GROUP BY`), precomputed `DashboardGoalItem`, added DB indexes
+  (v10→11), cached Graph Canvas text/node lookups, debounced Mirror recompute, keyed SearchDialog.
+- **Phase 5.5 — UX Polish & Interaction** — `docs/ADR/ADR-0010-gesture-navigation-and-graph-education.md`.
+  Swipe navigation (planner↔goals), first-time Graph education, gated breathing pulse.
+- **Phase 6.5 — Solar System Visual Foundation** — `docs/ADR/ADR-0011-graph-visual-foundation.md`.
+  Gold sun dominance, 3 orbit rings, priority presence, `MAX_VISIBLE_TASKS` 8→6, Adaptive Density
+  System (`GraphDensityMode { SIMPLE, CLUSTERED, SUMMARY }`).
 
-### Applied optimizations
-- **O1 — Bulk aggregation.** `GoalViewModel.goalsByTab` now `combine`s four single `GROUP BY` queries
-  (`observeGoalCompletionRatesByStatus`, `observeGoalActivityBulk`, `observeGoalActivityBulkInWindow`,
-  `observeGoalsByStatus`) instead of per-goal N+1. See `GoalDao` new bulk queries.
-- **O2 — Precomputed `DashboardGoalItem`.** New model (`plugins/goals/ui/DashboardGoalItem.kt`) carries
-  `goal`, `progress`, `lastActivity`, `activeDays`. `GoalCard` no longer holds a ViewModel or collects
-  any Flow; dashboard lambdas are `remember(goalId)`-cached. `GoalSort` signature unchanged (pure
-  `GoalEntity` + maps). **Compose responsibility shifted to ViewModel** (ADR-0009).
-- **O3 — Indexes.** Schema `10 → 11` via `Migration(10,11)` (`CREATE INDEX IF NOT EXISTS`); entity
-  `@Index` annotations added for fresh-install parity.
-- **O4 — Graph render caching.** `sunNode`, `taskNodes`, sun title/% text layouts, and cluster-count
-  text layouts are `remember(graph)`-cached in the composable scope and passed into `drawSolarSystem`.
-  The 4s breathing animation is **kept**; only per-frame text layout is removed.
-- **O5 — Mirror debounce.** `combine(goalRate, tasks, activeDays).debounce(250)` coalesces bursts.
-- **O6 — Search keys.** `SearchDialog` `items` now use stable `key = { "task:n" / "note:n" }`.
-- **O7 — Skipped** (B8 false positive).
-
-### Before / After (analytical)
-| Metric | Before | After |
-|--------|--------|-------|
-| Dashboard queries per tab emit | 2×N suspend `first()` + per-card 3 flows | 4 single `GROUP BY` queries (N-independent) |
-| Per `GoalCard` flows collected | 3 (incl. fresh `stateIn` per recomposition) | 0 — stable `DashboardGoalItem` |
-| Graph sheet idle frame | re-scan node list + 2–5 `TextMeasurer` calls | cached lookups + text; only pulse math |
-| `refreshMirror()` on task toggle | once per `goalRate` emission (bursty) | coalesced at 250ms |
-| Status/day/insight queries | full table scan | indexed |
-
-### Rejected changes
-- Removing the Graph breathing animation (kept + optimized instead).
-- Consolidating all `GoalDetailScreen` flows into one UiState (deferred — larger refactor, no behavior gain).
-- Deduplicating `PlannerViewModel.allGoals`/`GoalViewModel.allGoals` dual subscription (low impact).
-
-### Remaining limitations
-- `GoalDetailScreen` still collects ~11 independent `stateIn` flows (could be one UiState).
-- Active dual subscription to `goals`/`allGoals` between Planner & Goal VMs (low impact).
-- Robolectric Room DAO tests remain env-blocked (SDK36/JDK17); domain tests green.
-
----
-
-## 12. Phase 5.5 — UX Polish & Interaction Improvements
-
-**ADR:** `docs/ADR/ADR-0010-gesture-navigation-and-graph-education.md`. Scope: UX polish only — no DB
-redesign, no product-behavior change, no Graph architecture change.
-
-### Gesture navigation (Part 1)
-- **Decision:** lightweight `pointerInput { detectHorizontalDragGestures }` on the tab-content
-  `Modifier` in `MainScreen`; it only **writes `selectedTabId`** (bottom bar stays the single source
-  of truth). `HorizontalPager` was rejected (no existing pager infra; would fight the `AnimatedContent`
-  crossfade and require reconciling pager ↔ `selectedTabId` ↔ bottom-bar).
-- Direction uses accumulated drag (> 60px threshold) flipped by `LocalLayoutDirection` (RTL-correct).
-  An `isTabTransitioning` guard (~350ms) prevents double-switches during the crossfade.
-- **Scope:** swipe enabled only between the two bottom tabs (`planner` ↔ `goals`); `notes` excluded
-  (top-bar only, no bottom-bar ordinal).
-
-### Graph first-time education (Part 2)
-- New `GraphViewPreferences` (`com.example.plugins.goals.GraphViewPreferences`) — DataStore boolean
-  `graph_introduction_seen`, mirroring `OnboardingRepository`.
-- `GoalDetailViewModel.showGraphEducation = combine(showGraphSheet, hasSeenIntroduction) { open, seen ->
-  open && !seen }` (VM-gated, survives tab teardown).
-- First Graph open auto-shows the **existing in-sheet legend `AlertDialog`** (`GoalGraphSheetContent`);
-  dismiss → `markGraphIntroductionSeen()`. Manual `Info` Help unchanged. Legend copy updated to required
-  Persian text; future-feature row removed.
-
-### Animation smoothness (Part 3)
-- Audit: main recomposition cost is the full-tab `AnimatedContent` swap (`MainScreen.kt:137`) — accepted
-  for 5.5; chrome is outside it. Graph canvas already optimized (ADR-0009). No new `derivedStateOf`/
-  blocking-main-thread issues found.
-- **Fix:** Graph breathing pulse (`rememberInfiniteTransition`, 4s) now starts only after the staged
-  entrance completes (~640ms) via an `entranceDone` flag, so the sheet slide-in + assemble no longer
-  overlaps the breathing. Animation kept; visual language preserved.
-
-### Files touched
-- `ui/screens/MainScreen.kt` — swipe gesture + transition guard.
-- `plugins/goals/GraphViewPreferences.kt` (new) — DataStore education flag.
-- `plugins/goals/ui/GoalDetailViewModel.kt` — `showGraphEducation` + `markGraphIntroductionSeen`.
-- `plugins/goals/ui/GoalDetailScreen.kt` — passes education flag + dismiss callback.
-- `plugins/goals/ui/GoalGraphSheetContent.kt` — auto-show legend, verbatim Persian copy, pulse gating.
-
----
-
-## 13. Phase 6.5 — Behavioral Solar System Visual Foundation Audit
-
-**ADR:** `docs/ADR/ADR-0011-graph-visual-foundation.md`. Scope: read-only visual audit + safe refactor plan
-only. No DB redesign, no domain-model change, no data-flow change, no product-behavior change. (Audit
-phase is documentation-only; the 6.5.x implementation steps below are the follow-up.)
-
-> Naming note: the repo had already used "Phase 6.3" for Adaptive Visualization (ADR-0007). This audit is
-> re-labeled **6.5** to avoid collision (6.1 foundation, 6.2 visual language ADR-0006, 6.3 adaptive ADR-0007,
-> 6.4 motion ADR-0008, 5.4/5.5 polish).
-
-### Current state (verified by read)
-- Domain `domain.graph` is pure Kotlin (zero Android/Room/Compose imports); deterministic polar layout;
-  lanes HIGH 0.34 / MEDIUM 0.58 / LOW 0.82 / undated 0.92 / completed 0.97·R; sizes HIGH 22 / MEDIUM 16 /
-  LOW 12 / completed 6px; `MAX_VISIBLE_TASKS = 8` → CLUSTER mode; boulder = reschedule ≥ 2.
-- Data flow `GoalDetailViewModel.goalGraph = combine(goal, tasks, rescheduleCounts, goalProgress)` →
-  `GoalGraphBuilder.build` → `StateFlow<GoalGraph?>`; UI renders, no DAO access; VM activity-scoped.
-- Renderer draws 5 orbit rings, gold sun + Ring Tide halo + cyan progress arc + title/% inside sun,
-  satellites via `colorForRole`, breathing shimmer, boulder wobble, CLUSTER overview + tap-expand.
-
-### Critical finding — doc/code drift (not a code bug)
-ADR-0006:30 and §12/§7 of this doc said **Sun = `AccentPurple`**, but the implementation uses
-**`AccentGold`** everywhere (`GoalGraphSheetContent.kt:369,380`; `colorForRole` GOAL→AccentGold;
-`Color.kt:32` comment "AccentGold — Behavioral Solar System Sun"). The code is internally consistent
-(gold); the documents are stale. Resolution: gold is the source of truth (matches the "sun" metaphor).
-Only doc text needs correction — no code change.
-
-### Visual problems (ranked)
-1. Sun not visually dominant — core small (~12.5% viewport radius); halo low alpha reads as a dot + glow.
-2. Five orbit rings = clutter — undated (0.92) and completed (0.97) rings overlap and add noise; only 3
-   priority lanes are meaningful.
-3. Cross-priority differentiation too subtle at small canvas sizes.
-4. No overdue/urgent encoding — `TaskInput.deadlineEpochMs` is plumbed but VM passes `null`
-   (`GoalDetailViewModel.kt:140`); TaskEntity has no deadline yet. Blocked until V2.
-5. Abrupt individual→cluster handoff exactly at 9 active tasks; expansion can re-clutter at 20+.
-
-### Target visual principles
-- **Sun:** larger gold body, stronger core gradient, tighter halo falloff; Ring Tide intensity = progress.
-- **Planets:** HIGH inner + largest + glow + optional ring; MEDIUM medium + light glow; LOW small + quiet;
-  COMPLETED ghosted outline; BOULDER red halo + wobble (keep); OVERDUE (V2) distinct red marker.
-- **Scalability:** L1 ≤8 individual; L2 9–20 cluster overview (tap to drill, dim others); L3 20+ cluster
-  overview with capped member sample + "و N بیشتر" hint (additive builder sampling).
-
-### Animation verdict
-Keep: staged entrance, cluster expand, Ring Tide breathing (gated post-entrance, Phase 5.5), satellite
-shimmer (lower for LOW/completed), boulder wobble. Remove/none: gravity edges already removed. No physics
-or orbit motion (honors ADR-0006).
-
-### Recommended implementation order (6.5.x)
-1. **6.5.1** Doc correction — record Sun=`AccentGold` in ADR-0006 + this doc (zero code). ✅ DONE
-2. **6.5.2** Sun dominance — enlarge core, stronger gradient, tuned halo (`drawSolarSystem` only). ✅ DONE
-3. **6.5.3** Orbit denoise — draw only 3 priority rings; drop undated/completed rings (keep the points). ✅ DONE
-4. **6.5.4** Priority presence — strengthen HIGH glow/ring, ghost COMPLETED, calm LOW. ✅ DONE
-5. **6.5.5** Scalability handoff — lower `MAX_VISIBLE_TASKS` (→6), add L3 sample cap (additive domain). ✅ DONE
-6. **6.5.6** Adaptive Density System — `GraphDensityMode { SIMPLE, CLUSTERED, SUMMARY }` replaces
-   `GraphMode`; selected by **active** task count (≤6 SIMPLE, ≤20 CLUSTERED, >20 SUMMARY). ✅ DONE
-
-### Implementation notes (6.5.1–6.5.5)
-- **6.5.2** Sun: visual body enlarged to `sunR * 1.45`; flat disc → layered radial gradient
-  (`0xFFFFE08A` hot core → `AccentGold` body → deeper gold edge) + white-hot center; Ring Tide halo
-  tightened (peak alpha 0.30→0.45..0.90, max radius `1.5+tide*0.9` of body) and still driven by
-  `goalProgressOverall`. Progress ring repositioned around the larger body; title/% stay centered.
-- **6.5.3** Orbits: only HIGH 0.34 / MEDIUM 0.58 / LOW 0.82 rings drawn; undated (0.92) + completed
-  (0.97) rings removed (points still render on those radii). ~40% less ring noise.
-- **6.5.4** Satellites: HIGH gets tight bright glow ring + larger soft halo; MEDIUM a single soft halo;
-  LOW shimmer reduced (0.03→0.02); COMPLETED now ghosted (faint fill + outline, no glow/shimmer).
-- **6.5.5** `MAX_VISIBLE_TASKS` 8→6 (calmer L1→L2 handoff). Renderer L3 cap: expanded cluster samples
-  top 12 members by priority + shows "و N بیشتر" hint for the rest (no re-clutter at 20+). `AdaptiveGraphModeTest`
-  updated to the new 6/7 boundary (6 INDIVIDUAL, 7+ CLUSTER). All domain tests + assembleDebug green.
-- Verification: `compileDebugKotlin` + `testDebugUnitTest --tests "com.example.domain.*"` + `assembleDebug` SUCCESS.
-- 6.5.6 (overdue) deferred: `TaskEntity` has no deadline; `TaskInput.deadlineEpochMs` already plumbed
-  through `GoalGraphBuilder`, so it becomes a pure UI+VM mapping change once deadlines exist.
-
-### 6.5.6 — Adaptive Density System (implemented)
-- Replaced the two-tier `GraphMode { INDIVIDUAL, CLUSTER }` with a three-tier `GraphDensityMode`
-  `{ SIMPLE, CLUSTERED, SUMMARY }` in `domain.graph`. Threshold constants `SIMPLE_MAX_ACTIVE = 6` and
-  `CLUSTERED_MAX_ACTIVE = 20` (replaced `MAX_VISIBLE_TASKS`). Builder computes `densityMode` from the
-  **active** task count; individual `nodes` always computed; `clusters` built for CLUSTERED+SUMMARY.
-- Renderer: `graph.densityMode != SIMPLE` → cluster overview + tap-expand; the L3 expansion sample cap
-  (top-12 by priority + "و N بیشتر" hint) now applies **only in SUMMARY** — CLUSTERED expands all members.
-- `GoalGraph.mode` field renamed to `densityMode`; hitTest + render branches updated. Zero schema/VM change.
-- Tests: `AdaptiveGraphModeTest` → `AdaptiveDensityModeTest`; asserts SIMPLE(≤6)/CLUSTERED(7–20)/SUMMARY(>20)
-  boundaries. compileDebugKotlin + domain tests + assembleDebug SUCCESS.
-
-### What must remain unchanged
-- Domain purity, determinism (no `Random`), on-demand compute, no stored graph state.
-- Data flow (`combine` → `StateFlow`); no Composable touches DAO.
-- Per-goal contextual / Goal-centered / no global graph (ADR-0002/0004).
-- Kept animations; no physics. Education gate + swipe nav (Phase 5.5) untouched.
-
-### Files in scope (render-layer only)
-- `plugins/goals/ui/GoalGraphSheetContent.kt` — sun, rings, satellites, cluster rendering.
-- `ui/theme/Color.kt` — `AccentGold` comment already correct.
-- `domain/graph/GoalGraphBuilder.kt` — only for 6.5.5 additive sampling (`MAX_VISIBLE_TASKS` tweak).
+Current state is captured in §7 (Graph Status); these sections are history.
 
 ---
 

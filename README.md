@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/Kotlin-1.9-blue?style=flat-square&logo=kotlin" alt="Kotlin">
   <img src="https://img.shields.io/badge/Jetpack%20Compose-Material3-purple?style=flat-square" alt="Compose">
   <img src="https://img.shields.io/badge/Offline-100%25-orange?style=flat-square" alt="Offline">
-  <img src="https://img.shields.io/badge/Database-v14-red?style=flat-square" alt="Database">
+  <img src="https://img.shields.io/badge/Database-v15-red?style=flat-square" alt="Database">
 </p>
 
 ---
@@ -47,7 +47,7 @@ Goal → Task → Event → Snapshot → Mirror → Feedback
 | **Task** | Smallest execution unit |
 | **Event** | State transitions: created, completed, rescheduled |
 | **Snapshot** | Daily progress & behavior projections |
-| **Mirror** | Pattern detection + feedback inside Goal Dashboard |
+| **Mirror** | Pattern detection + feedback inside Goal Detail |
 
 ---
 
@@ -91,7 +91,7 @@ Goal → Task → Event → Snapshot → Mirror → Feedback
 **🌌 Behavioral Solar System**
 - Goal-centered graph visualization
 - Attention-driven task positioning
-- Adaptive clusters for >8 tasks
+- Adaptive density: SIMPLE (≤6 tasks) / CLUSTERED (7–20) / SUMMARY (>20)
 - Staged entrance animation
 - Breathing shimmer effects
 
@@ -122,7 +122,7 @@ Goal → Task → Event → Snapshot → Mirror → Feedback
 
 <table>
 <tr><td><strong>Language</strong></td><td>Kotlin</td><td><strong>UI</strong></td><td>Jetpack Compose + Material3</td></tr>
-<tr><td><strong>Database</strong></td><td>Room (v14)</td><td><strong>Async</strong></td><td>Coroutines + Flow</td></tr>
+<tr><td><strong>Database</strong></td><td>Room (v15)</td><td><strong>Async</strong></td><td>Coroutines + Flow</td></tr>
 <tr><td><strong>Architecture</strong></td><td>MVVM</td><td><strong>Persistence</strong></td><td>Offline-first local</td></tr>
 <tr><td><strong>Build</strong></td><td>Gradle</td><td><strong>Min SDK</strong></td><td>24 / Target 36</td></tr>
 </table>
@@ -140,12 +140,16 @@ Room DAO (Flow) → Repository → ViewModel StateFlow → Compose collectAsStat
 ### Database Schema (v14)
 
 ```
-goals              → GoalEntity (id, title, description, status)
-goal_events        → GoalEventEntity (id, goalId FK, eventType)
-tasks              → TaskEntity (id, title, priority, goalId FK)
-activity_events    → ActivityEventEntity (id, taskId, eventType)
-task_steps         → TaskStepEntity (id, taskId FK, title, isCompleted)
-behavior_snapshot  → BehaviorSnapshotEntity (dateEpochMs, streak, velocity)
+goals                → GoalEntity (id, title, description, status, why, deadlineEpochMs)
+goal_events          → GoalEventEntity (id, goalId FK, eventType)
+tasks                → TaskEntity (id, title, priority, goalId FK, dateEpochMs, deadlineEpochMs)
+task_events          → TaskEventEntity (id, taskId FK, eventType)
+activity_events      → ActivityEventEntity (id, taskId, eventType)
+task_steps           → TaskStepEntity (id, taskId FK, title, isCompleted)
+goal_progress_snapshot → GoalProgressSnapshotEntity (goalId FK, dateEpochMs, progress)
+behavior_snapshot    → BehaviorSnapshotEntity (dateEpochMs, streak, velocity)
+notes                → NoteEntity (id, title, content, timestamp)
+module_settings      → ModuleSettingsEntity (moduleId, enabled)
 ```
 
 ### Plugin System
@@ -200,7 +204,7 @@ The graph is a **Behavioral Understanding Tool**, not a generic data visualizati
 
 - **Goal = Sun** (center, with progress ring + glow)
 - **Task = Orbiting satellite** (positioned by attention)
-- **Adaptive clusters** for goals with >8 tasks
+- **Adaptive density:** SIMPLE (≤6) / CLUSTERED (7–20) / SUMMARY (>20)
 - **Motion language:** staged entrance, breathing shimmer
 
 ---

@@ -38,19 +38,19 @@ Vision Planner — goal-oriented progress system (not a todo app).
 
 ## Current Data Surfaces
 - Tables: `goals`, `goal_events`, `tasks`, `task_events`, `notes`, `module_settings`, `goal_progress_snapshot`, `behavior_snapshot`, `activity_events`, `task_steps`
-- DB version: **14**
+- DB version: **15**
 - Snapshot refresh: real-time today + app-launch backfill
 
 ## Mirror V1 Scope
 - Patterns: Boulder, Initiator/Finisher, Goal Attention, Consistency Decay
-- Placement: inside Goal Dashboard
+- Placement: inside Goal Detail
 - No separate Mirror screen yet
 - Meaningful analysis after roughly 7 days of usage
 
 ## Graph (Behavioral Solar System)
 - Goal = Sun (center)
 - Task = orbiting satellite / cluster
-- Adaptive cluster overview for large goals
+- Density modes: SIMPLE (≤6) / CLUSTERED (7–20) / SUMMARY (>20)
 - Attention-based positioning (not priority)
 - 19+ pure-JVM tests
 
