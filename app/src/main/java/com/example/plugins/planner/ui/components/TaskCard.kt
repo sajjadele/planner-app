@@ -23,13 +23,13 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.util.isolated
 import com.example.plugins.planner.data.TaskEntity
 import com.example.ui.theme.*
+import com.example.core.util.RTL
 
 @Composable
 fun TaskCard(
@@ -93,12 +93,11 @@ fun TaskCard(
                     .then(if (task.isCompleted) Modifier.alpha(0.5f) else Modifier)
             ) {
                 Text(
-                    text = task.title,
+                    text = "${RTL}${task.title}",
                     color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
-                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                    style = TextStyle(textDirection = TextDirection.Rtl)
+                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
                 )
 
                 Row(

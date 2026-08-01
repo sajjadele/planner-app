@@ -20,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,6 +31,7 @@ import com.example.ui.screens.components.VisionMenuItem
 import com.example.ui.screens.components.VisionMenuDivider
 import com.example.ui.screens.components.VisionPopupMenu
 import com.example.ui.theme.*
+import com.example.core.util.RTL
 
 private val STATUS_LABELS = mapOf(
     GoalStatus.ACTIVE to "فعال",
@@ -103,14 +103,13 @@ fun GoalCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = goal.title,
+                    text = "${RTL}${goal.title}",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = TextStyle(textDirection = TextDirection.Rtl)
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 Spacer(modifier = Modifier.width(8.dp))

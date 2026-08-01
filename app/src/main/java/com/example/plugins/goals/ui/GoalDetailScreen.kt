@@ -29,7 +29,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -303,14 +302,13 @@ fun GoalDetailScreen(
                     )
                 }
                 Text(
-                    text = goal?.title ?: "",
+                    text = "${RTL}${goal?.title ?: ""}",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = TextStyle(textDirection = TextDirection.Rtl)
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 // Mirror trigger (IconButton; architecture ready for a future unread badge)

@@ -21,7 +21,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -33,6 +32,7 @@ import com.example.core.util.formatPersianTime
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.core.util.RTL
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -330,13 +330,12 @@ fun SearchTaskItem(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = task.title,
+                text = "${RTL}${task.title}",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = TextStyle(textDirection = TextDirection.Rtl)
+                overflow = TextOverflow.Ellipsis
             )
         }
 
