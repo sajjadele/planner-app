@@ -69,6 +69,9 @@ fun VisionText(
         maxLines = maxLines,
         minLines = minLines,
         onTextLayout = onTextLayout,
-        style = style.copy(textDirection = TextDirection.Rtl)
+        style = style.copy(
+            textDirection = TextDirection.Rtl,
+            textAlign = textAlign ?: TextAlign.Left
+        )
     )
 }
