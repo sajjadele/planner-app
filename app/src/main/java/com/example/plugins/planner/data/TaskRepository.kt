@@ -16,6 +16,8 @@ class TaskRepository(
 
     fun getTasksByGoalId(goalId: Int): Flow<List<TaskEntity>> = taskDao.getTasksByGoalId(goalId)
 
+    suspend fun getTaskById(taskId: Int): TaskEntity? = taskDao.getTaskById(taskId)
+
     suspend fun insertTask(task: TaskEntity): Long = taskDao.insertTask(task)
 
     suspend fun updateTask(task: TaskEntity) = taskDao.updateTask(task)

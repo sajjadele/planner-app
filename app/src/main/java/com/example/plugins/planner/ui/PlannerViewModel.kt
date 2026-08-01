@@ -139,7 +139,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
     /** Select a task by ID — navigates to its day and sets selectedTaskId */
     fun selectTask(taskId: Int) {
         viewModelScope.launch {
-            val task = taskDao.getTaskById(taskId)
+            val task = repository.getTaskById(taskId)
             if (task != null) {
                 _selectedDateEpochMs.value = task.dateEpochMs
             }
