@@ -42,6 +42,7 @@ fun SearchDialog(
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
+    val recentTasks by viewModel.recentTasks.collectAsState()
 
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -142,28 +143,63 @@ fun SearchDialog(
 
                     // Results content
                     if (searchQuery.isBlank()) {
-                        // Empty search hint state
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("🔍", fontSize = 48.sp)
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    text = "عبارت مورد نظر خود را تایپ کنید",
-                                    fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "جستجوی آنی در بین تمامی برنامه‌ها",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                        if (recentTasks.isNotEmpty()) {
+                            // Show recent tasks
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                item {
+                                    VisionText(
+                                        text = "${RTL}تسک‌های اخیر",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(bottom = 4.dp)
+                                    )
+                                }
+                                items(recentTasks.size) { index ->
+                                    val task = recentTasks[index]
+                                    SearchTaskItem(
+                                        task = task,
+                                        onClick = {
+                                            onNavigateToTask(task.dateEpochMs)
+                                            onDismissRequest()
+                                        }
+                                    )
+                                }
+                            }
+                        } else {
+                            // Empty search hint state
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                                        modifier = Modifier.size(64.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    VisionText(
+                                        text = "${RTL}عبارت مورد نظر خود را تایپ کنید",
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    VisionText(
+                                        text = "${RTL}جستجوی آنی در بین تمامی برنامه‌ها",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     } else if (searchResults.isEmpty()) {

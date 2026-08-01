@@ -30,6 +30,33 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
+    /** Recent tasks shown when search is empty */
+    val recentTasks: StateFlow<List<SearchResult.TaskResult>> = taskDao.getRecentTasks(10)
+        .combine(_searchQuery) { tasks, query ->
+            // Only show recent tasks when query is empty
+            if (query.isBlank()) {
+                tasks.map { task ->
+                    val dayIdx = persianDayIndex(task.dateEpochMs)
+                    val dayName = DateConstants.persianDayNames.getOrElse(dayIdx) {
+                        DateConstants.persianDayNames.first()
+                    }
+                    SearchResult.TaskResult(
+                        id = task.id,
+                        title = task.title,
+                        priority = task.priority,
+                        isCompleted = task.isCompleted,
+                        dateEpochMs = task.dateEpochMs,
+                        dayName = dayName
+                    )
+                }
+            } else {
+                emptyList()
+            }
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
     val searchResults: StateFlow<List<SearchResult>> = combine(
         _searchQuery,

@@ -13,6 +13,10 @@ interface TaskDao {
     @Query("SELECT * FROM tasks ORDER BY id DESC")
     fun getAllTasks(): Flow<List<TaskEntity>>
 
+    /** Get recent tasks ordered by timestamp (for search screen) */
+    @Query("SELECT * FROM tasks ORDER BY timestamp DESC LIMIT :limit")
+    fun getRecentTasks(limit: Int = 10): Flow<List<TaskEntity>>
+
     /** One-shot query for BootReceiver — re-schedule reminders after reboot */
     @Query("SELECT * FROM tasks WHERE reminderHour IS NOT NULL AND reminderMinute IS NOT NULL AND isCompleted = 0")
     suspend fun getActiveReminders(): List<TaskEntity>
