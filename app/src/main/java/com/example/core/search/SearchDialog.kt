@@ -31,6 +31,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.example.core.util.RTL
+import com.example.ui.components.VisionText
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

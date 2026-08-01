@@ -32,6 +32,7 @@ import com.example.ui.screens.components.VisionMenuDivider
 import com.example.ui.screens.components.VisionPopupMenu
 import com.example.ui.theme.*
 import com.example.core.util.RTL
+import com.example.ui.components.VisionText
 
 private val STATUS_LABELS = mapOf(
     GoalStatus.ACTIVE to "فعال",
@@ -102,7 +103,7 @@ fun GoalCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
+                VisionText(
                     text = goal.title,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,

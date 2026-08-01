@@ -52,6 +52,7 @@ import com.example.ui.screens.components.VisionMenuItem
 import com.example.ui.screens.components.VisionPopupMenu
 import com.example.plugins.planner.ui.components.skeletonShimmerBrush
 import com.example.ui.theme.*
+import com.example.ui.components.VisionText
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -301,7 +302,7 @@ fun GoalDetailScreen(
                         tint = MaterialTheme.colorScheme.onBackground
                     )
                 }
-                Text(
+                VisionText(
                     text = goal?.title ?: "",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,

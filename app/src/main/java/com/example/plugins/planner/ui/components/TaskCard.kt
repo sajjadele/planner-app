@@ -30,6 +30,7 @@ import com.example.core.util.isolated
 import com.example.plugins.planner.data.TaskEntity
 import com.example.ui.theme.*
 import com.example.core.util.RTL
+import com.example.ui.components.VisionText
 
 @Composable
 fun TaskCard(
@@ -92,7 +93,7 @@ fun TaskCard(
                     .weight(1f)
                     .then(if (task.isCompleted) Modifier.alpha(0.5f) else Modifier)
             ) {
-                Text(
+                VisionText(
                     text = task.title,
                     color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                     fontSize = 15.sp,

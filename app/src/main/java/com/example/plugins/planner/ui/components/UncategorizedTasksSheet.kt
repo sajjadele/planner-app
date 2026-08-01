@@ -23,6 +23,7 @@ import com.example.core.util.RTL
 import com.example.core.util.isolated
 import com.example.plugins.planner.data.UncategorizedTask
 import com.example.core.util.JalaliDate
+import com.example.ui.components.VisionText
 
 /**
  * UncategorizedTasksSheet — Shows tasks without a goal.
@@ -165,7 +166,7 @@ private fun UncategorizedTaskItem(
 
         // Content
         Column(modifier = Modifier.weight(1f)) {
-            Text(
+            VisionText(
                 text = task.title,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
