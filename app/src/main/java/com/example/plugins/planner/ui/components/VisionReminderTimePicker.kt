@@ -56,18 +56,15 @@ fun VisionReminderTimePicker(
         )
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable { onDismiss() },
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.BottomCenter
         ) {
-            // Dialog content - stops click from propagating
+            // Dialog content
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                     .background(MaterialTheme.colorScheme.surface)
-                    .clickable { /* Consume click */ }
                     .padding(horizontal = 24.dp)
                     .padding(bottom = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
