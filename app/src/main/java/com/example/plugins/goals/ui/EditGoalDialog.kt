@@ -22,8 +22,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -46,6 +48,7 @@ fun EditGoalDialog(
     daysWithTasks: Set<Long> = emptySet()
 ) {
     Dialog(onDismissRequest = onDismiss) {
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         var title by remember { mutableStateOf(goal.title) }
         var description by remember { mutableStateOf(goal.description ?: "") }
         var showDescription by remember { mutableStateOf(goal.description?.isNotBlank() == true) }
@@ -287,5 +290,6 @@ fun EditGoalDialog(
                 }
             )
         }
+        } // end CompositionLocalProvider
     }
 }

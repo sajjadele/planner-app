@@ -29,8 +29,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.style.TextAlign
 import com.example.core.data.HolidayRepository
 import com.example.core.domain.DayContext
 import com.example.ui.theme.AccentGreen
@@ -38,6 +39,7 @@ import com.example.ui.theme.AccentRed
 import com.example.ui.theme.AccentFire
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -76,6 +78,7 @@ fun AddTaskDialog(
     initialDateEpochMs: Long? = null
 ) {
     Dialog(onDismissRequest = onDismiss) {
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         var title by remember { mutableStateOf("") }
         var priority by remember { mutableStateOf<String?>(null) }
         var selectedHour by remember { mutableStateOf<Int?>(null) }
@@ -521,6 +524,7 @@ fun AddTaskDialog(
                 showConfirmButton = true
             )
         }
+        } // end CompositionLocalProvider
     }
 }
 
