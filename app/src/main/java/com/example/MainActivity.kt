@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -35,6 +36,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Force RTL layout direction for Persian text rendering across the entire app.
+        // This ensures Unicode Bidirectional Algorithm works correctly for mixed
+        // Persian/English text (e.g. "تست rtl") without breaking layout positions.
+        window.decorView.layoutDirection = View.LAYOUT_DIRECTION_RTL
         // Phase 6.5.7 (launch-jank): do NOT prompt for the notification permission during the
         // first composition — the system GrantPermissionsActivity would contend with the initial
         // draw (cold-start jank). Defer it until after the first frame via onResume+postDelayed.
