@@ -219,6 +219,18 @@ interface InsightDao {
     suspend fun getEarliestTaskDateEpochMs(): Long?
 
     // ──────────────────────────────────────────────
+    // Uncategorized tasks list (goalId IS NULL)
+    // ──────────────────────────────────────────────
+
+    @Query("""
+        SELECT id, title, priority, isCompleted, dateEpochMs, timestamp
+        FROM tasks
+        WHERE goalId IS NULL AND lifeAreaId IS NULL
+        ORDER BY dateEpochMs DESC
+    """)
+    fun observeUnorganizedTasks(): Flow<List<UncategorizedTask>>
+
+    // ──────────────────────────────────────────────
     // Phase 2A: Attention — meaningful interaction timestamps
     //
     // Sources: notes (user-authored logs linked to tasks).
@@ -259,4 +271,13 @@ data class GoalRateResult(
     val totalTasks: Int,
     val completedTasks: Int,
     val completionRate: Float
+)
+
+data class UncategorizedTask(
+    val id: Int,
+    val title: String,
+    val priority: String?,
+    val isCompleted: Boolean,
+    val dateEpochMs: Long,
+    val timestamp: Long
 )

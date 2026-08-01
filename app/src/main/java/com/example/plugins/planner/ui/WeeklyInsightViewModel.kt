@@ -25,6 +25,9 @@ class WeeklyInsightViewModel(application: Application) : AndroidViewModel(applic
     private val _insightState = MutableStateFlow(WeeklyInsightState(hasData = false))
     val insightState: StateFlow<WeeklyInsightState> = _insightState.asStateFlow()
 
+    private val _unorganizedTasks = MutableStateFlow<List<com.example.plugins.planner.data.UncategorizedTask>>(emptyList())
+    val unorganizedTasks: StateFlow<List<com.example.plugins.planner.data.UncategorizedTask>> = _unorganizedTasks.asStateFlow()
+
     // Week ranges — computed once, fixed for the ViewModel lifetime
     private val currentWeek: Pair<Long, Long>
     private val previousWeek: Pair<Long, Long>
@@ -123,6 +126,11 @@ class WeeklyInsightViewModel(application: Application) : AndroidViewModel(applic
                     )
                 }
             }.collect { _insightState.value = it }
+        }
+
+        // Observe unorganized tasks list
+        viewModelScope.launch {
+            insightRepository.observeUnorganizedTasks().collect { _unorganizedTasks.value = it }
         }
     }
 }

@@ -14,6 +14,7 @@ interface InsightRepository {
     fun observeCreatedCount(start: Long, end: Long): Flow<Int>
     fun observeCompletionByLifeArea(start: Long, end: Long): Flow<List<LifeAreaCompletion>>
     fun observeUnorganizedCount(start: Long, end: Long): Flow<Int>
+    fun observeUnorganizedTasks(): Flow<List<UncategorizedTask>>
     fun observeCompletedTimestamps(): Flow<List<Long>>
     fun observeCompletionByDay(start: Long, end: Long): Flow<List<DayCompletion>>
     fun observeRescheduleCounts(): Flow<List<TaskRescheduleWithTitle>>

@@ -166,6 +166,7 @@ fun WeeklyInsightCard(
 @Composable
 fun InsightDetailsSheetContent(
     state: WeeklyInsightState,
+    onShowUncategorized: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -254,6 +255,17 @@ fun InsightDetailsSheetContent(
                 icon = "ℹ️",
                 text = "${RTL}${state.unorganizedCount.isolated()} تسک بدون دسته‌بندی",
                 iconTint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${RTL}مشاهده لیست",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onShowUncategorized() }
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             )
         }
 

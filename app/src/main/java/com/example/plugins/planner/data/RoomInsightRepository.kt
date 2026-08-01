@@ -19,6 +19,9 @@ class RoomInsightRepository(private val insightDao: InsightDao) : InsightReposit
     override fun observeUnorganizedCount(start: Long, end: Long): Flow<Int> =
         insightDao.observeUnorganizedCount(start, end)
 
+    override fun observeUnorganizedTasks(): Flow<List<UncategorizedTask>> =
+        insightDao.observeUnorganizedTasks()
+
     override fun observeCompletedTimestamps(): Flow<List<Long>> =
         insightDao.observeCompletedTimestamps()
 

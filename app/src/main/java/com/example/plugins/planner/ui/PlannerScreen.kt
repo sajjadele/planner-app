@@ -31,6 +31,7 @@ import com.example.plugins.planner.ui.components.InsightDetailsSheetContent
 import com.example.plugins.planner.ui.components.PlannerEmptyState
 import com.example.plugins.planner.ui.components.TaskCard
 import com.example.plugins.planner.ui.components.TaskCardSkeleton
+import com.example.plugins.planner.ui.components.UncategorizedTasksSheet
 import com.example.plugins.planner.ui.components.WeeklyInsightCard
 import com.example.plugins.planner.ui.components.persianDayIndex
 import com.example.core.util.JalaliDate
@@ -80,6 +81,8 @@ fun PlannerScreen(
 
     var selectedTaskId by remember { mutableStateOf<Int?>(null) }
     var showCalendarPopup by remember { mutableStateOf(false) }
+    var showUncategorizedSheet by remember { mutableStateOf(false) }
+    val unorganizedTasks by insightViewModel?.unorganizedTasks?.collectAsState() ?: remember { mutableStateOf(emptyList()) }
 
     // Reset internal navigation when resetTrigger changes (same tab re-clicked)
     LaunchedEffect(resetTrigger) {
@@ -144,7 +147,32 @@ fun PlannerScreen(
             containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
-            InsightDetailsSheetContent(state = insightState)
+            InsightDetailsSheetContent(
+                state = insightState,
+                onShowUncategorized = {
+                    showInsightSheet = false
+                    showUncategorizedSheet = true
+                }
+            )
+        }
+    }
+
+    // ── Uncategorized Tasks Sheet ──
+    if (showUncategorizedSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showUncategorizedSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            UncategorizedTasksSheet(
+                tasks = unorganizedTasks,
+                onTaskClick = { taskId ->
+                    showUncategorizedSheet = false
+                    selectedTaskId = taskId
+                },
+                onDismiss = { showUncategorizedSheet = false }
+            )
         }
     }
 
