@@ -1,8 +1,7 @@
 package com.example.plugins.planner.ui.components
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,14 +13,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.core.util.isolated
-import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
@@ -29,10 +30,9 @@ import kotlin.math.roundToInt
  *
  * Features:
  * - Shows 3 items visible (previous, current, next)
+ * - Selected item centered with highlight
  * - Snap behavior for smooth scrolling
- * - Auto-scroll to initial value
- * - Animated highlight for selected item
- * - Dark theme with primary accent
+ * - Consumes scroll events to prevent bottom sheet from closing
  */
 @Composable
 fun VisionWheelPicker(
@@ -41,23 +41,31 @@ fun VisionWheelPicker(
     onItemSelected: (Int) -> Unit,
     formatItem: (Int) -> String = { String.format("%02d", it) },
     modifier: Modifier = Modifier,
-    visibleItems: Int = 3
+    visibleItems: Int = 3,
+    itemHeight: Dp = 40.dp
 ) {
+    val density = LocalDensity.current
+    val itemHeightPx = with(density) { itemHeight.toPx() }
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = selectedIndex
     )
-    val coroutineScope = rememberCoroutineScope()
 
-    // Detect when scrolling stops
+    // Detect when scrolling stops and snap to nearest item
     val isScrolling by remember {
         derivedStateOf { listState.isScrollInProgress }
     }
 
     LaunchedEffect(isScrolling) {
         if (!isScrolling && listState.layoutInfo.visibleItemsInfo.isNotEmpty()) {
+            // Find the item closest to center
+            val viewportCenter = listState.layoutInfo.viewportEndOffset / 2f
             val centerIndex = listState.layoutInfo.visibleItemsInfo
-                .minByOrNull { kotlin.math.abs(it.offset) }
+                .minByOrNull {
+                    val itemCenter = it.offset + it.size / 2f
+                    kotlin.math.abs(itemCenter - viewportCenter)
+                }
                 ?.index ?: selectedIndex
+
             if (centerIndex in items.indices && centerIndex != selectedIndex) {
                 onItemSelected(centerIndex)
             }
@@ -71,18 +79,40 @@ fun VisionWheelPicker(
         }
     }
 
+    // Nested scroll connection to consume scroll events
+    // This prevents the bottom sheet from closing when scrolling the wheel
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                return available.copy(y = available.y)
+            }
+            override fun onPostScroll(
+                consumed: androidx.compose.ui.geometry.Offset,
+                available: androidx.compose.ui.geometry.Offset,
+                source: NestedScrollSource
+            ): androidx.compose.ui.geometry.Offset {
+                return available
+            }
+        }
+    }
+
     Box(
         modifier = modifier
-            .height((32.dp * visibleItems) + 16.dp)
+            .nestedScroll(nestedScrollConnection)
+            .height(itemHeight * visibleItems)
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+            // Consume vertical drag to prevent bottom sheet from closing
+            .pointerInput(Unit) {
+                detectVerticalDragGestures { _, _ -> }
+            }
     ) {
-        // Center highlight
+        // Center highlight bar
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
                 .fillMaxWidth()
-                .height(32.dp)
+                .height(itemHeight)
                 .clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
         )
@@ -91,32 +121,28 @@ fun VisionWheelPicker(
             state = listState,
             flingBehavior = rememberSnapFlingBehavior(listState),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(vertical = 8.dp)
+            contentPadding = PaddingValues(
+                vertical = itemHeight * (visibleItems / 2)
+            )
         ) {
             items(items.size) { index ->
                 val item = items[index]
-                val distance = kotlin.math.abs(
-                    (listState.layoutInfo.visibleItemsInfo.firstOrNull()?.let {
-                        (it.index - index)
-                    } ?: 0)
-                )
-                val alpha = if (distance <= 1) 1f else 0.3f
+                val isSelected = index == selectedIndex
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(32.dp),
+                        .height(itemHeight),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = formatItem(item),
-                        fontSize = 20.sp,
-                        fontWeight = if (index == selectedIndex)
-                            FontWeight.Bold else FontWeight.Normal,
-                        color = if (index == selectedIndex)
+                        fontSize = if (isSelected) 22.sp else 18.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isSelected)
                             MaterialTheme.colorScheme.primary
                         else
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                         textAlign = TextAlign.Center
                     )
                 }
@@ -143,8 +169,6 @@ fun VisionTimeWheel(
     val hours = remember { (1..12).toList() }
     val minutes = remember { (0..55 step 5).toList() }
 
-    val coroutineScope = rememberCoroutineScope()
-
     // Track current selected indices
     var selectedHourIndex by remember { mutableStateOf(hours.indexOf(hour).coerceAtLeast(0)) }
     var selectedMinuteIndex by remember { mutableStateOf(minutes.indexOf(minute).coerceAtLeast(0)) }
@@ -155,7 +179,7 @@ fun VisionTimeWheel(
     // Auto-switch to minute after hour stops scrolling
     LaunchedEffect(hourJustChanged) {
         if (hourJustChanged) {
-            kotlinx.coroutines.delay(800) // Wait for scrolling to stop
+            kotlinx.coroutines.delay(800)
             onModeAutoSwitch?.invoke()
             hourJustChanged = false
         }
@@ -181,7 +205,7 @@ fun VisionTimeWheel(
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
