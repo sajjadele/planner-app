@@ -22,9 +22,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -90,7 +87,6 @@ fun TaskCard(
             Spacer(modifier = Modifier.width(14.dp))
 
             // ── Task details area — faded when completed ──
-            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -101,7 +97,8 @@ fun TaskCard(
                     color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
-                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
+                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                    modifier = Modifier.fillMaxWidth()
                 )
 
                 Row(
@@ -135,7 +132,6 @@ fun TaskCard(
                         )
                     }
                 }
-            }
             }
 
             // ── Action icons — faded when completed ──
