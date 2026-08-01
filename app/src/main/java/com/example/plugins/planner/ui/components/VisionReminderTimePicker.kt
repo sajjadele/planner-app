@@ -1,6 +1,8 @@
 package com.example.plugins.planner.ui.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -17,6 +19,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -24,34 +29,16 @@ import androidx.compose.ui.unit.sp
 import com.example.core.util.RTL
 
 /**
- * VisionReminderTimePicker — Complete time picker for setting reminders.
+ * VisionReminderTimePicker — Premium time picker for Vision Planner.
  *
- * Phase 2: Replaces old TimePickerSheet with proper 12h + AM/PM architecture.
- *
- * Layout:
- * ┌──────────────────────────────┐
- * │      زمان یادآوری             │
- * │                              │
- * │         08:30                │
- * │         صبح                  │
- * │                              │
- * │      ┌──────────┐            │
- * │      │  Clock   │            │
- * │      │  Face    │            │
- * │      └──────────┘            │
- * │                              │
- * │    [ ساعت ] [ دقیقه ]        │
- * │                              │
- * │    [ صبح ] [ عصر ] [ شب ]   │
- * │                              │
- * │    [لغو]        [تایید]      │
- * └──────────────────────────────┘
- *
- * Interaction:
- * - Tap hour on clock → auto-advance to minute mode
- * - Tap minute on clock → stay in minute mode
- * - Swipe up/down on digital display → increment/decrement
- * - Tap AM/PM chips → toggle period
+ * Design:
+ * - Title
+ * - Digital time display (swipeable, animated)
+ * - Clock face (Canvas, tap to select)
+ * - Mode toggle (ساعت/دقیقه)
+ * - Context text (انتخاب ساعت/دقیقه)
+ * - Period toggle (صبح/عصر/شب)
+ * - Action buttons
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,7 +50,6 @@ fun VisionReminderTimePicker(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Single source of truth — converts from 24h input
     val pickerState = remember {
         ReminderTimePickerState(
             ReminderTimeState.from24Hour(initialHour, initialMinute)
@@ -86,15 +72,15 @@ fun VisionReminderTimePicker(
             // ── Title ──
             Text(
                 text = "${RTL}زمان یادآوری",
-                fontSize = 16.sp,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // ── Digital Time Display (swipeable) ──
-            DigitalTimeDisplay(
+            // ── Premium Digital Time Display ──
+            PremiumDigitalDisplay(
                 hour = pickerState.timeState.hour,
                 minute = pickerState.timeState.minute,
                 period = pickerState.timeState.period,
@@ -114,6 +100,25 @@ fun VisionReminderTimePicker(
                     }
                 }
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ── Context Text ──
+            AnimatedContent(
+                targetState = pickerState.mode,
+                transitionSpec = {
+                    fadeIn(tween(200)) togetherWith fadeOut(tween(200))
+                },
+                label = "context_text"
+            ) { mode ->
+                Text(
+                    text = "${RTL}${
+                        if (mode == TimeSelectionMode.HOUR) "انتخاب ساعت" else "انتخاب دقیقه"
+                    }",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -135,44 +140,43 @@ fun VisionReminderTimePicker(
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // ── Mode Toggle Chips ──
             Row(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                ClockModeChip(
+                PremiumModeChip(
                     label = "ساعت",
                     isSelected = pickerState.mode == TimeSelectionMode.HOUR,
-                    onClick = { pickerState.mode = TimeSelectionMode.HOUR },
-                    selectedColor = MaterialTheme.colorScheme.primary
+                    onClick = { pickerState.mode = TimeSelectionMode.HOUR }
                 )
-                ClockModeChip(
+                PremiumModeChip(
                     label = "دقیقه",
                     isSelected = pickerState.mode == TimeSelectionMode.MINUTE,
-                    onClick = { pickerState.mode = TimeSelectionMode.MINUTE },
-                    selectedColor = MaterialTheme.colorScheme.primary
+                    onClick = { pickerState.mode = TimeSelectionMode.MINUTE }
                 )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ── Period Toggle (AM/PM) ──
+            // ── Period Toggle (صبح/عصر/شب) ──
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 PeriodChip(
                     label = "صبح",
+                    icon = "☀️",
                     isSelected = pickerState.timeState.period == DayPeriod.AM,
                     onClick = {
                         if (pickerState.timeState.period != DayPeriod.AM) {
                             pickerState.togglePeriod()
                         }
-                    },
-                    selectedColor = MaterialTheme.colorScheme.primary
+                    }
                 )
                 PeriodChip(
                     label = "عصر",
+                    icon = "☁️",
                     isSelected = pickerState.timeState.period == DayPeriod.PM &&
                             pickerState.timeState.hour in 1..11,
                     onClick = {
@@ -181,61 +185,76 @@ fun VisionReminderTimePicker(
                         ) {
                             pickerState.togglePeriod()
                         }
-                    },
-                    selectedColor = MaterialTheme.colorScheme.primary
+                    }
                 )
                 PeriodChip(
                     label = "شب",
+                    icon = "🌙",
                     isSelected = pickerState.timeState.period == DayPeriod.PM &&
-                            pickerState.timeState.hour in 12..12,
+                            pickerState.timeState.hour == 12,
                     onClick = {
                         if (pickerState.timeState.period != DayPeriod.PM) {
                             pickerState.togglePeriod()
                         }
-                    },
-                    selectedColor = MaterialTheme.colorScheme.primary
+                    }
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // ── Action Buttons ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // Cancel — transparent/outlined
                 OutlinedButton(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.Transparent,
                         contentColor = MaterialTheme.colorScheme.onSurface
                     )
                 ) {
-                    Text("${RTL}لغو")
+                    Text(
+                        "${RTL}لغو",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
+
+                // Confirm — primary filled, larger
                 Button(
                     onClick = {
                         val (h, m) = pickerState.confirmValue()
                         onConfirm(h, m)
                     },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1.5f)
+                        .shadow(4.dp, RoundedCornerShape(12.dp)),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
-                    Text("${RTL}تأیید")
+                    Text(
+                        "${RTL}تأیید",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
                 }
             }
         }
     }
 }
 
-// ── Digital Time Display (swipeable) ──
+// ── Premium Digital Display ──
 
 @Composable
-private fun DigitalTimeDisplay(
+private fun PremiumDigitalDisplay(
     hour: Int,
     minute: Int,
     period: DayPeriod,
@@ -248,17 +267,43 @@ private fun DigitalTimeDisplay(
         DayPeriod.PM -> "عصر"
     }
 
+    // Animated colors for selected part
+    val hourColor by animateColorAsState(
+        targetValue = if (isMinuteMode)
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+        else
+            MaterialTheme.colorScheme.primary,
+        animationSpec = tween(250),
+        label = "hour_color"
+    )
+
+    val minuteColor by animateColorAsState(
+        targetValue = if (isMinuteMode)
+            MaterialTheme.colorScheme.primary
+        else
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+        animationSpec = tween(250),
+        label = "minute_color"
+    )
+
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+                    )
+                )
+            )
             .pointerInput(Unit) {
                 detectVerticalDragGestures { _, dragAmount ->
                     if (dragAmount < -10) onSwipeUp()
                     else if (dragAmount > 10) onSwipeDown()
                 }
             }
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .padding(horizontal = 32.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Time digits
@@ -267,89 +312,117 @@ private fun DigitalTimeDisplay(
         ) {
             Text(
                 text = String.format("%02d", hour),
-                fontSize = 40.sp,
+                fontSize = 48.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isMinuteMode)
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                else
-                    MaterialTheme.colorScheme.primary
+                color = hourColor
             )
             Text(
-                text = ":",
-                fontSize = 40.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                text = " : ",
+                fontSize = 48.sp,
+                fontWeight = FontWeight.Light,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
             )
             Text(
                 text = String.format("%02d", minute),
-                fontSize = 40.sp,
+                fontSize = 48.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isMinuteMode)
-                    MaterialTheme.colorScheme.primary
-                else
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                color = minuteColor
             )
         }
+
+        Spacer(modifier = Modifier.height(4.dp))
 
         // Period label
         Text(
             text = "${RTL}$periodLabel",
             fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
-// ── Mode Chip ──
+// ── Premium Mode Chip ──
 
 @Composable
-private fun ClockModeChip(
+private fun PremiumModeChip(
     label: String,
     isSelected: Boolean,
-    onClick: () -> Unit,
-    selectedColor: androidx.compose.ui.graphics.Color
+    onClick: () -> Unit
 ) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isSelected)
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+        else
+            Color.Transparent,
+        animationSpec = tween(200),
+        label = "chip_bg"
+    )
+
+    val borderColor by animateColorAsState(
+        targetValue = if (isSelected)
+            MaterialTheme.colorScheme.primary
+        else
+            MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+        animationSpec = tween(200),
+        label = "chip_border"
+    )
+
     Surface(
         modifier = Modifier.clickable { onClick() },
-        shape = RoundedCornerShape(8.dp),
-        color = if (isSelected) selectedColor.copy(alpha = 0.15f)
-            else androidx.compose.ui.graphics.Color.Transparent,
-        border = if (isSelected) BorderStroke(1.dp, selectedColor) else null
-    ) {
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            color = if (isSelected) selectedColor
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-        )
-    }
-}
-
-// ── Period Chip (AM/PM) ──
-
-@Composable
-private fun PeriodChip(
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    selectedColor: androidx.compose.ui.graphics.Color
-) {
-    Surface(
-        modifier = Modifier.clickable { onClick() },
-        shape = RoundedCornerShape(8.dp),
-        color = if (isSelected) selectedColor.copy(alpha = 0.15f)
-            else androidx.compose.ui.graphics.Color.Transparent,
-        border = if (isSelected) BorderStroke(1.dp, selectedColor) else null
+        shape = RoundedCornerShape(10.dp),
+        color = backgroundColor,
+        border = BorderStroke(1.dp, borderColor)
     ) {
         Text(
             text = "${RTL}$label",
             fontSize = 12.sp,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            color = if (isSelected) selectedColor
+            color = if (isSelected) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
+    }
+}
+
+// ── Period Chip (صبح/عصر/شب) ──
+
+@Composable
+private fun PeriodChip(
+    label: String,
+    icon: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isSelected)
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+        else
+            Color.Transparent,
+        animationSpec = tween(200),
+        label = "period_bg"
+    )
+
+    Surface(
+        modifier = Modifier.clickable { onClick() },
+        shape = RoundedCornerShape(10.dp),
+        color = backgroundColor,
+        border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+            else null
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(text = icon, fontSize = 14.sp)
+            Text(
+                text = "${RTL}$label",
+                fontSize = 12.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                color = if (isSelected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }

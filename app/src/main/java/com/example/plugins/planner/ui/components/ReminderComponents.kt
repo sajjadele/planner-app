@@ -19,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,15 +30,16 @@ import com.example.ui.theme.*
 
 data class ReminderPreset(
     val label: String,
-    val icon: ImageVector,
+    val icon: String,
+    val time: String,
     val hour: Int,
     val minute: Int
 )
 
 private val defaultPresets = listOf(
-    ReminderPreset("صبح", Icons.Default.WbSunny, 8, 0),
-    ReminderPreset("عصر", Icons.Default.WbCloudy, 14, 0),
-    ReminderPreset("شب", Icons.Default.DarkMode, 21, 0)
+    ReminderPreset("صبح", "☀️", "08:00", 8, 0),
+    ReminderPreset("عصر", "☁️", "14:00", 14, 0),
+    ReminderPreset("شب", "🌙", "21:00", 21, 0)
 )
 
 // ── Reusable Reminder Section ──
@@ -210,21 +210,19 @@ private fun ReminderPresetChip(
                 .padding(vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(
-                imageVector = preset.icon,
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier.size(18.dp)
+            Text(
+                text = preset.icon,
+                fontSize = 18.sp
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = preset.label,
+                text = "${RTL}${preset.label}",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 color = contentColor
             )
             Text(
-                text = String.format("%02d:%02d", preset.hour, preset.minute).isolated(),
+                text = preset.time.isolated(),
                 fontSize = 10.sp,
                 color = contentColor.copy(alpha = 0.7f)
             )
