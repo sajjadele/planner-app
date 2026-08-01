@@ -136,6 +136,7 @@ fun TaskCard(
                     }
                 }
             }
+            }
 
             // ── Action icons — faded when completed ──
             val actionsModifier = if (task.isCompleted) Modifier.alpha(0.4f) else Modifier
