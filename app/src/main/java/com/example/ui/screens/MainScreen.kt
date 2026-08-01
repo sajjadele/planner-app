@@ -141,6 +141,7 @@ fun MainScreen(
 
     var showThemeSettings by remember { mutableStateOf(false) }
     var showSearchDialog by remember { mutableStateOf(false) }
+    var selectedGoalId by remember { mutableStateOf<Int?>(null) }
     val plannerViewModel: PlannerViewModel = viewModel()
     // Phase 6.5.7 (launch-jank): GoalViewModel is only needed by the Add-Goal dialog, so create it
     // lazily on first demand rather than eagerly at launch (when the Planner tab is the default).
@@ -333,6 +334,14 @@ fun MainScreen(
             onNavigateToTask = { dateEpochMs ->
                 plannerViewModel.selectDate(dateEpochMs)
                 selectedTabId = "planner"
+            },
+            onNavigateToTaskDetails = { taskId ->
+                plannerViewModel.selectTask(taskId)
+                selectedTabId = "planner"
+            },
+            onNavigateToGoalDetails = { goalId ->
+                selectedGoalId = goalId
+                selectedTabId = "goals"
             }
         )
     }

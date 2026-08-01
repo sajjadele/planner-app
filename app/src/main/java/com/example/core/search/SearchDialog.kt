@@ -47,6 +47,8 @@ import com.example.ui.components.VisionText
 fun SearchDialog(
     onDismissRequest: () -> Unit,
     onNavigateToTask: (dateEpochMs: Long) -> Unit,
+    onNavigateToTaskDetails: (taskId: Int) -> Unit = {},
+    onNavigateToGoalDetails: (goalId: Int) -> Unit = {},
     viewModel: SearchViewModel = viewModel()
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -182,7 +184,7 @@ fun SearchDialog(
                                                 },
                                                 onEdit = {
                                                     viewModel.recordTaskAccess(result.id)
-                                                    onNavigateToTask(result.dateEpochMs)
+                                                    onNavigateToTaskDetails(result.id)
                                                     onDismissRequest()
                                                 }
                                             )
@@ -192,6 +194,7 @@ fun SearchDialog(
                                                 goal = result,
                                                 onClick = {
                                                     viewModel.recordTaskAccess(result.id)
+                                                    onNavigateToGoalDetails(result.id)
                                                     onDismissRequest()
                                                 }
                                             )
@@ -283,7 +286,7 @@ fun SearchDialog(
                                             },
                                             onEdit = {
                                                 viewModel.recordTaskAccess(result.id)
-                                                onNavigateToTask(result.dateEpochMs)
+                                                onNavigateToTaskDetails(result.id)
                                                 onDismissRequest()
                                             }
                                         )
@@ -293,6 +296,7 @@ fun SearchDialog(
                                             goal = result,
                                             onClick = {
                                                 viewModel.recordTaskAccess(result.id)
+                                                onNavigateToGoalDetails(result.id)
                                                 onDismissRequest()
                                             }
                                         )
@@ -377,15 +381,15 @@ fun SearchTaskItem(
                     )
                 }
 
-                // Day Badge
+                // Priority Badge
                 Box(
                     modifier = Modifier
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
+                        .background(priorityColor.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = task.dayName,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = priorityLabel,
+                        color = priorityColor,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -422,37 +426,17 @@ fun SearchTaskItem(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Priority + Edit button column
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+        // Edit button
+        IconButton(
+            onClick = onEdit,
+            modifier = Modifier.size(32.dp)
         ) {
-            // Priority Badge
-            Box(
-                modifier = Modifier
-                    .background(priorityColor.copy(alpha = 0.1f), CircleShape)
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = priorityLabel,
-                    color = priorityColor,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            
-            // Edit button
-            IconButton(
-                onClick = onEdit,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = "جزئیات",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
+            Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = "جزئیات",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }
