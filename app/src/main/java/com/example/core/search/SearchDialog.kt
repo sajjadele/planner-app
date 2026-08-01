@@ -9,7 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.PauseCircle
@@ -174,6 +174,11 @@ fun SearchDialog(
                                                     viewModel.recordTaskAccess(result.id)
                                                     onNavigateToTask(result.dateEpochMs)
                                                     onDismissRequest()
+                                                },
+                                                onEdit = {
+                                                    viewModel.recordTaskAccess(result.id)
+                                                    onNavigateToTask(result.dateEpochMs)
+                                                    onDismissRequest()
                                                 }
                                             )
                                         }
@@ -270,6 +275,11 @@ fun SearchDialog(
                                                 viewModel.recordTaskAccess(result.id)
                                                 onNavigateToTask(result.dateEpochMs)
                                                 onDismissRequest()
+                                            },
+                                            onEdit = {
+                                                viewModel.recordTaskAccess(result.id)
+                                                onNavigateToTask(result.dateEpochMs)
+                                                onDismissRequest()
                                             }
                                         )
                                     }
@@ -294,7 +304,8 @@ fun SearchDialog(
 @Composable
 fun SearchTaskItem(
     task: SearchResult.TaskResult,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onEdit: () -> Unit
 ) {
     // Handle nullable priority safely - default to LOW for display
     val priorityValue = task.priority ?: "LOW"
@@ -321,6 +332,7 @@ fun SearchTaskItem(
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Icon
         Box(
             modifier = Modifier
                 .size(40.dp)
@@ -328,31 +340,33 @@ fun SearchTaskItem(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.Default.EventNote,
-                contentDescription = "برنامه",
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                imageVector = Icons.Default.CheckCircleOutline,
+                contentDescription = "تسک",
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp)
             )
         }
 
-        Spacer(modifier = Modifier.width(14.dp))
+        Spacer(modifier = Modifier.width(12.dp))
 
+        // Content
         Column(
             modifier = Modifier.weight(1f)
         ) {
+            // Tags row
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 // Type Badge
                 Box(
                     modifier = Modifier
-                        .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "برنامه",
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        text = "تسک",
+                        color = MaterialTheme.colorScheme.onPrimary,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -363,7 +377,7 @@ fun SearchTaskItem(
                     modifier = Modifier
                         .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
+                ) {
                     Text(
                         text = task.dayName,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -390,7 +404,8 @@ fun SearchTaskItem(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            Text(
+            // Title
+            VisionText(
                 text = task.title,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -400,20 +415,39 @@ fun SearchTaskItem(
             )
         }
 
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(8.dp))
 
-        // Priority Marker
-        Box(
-            modifier = Modifier
-                .background(priorityColor.copy(alpha = 0.1f), CircleShape)
-                .padding(horizontal = 10.dp, vertical = 4.dp)
+        // Priority + Edit button column
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(
-                text = priorityLabel,
-                color = priorityColor,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold
-            )
+            // Priority Badge
+            Box(
+                modifier = Modifier
+                    .background(priorityColor.copy(alpha = 0.1f), CircleShape)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = priorityLabel,
+                    color = priorityColor,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            
+            // Edit button
+            IconButton(
+                onClick = onEdit,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "جزئیات",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }
@@ -456,6 +490,7 @@ fun SearchGoalItem(
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Icon
         Box(
             modifier = Modifier
                 .size(40.dp)
@@ -470,11 +505,49 @@ fun SearchGoalItem(
             )
         }
         
-        Spacer(modifier = Modifier.width(14.dp))
+        Spacer(modifier = Modifier.width(12.dp))
         
+        // Content
         Column(
             modifier = Modifier.weight(1f)
         ) {
+            // Tags row
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Type Badge
+                Box(
+                    modifier = Modifier
+                        .background(statusColor, RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "هدف",
+                        color = Color.White,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Status Badge
+                Box(
+                    modifier = Modifier
+                        .background(statusColor.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = statusLabel,
+                        color = statusColor,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Title
             VisionText(
                 text = goal.title,
                 fontSize = 14.sp,
@@ -483,6 +556,8 @@ fun SearchGoalItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            
+            // Description (if present)
             if (goal.description != null) {
                 Spacer(modifier = Modifier.height(2.dp))
                 VisionText(
@@ -493,21 +568,6 @@ fun SearchGoalItem(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-        }
-        
-        Spacer(modifier = Modifier.width(12.dp))
-        
-        Box(
-            modifier = Modifier
-                .background(statusColor.copy(alpha = 0.1f), CircleShape)
-                .padding(horizontal = 10.dp, vertical = 4.dp)
-        ) {
-            Text(
-                text = statusLabel,
-                color = statusColor,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold
-            )
         }
     }
 }
