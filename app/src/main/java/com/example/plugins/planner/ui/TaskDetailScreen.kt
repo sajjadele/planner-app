@@ -56,6 +56,8 @@ import com.example.core.util.JalaliDate
 import com.example.core.util.RTL
 import androidx.compose.material3.AlertDialog
 import com.example.plugins.planner.data.ActivityCreationAction
+import com.example.ui.screens.components.VisionPopupMenu
+import com.example.ui.screens.components.VisionMenuItem
 import com.example.plugins.planner.data.ActivityDraft
 import com.example.plugins.planner.data.ActivityAttachment
 import com.example.plugins.planner.data.ActivityFeedFilterState
@@ -935,33 +937,37 @@ private fun ActivityFeedHeader(
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-            DropdownMenu(
+            VisionPopupMenu(
                 expanded = showMenu,
                 onDismissRequest = { showMenu = false }
             ) {
-                DropdownMenuItem(
-                    text = { Text("${RTL}📝  یادداشت", fontSize = 13.sp) },
+                VisionMenuItem(
+                    text = "${RTL}📝  یادداشت",
+                    leadingIcon = null,
                     onClick = {
                         showMenu = false
                         onSelectAction(ActivityCreationAction.Note)
                     }
                 )
-                DropdownMenuItem(
-                    text = { Text("${RTL}📷  تصویر", fontSize = 13.sp) },
+                VisionMenuItem(
+                    text = "${RTL}📷  تصویر",
+                    leadingIcon = null,
                     onClick = {
                         showMenu = false
                         onSelectAction(ActivityCreationAction.Image)
                     }
                 )
-                DropdownMenuItem(
-                    text = { Text("${RTL}📎  فایل", fontSize = 13.sp) },
+                VisionMenuItem(
+                    text = "${RTL}📎  فایل",
+                    leadingIcon = null,
                     onClick = {
                         showMenu = false
                         onSelectAction(ActivityCreationAction.File)
                     }
                 )
-                DropdownMenuItem(
-                    text = { Text("${RTL}⏱️  فعالیت دستی", fontSize = 13.sp) },
+                VisionMenuItem(
+                    text = "${RTL}⏱️  فعالیت دستی",
+                    leadingIcon = null,
                     onClick = {
                         showMenu = false
                         onSelectAction(ActivityCreationAction.ManualActivity)
