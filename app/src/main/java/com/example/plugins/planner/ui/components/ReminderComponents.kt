@@ -37,9 +37,9 @@ data class ReminderPreset(
 )
 
 private val defaultPresets = listOf(
-    ReminderPreset("قبل از ظهر", "🔵", "08:00 ق.ظ", 8, 0),
-    ReminderPreset("بعد از ظهر", "🟣", "02:00 ب.ظ", 14, 0),
-    ReminderPreset("بعد از ظهر", "🟣", "09:00 ب.ظ", 21, 0)
+    ReminderPreset("صبح", "☀️", "08:00", 8, 0),
+    ReminderPreset("عصر", "☁️", "14:00", 14, 0),
+    ReminderPreset("شب", "🌙", "21:00", 21, 0)
 )
 
 // ── Reusable Reminder Section ──
@@ -122,7 +122,7 @@ fun ReminderSection(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = if (isCustom)
-                    "${RTL}${formatTimeWithPeriod(reminderHour ?: 0, reminderMinute ?: 0).isolated()}"
+                    "${RTL}${String.format("%02d:%02d", reminderHour, reminderMinute).isolated()}"
                 else
                     "${RTL}زمان دلخواه",
                 fontSize = 13.sp,
@@ -228,16 +228,4 @@ private fun ReminderPresetChip(
             )
         }
     }
-}
-
-// ── Helper: Format time with AM/PM in Persian ──
-
-private fun formatTimeWithPeriod(hour24: Int, minute: Int): String {
-    val period = if (hour24 < 12) "قبل از ظهر" else "بعد از ظهر"
-    val hour12 = when {
-        hour24 == 0 -> 12
-        hour24 > 12 -> hour24 - 12
-        else -> hour24
-    }
-    return String.format("%02d:%02d %s", hour12, minute, period)
 }
