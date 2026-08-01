@@ -18,6 +18,7 @@ interface AppPlugin {
     fun Content(
         modifier: Modifier,
         onNavigateToSettings: () -> Unit,
-        onBack: () -> Unit = {}
+        onBack: () -> Unit = {},
+        resetTrigger: Int = 0
     )
 }

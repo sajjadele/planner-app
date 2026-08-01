@@ -17,8 +17,9 @@ class GoalsPlugin : AppPlugin {
     override fun Content(
         modifier: Modifier,
         onNavigateToSettings: () -> Unit,
-        onBack: () -> Unit
+        onBack: () -> Unit,
+        resetTrigger: Int
     ) {
-        GoalDashboardScreen(modifier = modifier)
+        GoalDashboardScreen(modifier = modifier, resetTrigger = resetTrigger)
     }
 }

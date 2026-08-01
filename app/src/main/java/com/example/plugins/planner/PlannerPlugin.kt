@@ -17,8 +17,9 @@ class PlannerPlugin : AppPlugin {
     override fun Content(
         modifier: Modifier,
         onNavigateToSettings: () -> Unit,
-        onBack: () -> Unit
+        onBack: () -> Unit,
+        resetTrigger: Int
     ) {
-        PlannerScreen(modifier = modifier)
+        PlannerScreen(modifier = modifier, resetTrigger = resetTrigger)
     }
 }

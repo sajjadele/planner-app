@@ -43,7 +43,8 @@ import kotlinx.coroutines.launch
 fun PlannerScreen(
     modifier: Modifier = Modifier,
     viewModel: PlannerViewModel = viewModel(),
-    insightViewModel: WeeklyInsightViewModel? = null
+    insightViewModel: WeeklyInsightViewModel? = null,
+    resetTrigger: Int = 0
 ) {
     val selectedDateEpochMs by viewModel.selectedDateEpochMs.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
@@ -79,6 +80,13 @@ fun PlannerScreen(
 
     var selectedTaskId by remember { mutableStateOf<Int?>(null) }
     var showCalendarPopup by remember { mutableStateOf(false) }
+
+    // Reset internal navigation when resetTrigger changes (same tab re-clicked)
+    LaunchedEffect(resetTrigger) {
+        if (resetTrigger > 0) {
+            selectedTaskId = null
+        }
+    }
 
     // Hoisted LazyListState for InfiniteWeekRow — enables programmatic scroll-to-week
     val weekRowListState = rememberLazyListState()

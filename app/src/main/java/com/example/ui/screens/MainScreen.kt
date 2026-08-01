@@ -95,6 +95,8 @@ fun MainScreen(
     }
 
     var selectedTabId by remember { mutableStateOf("planner") }
+    var plannerResetTrigger by remember { mutableIntStateOf(0) }
+    var goalsResetTrigger by remember { mutableIntStateOf(0) }
 
     // Guards rapid swipe/click double-switches during the AnimatedContent crossfade (Phase 5.5).
     var isTabTransitioning by remember { mutableStateOf(false) }
@@ -164,6 +166,13 @@ fun MainScreen(
                 selectedTabId = selectedTabId,
                 onTabSelected = {
                     isTabTransitioning = true
+                    // If clicking the same tab, increment reset trigger
+                    if (it == selectedTabId) {
+                        when (it) {
+                            "planner" -> plannerResetTrigger++
+                            "goals" -> goalsResetTrigger++
+                        }
+                    }
                     selectedTabId = it
                 },
                 onActionClick = {
@@ -195,7 +204,8 @@ fun MainScreen(
                     plannerPlugin.Content(
                         modifier = Modifier.fillMaxSize(),
                         onNavigateToSettings = { showThemeSettings = true },
-                        onBack = { selectedTabId = "planner" }
+                        onBack = { selectedTabId = "planner" },
+                        resetTrigger = plannerResetTrigger
                     )
                 }
             }
@@ -207,7 +217,8 @@ fun MainScreen(
                     goalsPlugin.Content(
                         modifier = Modifier.fillMaxSize(),
                         onNavigateToSettings = { showThemeSettings = true },
-                        onBack = { selectedTabId = "planner" }
+                        onBack = { selectedTabId = "planner" },
+                        resetTrigger = goalsResetTrigger
                     )
                 }
             }

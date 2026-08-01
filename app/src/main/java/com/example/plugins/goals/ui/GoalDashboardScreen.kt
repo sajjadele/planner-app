@@ -25,7 +25,8 @@ import com.example.ui.theme.*
 @Composable
 fun GoalDashboardScreen(
     modifier: Modifier = Modifier,
-    viewModel: GoalViewModel = viewModel()
+    viewModel: GoalViewModel = viewModel(),
+    resetTrigger: Int = 0
 ) {
     val selectedTab by viewModel.selectedTab.collectAsState()
     val goalsByTab by viewModel.goalsByTab.collectAsState()
@@ -39,6 +40,13 @@ fun GoalDashboardScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var homeHintFor by remember { mutableStateOf(false) }
     var showAddGoalDialog by remember { mutableStateOf(false) }
+
+    // Reset internal navigation when resetTrigger changes (same tab re-clicked)
+    LaunchedEffect(resetTrigger) {
+        if (resetTrigger > 0) {
+            selectedGoalId = null
+        }
+    }
 
     // Deep-link from onboarding: land directly on the new goal's detail screen.
     LaunchedEffect(Unit) {
