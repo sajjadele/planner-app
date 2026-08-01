@@ -73,6 +73,8 @@ fun VisionClockFace(
     }
 
     // Selected value based on mode
+    val selectedValue = if (isMinuteMode) selectedMinute else selectedHour
+
     Canvas(
         modifier = modifier
             .size(240.dp)
