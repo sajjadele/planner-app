@@ -31,8 +31,8 @@ Goal → Task → Event → Snapshot → Mirror → Feedback
 | 2 | Goal System | ✅ Complete |
 | 3 | Behavior Data Foundation | ✅ Complete |
 | 4 | Mirror Engine Foundation | ✅ Complete |
-| 5 | Goal Experience Evolution | ✅ Complete (5.1–5.4) |
-| 6 | Behavioral Solar System | ✅ Complete (6.1–6.4) |
+| 5 | Goal Experience Evolution | ✅ Complete (5.1–5.9) |
+| 6 | Behavioral Solar System + Activity Feed | ✅ Complete (6.0–6.5) |
 | 7 | AI Insight Layer | Planned |
 
 ---
@@ -95,26 +95,38 @@ Implemented architecture surfaces:
 
 ## Phase 5 — Goal Experience Evolution
 
-**Status:** Complete (5.1–5.4)
+**Status:** Complete (5.1–5.9)
 
 Goals of this phase:
 - Strengthen Goal-first daily UX
 - Keep daily task execution simple
 - Visually separate Inbox/capture tasks from goal-linked tasks
 - Improve Goal Card progress and feedback presentation
+- Evolve the Activity Feed into a telegram-style message experience
 
 Sub-phases:
-- **5.1–5.2:** Goal lifecycle, performance optimizations
-- **5.3:** GoalDetail metrics, active-days window
-- **5.4:** Performance & UX Stability Audit (indexes, deferred init)
+- **5.1–5.2:** Goal lifecycle (status transitions, archive, why/deadline), Goal Dashboard
+  (segmented tabs, rich GoalCard, `domain.goal` sort/progress/formatter), Activity Feed UX layer
+- **5.3:** GoalDetail metrics, active-days window; telegram-style Activity Message polish
+- **5.4:** Activity Feed UX & Architecture audit → performance stabilization (bulk queries,
+  indexes, precomputed `DashboardGoalItem`)
+- **5.5a–5.5d:** Step-as-Tag migration — step decoupling design, context-aware creation,
+  legacy step container removal, step→tag simplification
+- **5.6–5.7:** Telegram-style Activity Message renderer (RTL, bubbles, media ordering,
+  message polish)
+- **5.8:** Activity Creation UX redesign (draft resolver, payload codec, creation flow)
+- **5.9:** Tag management (dedicated creation UX, tag colors, in-place update, safe delete)
 
-Decision records: `docs/ADR/ADR-0009-performance-audit-5.4.md`
+Decision records:
+- `docs/ADR/ADR-0009-performance-audit-5.4.md`
+- `docs/ADR/ADR-0013-goal-detail-loading-performance.md`
+- `docs/ADR/ADR-0014-visibility-resolver.md`
 
 ---
 
-## Phase 6 — Behavioral Solar System
+## Phase 6 — Behavioral Solar System + Activity Feed
 
-**Status:** Complete (6.1–6.4)
+**Status:** Complete (6.0–6.5)
 
 - Goal = Sun (center), Task = orbiting satellite / cluster
 - Computed on demand, never stored
@@ -122,18 +134,24 @@ Decision records: `docs/ADR/ADR-0009-performance-audit-5.4.md`
 - Attention-driven positioning
 
 Sub-phases:
+- **6.0:** Activity Feed Date Navigator (collapsed-first UX)
 - **6.1:** Foundation audit & alignment, Help/Legend
-- **6.2:** Individual task satellites
-- **6.3:** Adaptive cluster visualization
-- **6.4:** Solar System motion & animation
+- **6.2:** Individual task satellites (visual language)
+- **6.3:** Adaptive cluster visualization; Solar Identity Refinement (6.3.1–6.3.2)
+- **6.4:** Solar System motion & animation (staged entrance, breathing shimmer)
+- **6.5:** Visual Foundation Audit → gold sun dominance, 3 orbit rings, priority presence,
+  adaptive density system (`GraphDensityMode { SIMPLE, CLUSTERED, SUMMARY }`)
+- **6.6+:** Vision Time Picker (refactor → iOS-style wheel picker, AM/PM, clock-face tap fixes)
 
 Decision records:
 - `docs/ADR/ADR-0002-graph-architecture.md`
 - `docs/ADR/ADR-0004-graph-solar-system.md`
 - `docs/ADR/ADR-0005-behavioral-solar-system.md`
+- `docs/ADR/ADR-0006-graph-visual-language.md`
+- `docs/ADR/ADR-0007-adaptive-solar-system.md`
 - `docs/ADR/ADR-0008-solar-system-motion.md`
+- `docs/ADR/ADR-0011-graph-visual-foundation.md`
 - `docs/ATTENTION_ARCHITECTURE.md`
-- `docs/GRAPH_VIEW_RETROSPECTIVE.md`
 
 ---
 
@@ -147,6 +165,11 @@ Goals of this phase:
 - Remain offline-first
 - No remote/network AI dependency under current constraints
 
+Open product decision (pending — needed before implementation):
+- **Scope of "AI" offline:** on-device model (e.g. TFLite/ML Kit on device) vs
+  deterministic rule-based "intelligence layer" (no model at all) vs small embedded model.
+  This decision must be recorded in `PRODUCT_DIRECTION_DECISION_DOCUMENT.md` first.
+
 ---
 
 ## Explicitly Out of Scope
@@ -156,6 +179,7 @@ Goals of this phase:
 - Life Area as first-class entity or graph node
 - Graph persistence
 - Authoritative progress writes outside projections
+- Network dependencies of any kind
 
 ---
 
