@@ -93,7 +93,7 @@ fun TaskCard(
                     .then(if (task.isCompleted) Modifier.alpha(0.5f) else Modifier)
             ) {
                 Text(
-                    text = "${RTL}${task.title}",
+                    text = task.title,
                     color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,

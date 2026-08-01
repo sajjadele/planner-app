@@ -302,7 +302,7 @@ fun GoalDetailScreen(
                     )
                 }
                 Text(
-                    text = "${RTL}${goal?.title ?: ""}",
+                    text = goal?.title ?: "",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,

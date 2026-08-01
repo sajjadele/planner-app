@@ -330,7 +330,7 @@ fun SearchTaskItem(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "${RTL}${task.title}",
+                text = task.title,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
