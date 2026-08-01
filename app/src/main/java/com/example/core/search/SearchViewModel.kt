@@ -26,37 +26,37 @@ sealed class SearchResult {
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getDatabase(application)
     private val taskDao = database.taskDao()
+    private val searchHistory = SearchHistoryManager(application)
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
-    /** Recent tasks shown when search is empty */
-    val recentTasks: StateFlow<List<SearchResult.TaskResult>> = taskDao.getRecentTasks(10)
-        .combine(_searchQuery) { tasks, query ->
-            // Only show recent tasks when query is empty
-            if (query.isBlank()) {
-                tasks.map { task ->
-                    val dayIdx = persianDayIndex(task.dateEpochMs)
-                    val dayName = DateConstants.persianDayNames.getOrElse(dayIdx) {
-                        DateConstants.persianDayNames.first()
-                    }
-                    SearchResult.TaskResult(
-                        id = task.id,
-                        title = task.title,
-                        priority = task.priority,
-                        isCompleted = task.isCompleted,
-                        dateEpochMs = task.dateEpochMs,
-                        dayName = dayName
-                    )
+    /** Recent tasks based on search history (last clicked from search) */
+    val recentTasks: StateFlow<List<SearchResult.TaskResult>> = combine(
+        searchHistory.recentTaskIds,
+        taskDao.getAllTasks()
+    ) { recentIds, allTasks ->
+        recentIds.mapNotNull { id ->
+            allTasks.find { it.id == id }?.let { task ->
+                val dayIdx = persianDayIndex(task.dateEpochMs)
+                val dayName = DateConstants.persianDayNames.getOrElse(dayIdx) {
+                    DateConstants.persianDayNames.first()
                 }
-            } else {
-                emptyList()
+                SearchResult.TaskResult(
+                    id = task.id,
+                    title = task.title,
+                    priority = task.priority,
+                    isCompleted = task.isCompleted,
+                    dateEpochMs = task.dateEpochMs,
+                    dayName = dayName
+                )
             }
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
 
     val searchResults: StateFlow<List<SearchResult>> = combine(
         _searchQuery,
@@ -92,5 +92,13 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
 
     fun updateQuery(query: String) {
         _searchQuery.value = query
+    }
+
+    /**
+     * Record that a task was accessed from search results.
+     * Call this before navigating to the task.
+     */
+    fun recordTaskAccess(taskId: Int) {
+        searchHistory.recordAccess(taskId)
     }
 }

@@ -165,6 +165,7 @@ fun SearchDialog(
                                     SearchTaskItem(
                                         task = task,
                                         onClick = {
+                                            viewModel.recordTaskAccess(task.id)
                                             onNavigateToTask(task.dateEpochMs)
                                             onDismissRequest()
                                         }
@@ -248,6 +249,7 @@ fun SearchDialog(
                                         SearchTaskItem(
                                             task = result,
                                             onClick = {
+                                                viewModel.recordTaskAccess(result.id)
                                                 onNavigateToTask(result.dateEpochMs)
                                                 onDismissRequest()
                                             }
