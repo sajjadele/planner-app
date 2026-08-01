@@ -73,8 +73,6 @@ fun VisionClockFace(
     }
 
     // Selected value based on mode
-    val selectedValue = if (isMinuteMode) selectedMinute else selectedHour
-
     Canvas(
         modifier = modifier
             .size(240.dp)
@@ -82,14 +80,16 @@ fun VisionClockFace(
                 detectTapGestures { offset ->
                     val centerX = size.width / 2f
                     val centerY = size.height / 2f
-                    val radius = min(centerX, centerY) * 0.72f
+                    val numberRadius = min(centerX, centerY) * 0.78f
 
+                    // Find which number was tapped
                     numbers.forEachIndexed { index, num ->
                         val angle = (index * (360f / numbers.size) - 90f)
                         val rad = Math.toRadians(angle.toDouble())
-                        val x = centerX + (radius * cos(rad)).toFloat()
-                        val y = centerY + (radius * sin(rad)).toFloat()
+                        val x = centerX + (numberRadius * cos(rad)).toFloat()
+                        val y = centerY + (numberRadius * sin(rad)).toFloat()
 
+                        // Check if tap is within the number's area
                         val distance = kotlin.math.sqrt(
                             (offset.x - x) * (offset.x - x) +
                             (offset.y - y) * (offset.y - y)
