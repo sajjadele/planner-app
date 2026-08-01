@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,13 +26,7 @@ import com.example.plugins.planner.data.ActivityAttachment
 /**
  * AttachmentPreview — Shows attached images/files in the composer.
  *
- * Layout:
- * ┌──────────────────────┐
- * │                      │
- * │      image           │
- * │                      │
- * └──────────────────────┘
- * description...
+ * Vision Planner styled: Material icons, dark surface, rounded shapes.
  */
 @Composable
 fun AttachmentPreview(
@@ -132,7 +127,12 @@ private fun FileAttachmentPreview(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(text = "📎", fontSize = 16.sp)
+                Icon(
+                    imageVector = Icons.Default.Description,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
                 Text(
                     text = name,
                     fontSize = 13.sp,
@@ -157,6 +157,8 @@ private fun FileAttachmentPreview(
 
 /**
  * DurationChip — Shows duration in the composer.
+ *
+ * Vision Planner styled: Material icons, primary accent.
  */
 @Composable
 fun DurationChip(
@@ -177,7 +179,12 @@ fun DurationChip(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(text = "⏱️", fontSize = 12.sp)
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(12.dp)
+            )
             Text(
                 text = "$durationMinutes ${RTL}دقیقه",
                 fontSize = 12.sp,

@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.util.RTL
@@ -122,7 +123,19 @@ fun ActivityComposerBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        dragHandle = {
+            Surface(
+                modifier = Modifier
+                    .padding(vertical = 8.dp)
+                    .width(40.dp)
+                    .height(4.dp),
+                shape = RoundedCornerShape(2.dp),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+            ) {}
+        }
     ) {
         Box(
             modifier = Modifier
@@ -146,9 +159,13 @@ fun ActivityComposerBottomSheet(
             ) {
                 Text(
                     text = headerText,
-                    fontSize = 16.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
 
                 UnifiedComposerContent(
