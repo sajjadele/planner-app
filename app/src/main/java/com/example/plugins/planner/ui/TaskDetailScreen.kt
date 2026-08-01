@@ -567,45 +567,75 @@ fun TaskDetailScreen(
         deletingTag?.let { tag ->
             AlertDialog(
                 onDismissRequest = { deletingTag = null },
+                containerColor = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(20.dp),
                 title = {
                     Text(
-                        "${RTL}حذف دسته؟",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
+                        text = "${RTL}حذف دسته؟",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
                     )
                 },
                 text = {
-                    Column {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(40.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            "${RTL}با حذف این دسته، فعالیت‌های قبلی حذف نمی‌شوند",
-                            fontSize = 14.sp
+                            text = "${RTL}با حذف این دسته، فعالیت‌های قبلی حذف نمی‌شوند",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            "${RTL}اما این دسته‌بندی از آن‌ها حذف خواهد شد.",
+                            text = "${RTL}اما این دسته‌بندی از آن‌ها حذف خواهد شد.",
                             fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 },
                 confirmButton = {
-                    TextButton(
+                    Button(
                         onClick = {
                             viewModel.deleteStep(tag)
                             deletingTag = null
                             selectedTagForAction = null
-                        }
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
                     ) {
                         Text(
-                            "${RTL}حذف",
-                            color = MaterialTheme.colorScheme.error,
+                            text = "${RTL}حذف",
+                            color = MaterialTheme.colorScheme.onError,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { deletingTag = null }) {
-                        Text("${RTL}لغو")
+                    TextButton(
+                        onClick = { deletingTag = null },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = "${RTL}لغو",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             )
