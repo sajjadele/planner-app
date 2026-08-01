@@ -11,7 +11,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -20,9 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -79,24 +76,16 @@ fun VisionReminderTimePicker(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // ── Premium Digital Time Display ──
-            PremiumDigitalDisplay(
+            // ── Time Wheel Picker (iOS-style) ──
+            VisionTimeWheel(
                 hour = pickerState.timeState.hour,
                 minute = pickerState.timeState.minute,
-                period = pickerState.timeState.period,
-                isMinuteMode = pickerState.mode == TimeSelectionMode.MINUTE,
-                onSwipeUp = {
+                onHourChange = { pickerState.selectHour(it) },
+                onMinuteChange = { pickerState.selectMinute(it) },
+                onModeAutoSwitch = {
+                    // Auto-switch from hour to minute after scrolling stops
                     if (pickerState.mode == TimeSelectionMode.HOUR) {
-                        pickerState.increaseHour()
-                    } else {
-                        pickerState.increaseMinute()
-                    }
-                },
-                onSwipeDown = {
-                    if (pickerState.mode == TimeSelectionMode.HOUR) {
-                        pickerState.decreaseHour()
-                    } else {
-                        pickerState.decreaseMinute()
+                        pickerState.mode = TimeSelectionMode.MINUTE
                     }
                 }
             )
@@ -248,97 +237,6 @@ fun VisionReminderTimePicker(
                 }
             }
         }
-    }
-}
-
-// ── Premium Digital Display ──
-
-@Composable
-private fun PremiumDigitalDisplay(
-    hour: Int,
-    minute: Int,
-    period: DayPeriod,
-    isMinuteMode: Boolean,
-    onSwipeUp: () -> Unit,
-    onSwipeDown: () -> Unit
-) {
-    val periodLabel = when (period) {
-        DayPeriod.AM -> "صبح"
-        DayPeriod.PM -> "عصر"
-    }
-
-    // Animated colors for selected part
-    val hourColor by animateColorAsState(
-        targetValue = if (isMinuteMode)
-            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-        else
-            MaterialTheme.colorScheme.primary,
-        animationSpec = tween(250),
-        label = "hour_color"
-    )
-
-    val minuteColor by animateColorAsState(
-        targetValue = if (isMinuteMode)
-            MaterialTheme.colorScheme.primary
-        else
-            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-        animationSpec = tween(250),
-        label = "minute_color"
-    )
-
-    Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
-                    )
-                )
-            )
-            .pointerInput(Unit) {
-                detectVerticalDragGestures { _, dragAmount ->
-                    if (dragAmount < -10) onSwipeUp()
-                    else if (dragAmount > 10) onSwipeDown()
-                }
-            }
-            .padding(horizontal = 32.dp, vertical = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Time digits
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = String.format("%02d", hour),
-                fontSize = 48.sp,
-                fontWeight = FontWeight.Bold,
-                color = hourColor
-            )
-            Text(
-                text = " : ",
-                fontSize = 48.sp,
-                fontWeight = FontWeight.Light,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-            )
-            Text(
-                text = String.format("%02d", minute),
-                fontSize = 48.sp,
-                fontWeight = FontWeight.Bold,
-                color = minuteColor
-            )
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Period label
-        Text(
-            text = "${RTL}$periodLabel",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 
