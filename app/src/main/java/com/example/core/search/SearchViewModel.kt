@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.constants.DateConstants
 import com.example.core.database.AppDatabase
+import com.example.core.goal.GoalDao
 import com.example.plugins.planner.ui.components.persianDayIndex
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,28 +22,38 @@ sealed class SearchResult {
         val dateEpochMs: Long,
         val dayName: String
     ) : SearchResult()
+    
+    data class GoalResult(
+        val id: Int,
+        val title: String,
+        val status: String,
+        val description: String?
+    ) : SearchResult()
 }
 
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getDatabase(application)
     private val taskDao = database.taskDao()
+    private val goalDao = database.goalDao()
     private val searchHistory = SearchHistoryManager(application)
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
-    /** Recent tasks based on search history (last clicked from search) */
-    val recentTasks: StateFlow<List<SearchResult.TaskResult>> = combine(
+    /** Recent tasks and goals based on search history (last clicked from search) */
+    val recentTasks: StateFlow<List<SearchResult>> = combine(
         searchHistory.recentTaskIds,
-        taskDao.getAllTasks()
-    ) { recentIds, allTasks ->
+        taskDao.getAllTasks(),
+        goalDao.getAllGoals()
+    ) { recentIds, allTasks, allGoals ->
         recentIds.mapNotNull { id ->
+            // Try to find as task first
             allTasks.find { it.id == id }?.let { task ->
                 val dayIdx = persianDayIndex(task.dateEpochMs)
                 val dayName = DateConstants.persianDayNames.getOrElse(dayIdx) {
                     DateConstants.persianDayNames.first()
                 }
-                SearchResult.TaskResult(
+                return@mapNotNull SearchResult.TaskResult(
                     id = task.id,
                     title = task.title,
                     priority = task.priority,
@@ -51,6 +62,16 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                     dayName = dayName
                 )
             }
+            // Try to find as goal
+            allGoals.find { it.id == id }?.let { goal ->
+                return@mapNotNull SearchResult.GoalResult(
+                    id = goal.id,
+                    title = goal.title,
+                    status = goal.status,
+                    description = goal.description
+                )
+            }
+            null
         }
     }.stateIn(
         scope = viewModelScope,
@@ -60,29 +81,46 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
 
     val searchResults: StateFlow<List<SearchResult>> = combine(
         _searchQuery,
-        taskDao.getAllTasks()
-    ) { query, tasks ->
+        taskDao.getAllTasks(),
+        goalDao.getAllGoals()
+    ) { query, tasks, goals ->
         if (query.isBlank()) {
             emptyList()
         } else {
             val normalizedQuery = query.trim().lowercase()
+            val results = mutableListOf<SearchResult>()
             
+            // Search tasks
             tasks.filter { 
                 it.title.lowercase().contains(normalizedQuery)
-            }.map { task ->
+            }.forEach { task ->
                 val dayIdx = persianDayIndex(task.dateEpochMs)
                 val dayName = DateConstants.persianDayNames.getOrElse(dayIdx) {
                     DateConstants.persianDayNames.first()
                 }
-                SearchResult.TaskResult(
+                results.add(SearchResult.TaskResult(
                     id = task.id,
                     title = task.title,
                     priority = task.priority,
                     isCompleted = task.isCompleted,
                     dateEpochMs = task.dateEpochMs,
                     dayName = dayName
-                )
+                ))
             }
+            
+            // Search goals
+            goals.filter {
+                it.title.lowercase().contains(normalizedQuery)
+            }.forEach { goal ->
+                results.add(SearchResult.GoalResult(
+                    id = goal.id,
+                    title = goal.title,
+                    status = goal.status,
+                    description = goal.description
+                ))
+            }
+            
+            results
         }
     }.stateIn(
         scope = viewModelScope,

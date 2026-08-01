@@ -9,7 +9,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.PauseCircle
 import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -30,6 +33,7 @@ import com.example.core.util.formatPersianTime
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.core.search.SearchResult
 import com.example.core.util.RTL
 import com.example.ui.components.VisionText
 
@@ -42,7 +46,7 @@ fun SearchDialog(
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
-    val recentTasks by viewModel.recentTasks.collectAsState()
+    val recentTasks: List<SearchResult> by viewModel.recentTasks.collectAsState()
 
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -161,15 +165,28 @@ fun SearchDialog(
                                     )
                                 }
                                 items(recentTasks.size) { index ->
-                                    val task = recentTasks[index]
-                                    SearchTaskItem(
-                                        task = task,
-                                        onClick = {
-                                            viewModel.recordTaskAccess(task.id)
-                                            onNavigateToTask(task.dateEpochMs)
-                                            onDismissRequest()
+                                    val result = recentTasks[index]
+                                    when (result) {
+                                        is SearchResult.TaskResult -> {
+                                            SearchTaskItem(
+                                                task = result,
+                                                onClick = {
+                                                    viewModel.recordTaskAccess(result.id)
+                                                    onNavigateToTask(result.dateEpochMs)
+                                                    onDismissRequest()
+                                                }
+                                            )
                                         }
-                                    )
+                                        is SearchResult.GoalResult -> {
+                                            SearchGoalItem(
+                                                goal = result,
+                                                onClick = {
+                                                    viewModel.recordTaskAccess(result.id)
+                                                    onDismissRequest()
+                                                }
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         } else {
@@ -251,6 +268,15 @@ fun SearchDialog(
                                             onClick = {
                                                 viewModel.recordTaskAccess(result.id)
                                                 onNavigateToTask(result.dateEpochMs)
+                                                onDismissRequest()
+                                            }
+                                        )
+                                    }
+                                    is SearchResult.GoalResult -> {
+                                        SearchGoalItem(
+                                            goal = result,
+                                            onClick = {
+                                                viewModel.recordTaskAccess(result.id)
                                                 onDismissRequest()
                                             }
                                         )
@@ -384,6 +410,100 @@ fun SearchTaskItem(
             Text(
                 text = priorityLabel,
                 color = priorityColor,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+fun SearchGoalItem(
+    goal: SearchResult.GoalResult,
+    onClick: () -> Unit
+) {
+    val statusColor = when (goal.status) {
+        "active" -> MaterialTheme.colorScheme.primary
+        "paused" -> MaterialTheme.colorScheme.tertiary
+        "completed" -> MaterialTheme.colorScheme.secondary
+        "archived" -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    
+    val statusLabel = when (goal.status) {
+        "active" -> "فعال"
+        "paused" -> "متوقف"
+        "completed" -> "تکمیل"
+        "archived" -> "آرشیو"
+        else -> goal.status
+    }
+    
+    val goalIcon = when (goal.status) {
+        "completed" -> Icons.Default.CheckCircle
+        "paused" -> Icons.Default.PauseCircle
+        "active" -> Icons.Default.Flag
+        else -> Icons.Default.Flag
+    }
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(statusColor.copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = goalIcon,
+                contentDescription = "هدف",
+                tint = statusColor,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        
+        Spacer(modifier = Modifier.width(14.dp))
+        
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            VisionText(
+                text = goal.title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (goal.description != null) {
+                Spacer(modifier = Modifier.height(2.dp))
+                VisionText(
+                    text = goal.description,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.width(12.dp))
+        
+        Box(
+            modifier = Modifier
+                .background(statusColor.copy(alpha = 0.1f), CircleShape)
+                .padding(horizontal = 10.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = statusLabel,
+                color = statusColor,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold
             )
