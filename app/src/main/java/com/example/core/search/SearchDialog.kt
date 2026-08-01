@@ -56,7 +56,7 @@ fun SearchDialog(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFFFDFBFF))
+                    .background(MaterialTheme.colorScheme.background)
                     .statusBarsPadding()
                     .navigationBarsPadding()
             ) {
@@ -77,20 +77,20 @@ fun SearchDialog(
                             text = "جستجوی پیشرفته",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1C1B1F)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
 
                         IconButton(
                             onClick = onDismissRequest,
                             modifier = Modifier
-                                .background(Color(0xFFF3EDF7), CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
                                 .size(36.dp)
                                 .testTag("close_search_button")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "بستن",
-                                tint = Color(0xFF49454F),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -157,14 +157,14 @@ fun SearchDialog(
                                 Text(
                                     text = "عبارت مورد نظر خود را تایپ کنید",
                                     fontSize = 14.sp,
-                                    color = Color(0xFF938F99),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontWeight = FontWeight.Medium
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = "جستجوی آنی در بین تمامی برنامه‌ها",
                                     fontSize = 11.sp,
-                                    color = Color(0xFF938F99)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -182,14 +182,14 @@ fun SearchDialog(
                                 Text(
                                     text = "نتیجه‌ای یافت نشد",
                                     fontSize = 14.sp,
-                                    color = Color(0xFF938F99),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontWeight = FontWeight.Medium
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = "لطفاً املای کلمات را بررسی کنید یا عبارت دیگری بنویسید",
                                     fontSize = 11.sp,
-                                    color = Color(0xFF938F99)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -238,9 +238,9 @@ fun SearchTaskItem(
     val priorityValue = task.priority ?: "LOW"
     
     val priorityColor = when (priorityValue.uppercase()) {
-        "HIGH" -> Color(0xFFB3261E)
-        "MEDIUM" -> Color(0xFF6750A4)
-        else -> Color(0xFF49454F)
+        "HIGH" -> MaterialTheme.colorScheme.error
+        "MEDIUM" -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     
     val priorityLabel = when (priorityValue.uppercase()) {
@@ -252,8 +252,8 @@ fun SearchTaskItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White, RoundedCornerShape(16.dp))
-            .border(1.dp, Color(0xFFCAC4D0), RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
             .padding(16.dp),
@@ -262,13 +262,13 @@ fun SearchTaskItem(
         Box(
             modifier = Modifier
                 .size(40.dp)
-                .background(Color(0xFFEADDFF).copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Default.EventNote,
                 contentDescription = "برنامه",
-                tint = Color(0xFF21005D),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -285,12 +285,12 @@ fun SearchTaskItem(
                 // Type Badge
                 Box(
                     modifier = Modifier
-                        .background(Color(0xFFEADDFF), RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(4.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
                         text = "برنامه",
-                        color = Color(0xFF21005D),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -299,12 +299,12 @@ fun SearchTaskItem(
                 // Day Badge
                 Box(
                     modifier = Modifier
-                        .background(Color(0xFFF3EDF7), RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
+                    ) {
                     Text(
                         text = task.dayName,
-                        color = Color(0xFF49454F),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -313,12 +313,12 @@ fun SearchTaskItem(
                 if (task.isCompleted) {
                     Box(
                         modifier = Modifier
-                            .background(Color(0xFF21005D).copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = "انجام شده",
-                            color = Color(0xFF21005D),
+                            color = MaterialTheme.colorScheme.primary,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -332,7 +332,7 @@ fun SearchTaskItem(
                 text = task.title,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF1C1B1F),
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
