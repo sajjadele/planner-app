@@ -258,6 +258,7 @@ fun SearchDialog(
                                 key = {
                                     when (it) {
                                         is SearchResult.TaskResult -> "task:${it.id}"
+                                        is SearchResult.GoalResult -> "goal:${it.id}"
                                     }
                                 }
                             ) { result ->
