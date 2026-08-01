@@ -1,7 +1,6 @@
 package com.example.plugins.planner.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,11 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -32,7 +26,6 @@ import kotlin.math.roundToInt
  * - Shows 3 items visible (previous, current, next)
  * - Selected item centered with highlight
  * - Snap behavior for smooth scrolling
- * - Consumes scroll events to prevent bottom sheet from closing
  */
 @Composable
 fun VisionWheelPicker(
@@ -44,8 +37,6 @@ fun VisionWheelPicker(
     visibleItems: Int = 3,
     itemHeight: Dp = 40.dp
 ) {
-    val density = LocalDensity.current
-    val itemHeightPx = with(density) { itemHeight.toPx() }
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = selectedIndex
     )
@@ -79,33 +70,11 @@ fun VisionWheelPicker(
         }
     }
 
-    // Nested scroll connection to consume scroll events
-    // This prevents the bottom sheet from closing when scrolling the wheel
-    val nestedScrollConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: NestedScrollSource): androidx.compose.ui.geometry.Offset {
-                return available.copy(y = available.y)
-            }
-            override fun onPostScroll(
-                consumed: androidx.compose.ui.geometry.Offset,
-                available: androidx.compose.ui.geometry.Offset,
-                source: NestedScrollSource
-            ): androidx.compose.ui.geometry.Offset {
-                return available
-            }
-        }
-    }
-
     Box(
         modifier = modifier
-            .nestedScroll(nestedScrollConnection)
             .height(itemHeight * visibleItems)
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
-            // Consume vertical drag to prevent bottom sheet from closing
-            .pointerInput(Unit) {
-                detectVerticalDragGestures { _, _ -> }
-            }
     ) {
         // Center highlight bar
         Box(
