@@ -153,7 +153,7 @@ fun SearchDialog(
                             ) {
                                 item {
                                     VisionText(
-                                        text = "${RTL}تسک‌های اخیر",
+                                        text = "${RTL}آخرین جستجوها",
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
