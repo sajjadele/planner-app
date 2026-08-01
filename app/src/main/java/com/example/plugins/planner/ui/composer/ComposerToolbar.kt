@@ -55,11 +55,11 @@ fun ComposerToolbar(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // File button (disabled for now)
+                // File button
                 ToolbarActionButton(
                     icon = Icons.Default.Attachment,
                     label = "${RTL}فایل",
-                    enabled = false,
+                    enabled = true,
                     onClick = onAddFile
                 )
 

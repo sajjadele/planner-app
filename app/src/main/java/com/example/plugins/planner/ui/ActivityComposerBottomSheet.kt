@@ -98,6 +98,22 @@ fun ActivityComposerBottomSheet(
         }
     )
 
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+        onResult = { uri: Uri? ->
+            if (uri != null) {
+                try {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                } catch (_: Exception) { }
+                val fileName = uri.lastPathSegment ?: "فایل"
+                dispatch(ActivityComposerAction.AddAttachment(ActivityAttachment.File(uri.toString(), name = fileName)))
+            }
+        }
+    )
+
     val handleSubmit = remember(composerState) {
         {
             if (composerState.canSubmit()) {
@@ -172,7 +188,7 @@ fun ActivityComposerBottomSheet(
                     state = composerState,
                     dispatch = dispatch,
                     onSubmit = handleSubmit,
-                    onAddFile = { },
+                    onAddFile = { filePickerLauncher.launch(arrayOf("*/*")) },
                     onAddImage = {
                         imagePickerLauncher.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
