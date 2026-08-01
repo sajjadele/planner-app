@@ -83,7 +83,7 @@ fun PlannerScreen(
     var showCalendarPopup by remember { mutableStateOf(false) }
     var showUncategorizedSheet by remember { mutableStateOf(false) }
     val unorganizedTasks by (resolvedInsightVm?.unorganizedTasks
-        ?: MutableStateFlow(emptyList()).asStateFlow()).collectAsState()
+        ?: MutableStateFlow<List<com.example.plugins.planner.data.UncategorizedTask>>(emptyList()).asStateFlow()).collectAsState()
 
     // Reset internal navigation when resetTrigger changes (same tab re-clicked)
     LaunchedEffect(resetTrigger) {
