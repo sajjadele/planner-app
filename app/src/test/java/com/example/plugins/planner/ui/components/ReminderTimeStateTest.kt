@@ -127,7 +127,6 @@ class ReminderTimeStateTest {
         picker.decreaseHour()
         assertEquals(11, picker.timeState.hour)
     }
-}
 
     // ═══════════════════════════════════════════
     // Minute protection (0..55 step 5)
