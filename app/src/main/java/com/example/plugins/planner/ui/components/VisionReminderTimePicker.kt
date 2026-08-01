@@ -149,13 +149,13 @@ fun VisionReminderTimePicker(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ── Period Toggle (صبح/عصر/شب) ──
+            // ── Period Toggle (قبل/بعد از ظهر) ──
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 PeriodChip(
-                    label = "صبح",
-                    icon = "☀️",
+                    label = "قبل از ظهر",
+                    icon = "🔵",
                     isSelected = pickerState.timeState.period == DayPeriod.AM,
                     onClick = {
                         if (pickerState.timeState.period != DayPeriod.AM) {
@@ -164,23 +164,9 @@ fun VisionReminderTimePicker(
                     }
                 )
                 PeriodChip(
-                    label = "عصر",
-                    icon = "☁️",
-                    isSelected = pickerState.timeState.period == DayPeriod.PM &&
-                            pickerState.timeState.hour in 1..11,
-                    onClick = {
-                        if (pickerState.timeState.period != DayPeriod.PM ||
-                            pickerState.timeState.hour == 12
-                        ) {
-                            pickerState.togglePeriod()
-                        }
-                    }
-                )
-                PeriodChip(
-                    label = "شب",
-                    icon = "🌙",
-                    isSelected = pickerState.timeState.period == DayPeriod.PM &&
-                            pickerState.timeState.hour == 12,
+                    label = "بعد از ظهر",
+                    icon = "🟣",
+                    isSelected = pickerState.timeState.period == DayPeriod.PM,
                     onClick = {
                         if (pickerState.timeState.period != DayPeriod.PM) {
                             pickerState.togglePeriod()
