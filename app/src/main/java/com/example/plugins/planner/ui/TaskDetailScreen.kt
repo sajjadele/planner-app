@@ -107,6 +107,8 @@ fun TaskDetailScreen(
     val selectedActivityDate by viewModel.selectedActivityDate.collectAsState()
     val timelineStartDate by viewModel.timelineStartDate.collectAsState()
     val timelineEndDate by viewModel.timelineEndDate.collectAsState()
+    val hasMoreOlder by viewModel.hasMoreOlder.collectAsState()
+    val isLoadingOlder by viewModel.isLoadingOlder.collectAsState()
 
     val editableTitle by viewModel.editableTitle.collectAsState()
     var showGoalDropdown by remember { mutableStateOf(false) }
@@ -208,7 +210,9 @@ fun TaskDetailScreen(
     // ── Scroll to message on ReplyNavigation ──
     // Uses filteredActivityMessages for correct LazyColumn index.
     // If target is hidden by an active filter, clears filter and retries.
-    LaunchedEffect(scrollToMessageId, filteredActivityMessages) {
+    // If target is older than the current window (P0 windowing), loads the next
+    // older page and retries until found or no more history remains.
+    LaunchedEffect(scrollToMessageId, filteredActivityMessages, hasMoreOlder, isLoadingOlder) {
         val targetId = scrollToMessageId ?: return@LaunchedEffect
         val index = filteredActivityMessages.indexOfFirst { it.id == targetId }
         if (index >= 0) {
@@ -221,8 +225,12 @@ fun TaskDetailScreen(
             viewModel.showAllActivities()
             // Keep scrollToMessageId set; the next LaunchedEffect emission will find
             // the target now that the filter is cleared (filteredActivityMessages updated)
+        } else if (hasMoreOlder && !isLoadingOlder) {
+            // Target not loaded yet (older than the window) — page back and retry
+            kotlinx.coroutines.delay(150)
+            viewModel.loadOlderActivities()
         }
-        // If target not found and no filter active, the target may not exist — silently ignore
+        // If target not found and no history remains, the target may not exist — ignore
     }
 
     // ── Scroll to bottom on initial load (Telegram-style: oldest at top, newest at bottom) ──
@@ -379,6 +387,9 @@ fun TaskDetailScreen(
                     onGoToToday = { viewModel.goToToday() },
                     onMoveDate = { days -> viewModel.moveActivityDate(days) },
                     onClearDate = { viewModel.clearDateFilter() },
+                    onLoadOlder = { viewModel.loadOlderActivities() },
+                    hasMoreOlder = hasMoreOlder,
+                    isLoadingOlder = isLoadingOlder,
                     listState = activityListState
                 )
             }
@@ -977,6 +988,9 @@ private fun TaskDetailActivityContent(
     onGoToToday: () -> Unit = {},
     onMoveDate: (Int) -> Unit = {},
     onClearDate: () -> Unit = {},
+    onLoadOlder: () -> Unit = {},
+    hasMoreOlder: Boolean = false,
+    isLoadingOlder: Boolean = false,
     listState: LazyListState = rememberLazyListState()
 ) {
     val context = LocalContext.current
@@ -984,6 +998,21 @@ private fun TaskDetailActivityContent(
     // F1: precompute reply lookup once per list update (O(n)) instead of per-card `find` (O(n²))
     val replyMap = remember(messages) { messages.associateBy { it.id } }
     var fullScreenImageUrl by remember { mutableStateOf<String?>(null) }
+
+    // ── P0 Windowed Loading: load the previous (older) page when scrolled near the top ──
+    // Re-arms only after the user scrolls away from the top, so holding at the top of a
+    // huge history loads one page per approach instead of cascading through everything.
+    val firstVisibleIndex by remember { derivedStateOf { listState.firstVisibleItemIndex } }
+    var autoLoadArmed by remember { mutableStateOf(true) }
+    LaunchedEffect(firstVisibleIndex, hasMoreOlder, isLoadingOlder, messages.size) {
+        val nearTop = firstVisibleIndex <= 3
+        if (!nearTop) {
+            autoLoadArmed = true
+        } else if (hasMoreOlder && !isLoadingOlder && autoLoadArmed && messages.isNotEmpty()) {
+            autoLoadArmed = false
+            onLoadOlder()
+        }
+    }
 
     // ── Fullscreen Image Viewer ──
     fullScreenImageUrl?.let { url ->

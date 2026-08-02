@@ -30,16 +30,22 @@ import com.example.plugins.planner.data.TaskDao
 import com.example.plugins.planner.data.TaskEntity
 import com.example.plugins.planner.data.TaskStepEntity
 import com.example.plugins.planner.data.TaskStepRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class TaskDetailViewModel(
     application: Application,
     private val taskId: Int
@@ -117,17 +123,36 @@ class TaskDetailViewModel(
             initialValue = emptyList()
         )
 
-    /** Activity timeline for this task — most recent first */
-    val activities: StateFlow<List<ActivityEventEntity>> = activityEventRepository.observeActivities(taskId)
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    // ════════════════════════════════════════════════════════════════
+    // Activity Feed — Windowed Loading (P0)
+    // Bounded cursor window instead of loading the task's entire history.
+    // No Pagination concept in Domain; Repository/DAO only gain additive methods.
+    // ════════════════════════════════════════════════════════════════
 
-    /** Pre-mapped activity messages — system events filtered out */
-    val activityMessages: StateFlow<List<ActivityMessageModel>> = activities
+    /** Merged feed window as raw entities — chronological ASC (dedup, cursor-paged). */
+    private val _loadedEntities = MutableStateFlow<List<ActivityEventEntity>>(emptyList())
+
+    /** True when an older page still exists and can be loaded (scroll-back). */
+    private val _hasMoreOlder = MutableStateFlow(false)
+    val hasMoreOlder: StateFlow<Boolean> = _hasMoreOlder.asStateFlow()
+
+    /** True while an older page is being fetched (guards against double-load). */
+    private val _isLoadingOlder = MutableStateFlow(false)
+    val isLoadingOlder: StateFlow<Boolean> = _isLoadingOlder.asStateFlow()
+
+    // Feed-scope state — reset whenever the active date/tag filter changes.
+    private val olderEntities = mutableListOf<ActivityEventEntity>()
+    private var recentEntities: List<ActivityEventEntity> = emptyList()
+    private var olderBeforeTs: Long? = null
+    private var olderBeforeId: Int? = null
+    private var feedGeneration = 0
+
+    private data class FeedScope(val date: Long?, val stepId: Long?)
+
+    /** Windowed activity messages — system events filtered out, mapped off the main thread. */
+    val activityMessages: StateFlow<List<ActivityMessageModel>> = _loadedEntities
         .map { ActivityMessageMapper.toMessages(it) }
+        .flowOn(Dispatchers.Default)
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -146,12 +171,12 @@ class TaskDetailViewModel(
     private val _filterState = MutableStateFlow(ActivityFeedFilterState.DEFAULT)
     val filterState: StateFlow<ActivityFeedFilterState> = _filterState.asStateFlow()
 
-    /** Filtered activity messages — combines raw messages with current filter (tag + date) */
+    /** Filtered activity messages — window + current filter (tag + date), applied off the main thread. */
     val filteredActivityMessages: StateFlow<List<ActivityMessageModel>> = combine(
         activityMessages, _filterState, _selectedActivityDate
     ) { messages, filter, selectedDate ->
         applyFilter(messages, filter, selectedDate)
-    }.stateIn(
+    }.flowOn(Dispatchers.Default).stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
@@ -280,6 +305,81 @@ class TaskDetailViewModel(
                         _selectedActivityDate.value = clampToTimelineRange(sel)
                     }
                 }
+            }
+        }
+
+        // ── Windowed Feed Loader (P0): reactive anchor window + scroll-back paging ──
+        // Re-subscribes (and resets accumulated pages) whenever the active date/tag
+        // filter changes. The bounded Room Flow keeps the window live on new inserts.
+        viewModelScope.launch {
+            combine(_selectedActivityDate, _filterState) { date, filter ->
+                FeedScope(date, filter.selectedStepId)
+            }
+                .distinctUntilChanged()
+                .collectLatest { scope ->
+                    beginFeedScope()
+                    val dayStart = scope.date
+                    val dayEnd = scope.date?.plus(DAY_MILLIS)
+                    activityEventRepository.observeFeedWindow(
+                        taskId, dayStart, dayEnd, scope.stepId?.toInt(), ACTIVITY_WINDOW_SIZE
+                    ).collect { page -> onRecentPage(page) }
+                }
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // Windowed Feed — helpers (P0)
+    // ════════════════════════════════════════════════════════════════
+
+    /** Reset accumulated older pages/cursor when the feed scope (date/tag) changes. */
+    private fun beginFeedScope() {
+        feedGeneration++
+        olderEntities.clear()
+        recentEntities = emptyList()
+        olderBeforeTs = null
+        olderBeforeId = null
+        _loadedEntities.value = emptyList()
+        _hasMoreOlder.value = true
+    }
+
+    /** Reactive anchor-window emission: cache it and recompute the merged, deduped window. */
+    private fun onRecentPage(page: List<ActivityEventEntity>) {
+        recentEntities = page
+        rebuildWindow()
+    }
+
+    /** Merge older pages + recent anchor window (dedup by id, chronological ASC) and refresh cursor. */
+    private fun rebuildWindow() {
+        val all = (olderEntities + recentEntities)
+            .distinctBy { it.id }
+            .sortedWith(compareBy<ActivityEventEntity> { it.timestamp }.thenBy { it.id })
+        _loadedEntities.value = all
+        val oldest = all.firstOrNull()
+        olderBeforeTs = oldest?.timestamp
+        olderBeforeId = oldest?.id
+    }
+
+    /** Load the next older page (scroll-up pagination). No-op when nothing more or already loading. */
+    fun loadOlderActivities() {
+        if (_isLoadingOlder.value || !_hasMoreOlder.value) return
+        val beforeTs = olderBeforeTs ?: return
+        val beforeId = olderBeforeId ?: return
+        val gen = feedGeneration
+        val dayStart = _selectedActivityDate.value
+        val dayEnd = dayStart?.plus(DAY_MILLIS)
+        val stepId = _filterState.value.selectedStepId?.toInt()
+        viewModelScope.launch {
+            _isLoadingOlder.value = true
+            try {
+                val page = activityEventRepository.getFeedPageBefore(
+                    taskId, dayStart, dayEnd, stepId, beforeTs, beforeId, ACTIVITY_WINDOW_SIZE
+                )
+                if (gen != feedGeneration) return@launch // scope changed while loading — discard
+                olderEntities.addAll(page)
+                _hasMoreOlder.value = page.size == ACTIVITY_WINDOW_SIZE
+                rebuildWindow()
+            } finally {
+                _isLoadingOlder.value = false
             }
         }
     }
@@ -623,6 +723,9 @@ class TaskDetailViewModel(
 
     companion object {
         private const val DAY_MILLIS = 86_400_000L
+
+        /** Number of activity entities loaded per window/page (P0 windowed loading). */
+        private const val ACTIVITY_WINDOW_SIZE = 200
 
         fun factory(application: Application, taskId: Int): ViewModelProvider.Factory {
             return object : ViewModelProvider.AndroidViewModelFactory(application) {

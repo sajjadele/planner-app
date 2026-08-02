@@ -7,6 +7,28 @@ class ActivityEventRepository(private val dao: ActivityEventDao) {
     fun observeActivities(taskId: Int): Flow<List<ActivityEventEntity>> =
         dao.observeByTaskId(taskId)
 
+    /** Windowed reactive feed anchor — bounded to [limit] rows (P0 windowed loading). */
+    fun observeFeedWindow(
+        taskId: Int,
+        dayStart: Long?,
+        dayEnd: Long?,
+        stepId: Int?,
+        limit: Int
+    ): Flow<List<ActivityEventEntity>> =
+        dao.observeFeedWindow(taskId, dayStart, dayEnd, stepId, limit)
+
+    /** One-shot cursor-based older-page fetch for scroll-back pagination (P0). */
+    suspend fun getFeedPageBefore(
+        taskId: Int,
+        dayStart: Long?,
+        dayEnd: Long?,
+        stepId: Int?,
+        beforeTs: Long,
+        beforeId: Int,
+        limit: Int
+    ): List<ActivityEventEntity> =
+        dao.getFeedPageBefore(taskId, dayStart, dayEnd, stepId, beforeTs, beforeId, limit)
+
     fun observeById(id: Long): Flow<ActivityEventEntity?> =
         dao.observeById(id)
 
