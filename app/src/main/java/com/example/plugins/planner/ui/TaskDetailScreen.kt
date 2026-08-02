@@ -162,8 +162,15 @@ fun TaskDetailScreen(
                         android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
                     )
                 }
-                // Derive file name from URI
-                val fileName = uri.lastPathSegment ?: "فایل"
+                // Get actual file name from ContentResolver
+                val fileName = context.contentResolver.query(
+                    uri,
+                    arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                    null, null, null
+                )?.use { cursor ->
+                    val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (cursor.moveToFirst() && nameIndex >= 0) cursor.getString(nameIndex) else null
+                } ?: uri.lastPathSegment ?: "فایل"
                 // Create activity directly with the selected file
                 viewModel.createActivity(
                     ActivityDraft(
@@ -902,6 +909,7 @@ private fun TaskDetailActivityContent(
     onClearDate: () -> Unit = {},
     listState: LazyListState = rememberLazyListState()
 ) {
+    val context = LocalContext.current
     val groups = remember(messages) { groupActivityMessagesByDay(messages) }
     var fullScreenImageUrl by remember { mutableStateOf<String?>(null) }
 
@@ -977,8 +985,25 @@ private fun TaskDetailActivityContent(
                         isSelected = message.id == selectedMessageId,
                         onAction = onMessageAction,
                         onAttachmentClick = { attachment ->
-                            if (attachment is ActivityAttachment.Image) {
-                                fullScreenImageUrl = attachment.uri
+                            when (attachment) {
+                                is ActivityAttachment.Image -> {
+                                    fullScreenImageUrl = attachment.uri
+                                }
+                                is ActivityAttachment.File -> {
+                                    // Open file with external app
+                                    val uri = android.net.Uri.parse(attachment.uri)
+                                    val intent = android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW
+                                    ).apply {
+                                        setDataAndType(uri, context.contentResolver.getType(uri))
+                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    try {
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) {
+                                        // No app can handle this file type
+                                    }
+                                }
                             }
                         },
                         onReplyReferenceClick = { targetId ->
