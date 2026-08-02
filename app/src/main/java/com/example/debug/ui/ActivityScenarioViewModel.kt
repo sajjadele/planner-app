@@ -101,67 +101,51 @@ class ActivityScenarioViewModel(application: Application) : AndroidViewModel(app
         details.add("Created task id=$taskId")
 
         try {
-            // Step A: create
-            val stepA = TaskStepEntity(taskId = taskId, title = "Step A-$tag")
-            val stepAId = stepRepo.addStep(stepA)
-            details.add("Step A created id=$stepAId")
+            // Tag A: create
+            val tagA = TaskStepEntity(taskId = taskId, title = "Tag A-$tag")
+            val tagAId = stepRepo.addStep(tagA)
+            details.add("Tag A created id=$tagAId")
 
-            val createdEvent = activityRepo.findLatestEvent(taskId, ActivityEventType.STEP_CREATED.name)
-            if (createdEvent?.stepId == stepAId) {
-                details.add("PASS: STEP_CREATED event present for step $stepAId")
+            // Tags are metadata — no activity event should be created
+            val noCreatedEvent = activityRepo.findLatestEvent(taskId, ActivityEventType.STEP_CREATED.name) == null
+            if (noCreatedEvent) {
+                details.add("PASS: No STEP_CREATED event for tag creation (metadata only)")
             } else {
-                details.add("FAIL: STEP_CREATED event missing or mismatched stepId")
+                details.add("FAIL: Unexpected STEP_CREATED event for tag creation")
                 passed = false
             }
 
             // Tags are metadata — no completion state to test
             details.add("SKIP: Tag completion state (tags are metadata only)")
 
-            // Step B: create + delete
-            val stepB = TaskStepEntity(taskId = taskId, title = "Step B-$tag")
-            val stepBId = stepRepo.addStep(stepB)
-            details.add("Step B created id=$stepBId")
-            activityRepo.addEvent(
-                ActivityEventEntity(taskId = taskId, stepId = stepBId, eventType = ActivityEventType.STEP_CREATED.name, description = stepB.title)
-            )
-            activityRepo.addEvent(
-                ActivityEventEntity(taskId = taskId, stepId = stepBId, eventType = ActivityEventType.STEP_DELETED.name, description = stepB.title)
-            )
-            stepRepo.deleteStep(stepBId)
+            // Tag B: create + delete
+            val tagB = TaskStepEntity(taskId = taskId, title = "Tag B-$tag")
+            val tagBId = stepRepo.addStep(tagB)
+            details.add("Tag B created id=$tagBId")
+            stepRepo.deleteStep(tagBId)
 
-            if (stepRepo.getStepById(stepBId) == null) {
-                details.add("PASS: Step B deleted from DB")
+            if (stepRepo.getStepById(tagBId) == null) {
+                details.add("PASS: Tag B deleted from DB")
             } else {
-                details.add("FAIL: Step B still exists after deletion")
+                details.add("FAIL: Tag B still exists after deletion")
                 passed = false
             }
 
-            // Verify events for Step A
-            val eventsA = activityRepo.getEventsByStepId(stepAId)
-            val typesA = eventsA.map { it.eventType }.toSet()
-            val expectedA = setOf(
-                ActivityEventType.STEP_CREATED.name,
-                ActivityEventType.STEP_COMPLETED.name,
-                ActivityEventType.STEP_REOPENED.name
-            )
-            if (typesA.containsAll(expectedA)) {
-                details.add("PASS: Step A has ${eventsA.size} events with types=$typesA")
+            // Verify events for Tag A — tags create no activity events
+            val eventsA = activityRepo.getEventsByStepId(tagAId)
+            if (eventsA.isEmpty()) {
+                details.add("PASS: Tag A has no activity events (metadata only)")
             } else {
-                details.add("FAIL: Step A missing event types, got=$typesA")
+                details.add("FAIL: Tag A has unexpected events: ${eventsA.map { it.eventType }}")
                 passed = false
             }
 
-            // Verify events for Step B
-            val eventsB = activityRepo.getEventsByStepId(stepBId)
-            val typesB = eventsB.map { it.eventType }.toSet()
-            val expectedB = setOf(
-                ActivityEventType.STEP_CREATED.name,
-                ActivityEventType.STEP_DELETED.name
-            )
-            if (typesB.containsAll(expectedB)) {
-                details.add("PASS: Step B has ${eventsB.size} events with types=$typesB")
+            // Verify events for Tag B — tags create no activity events
+            val eventsB = activityRepo.getEventsByStepId(tagBId)
+            if (eventsB.isEmpty()) {
+                details.add("PASS: Tag B has no activity events (metadata only)")
             } else {
-                details.add("FAIL: Step B missing event types, got=$typesB")
+                details.add("FAIL: Tag B has unexpected events: ${eventsB.map { it.eventType }}")
                 passed = false
             }
 
@@ -190,25 +174,23 @@ class ActivityScenarioViewModel(application: Application) : AndroidViewModel(app
         details.add("Created task id=$taskId")
 
         try {
-            val step = TaskStepEntity(taskId = taskId, title = "MultiDay Step")
-            val stepId = stepRepo.addStep(step)
-            val autoCreatedAt = activityRepo.findLatestEvent(taskId, ActivityEventType.STEP_CREATED.name)!!.timestamp
+            val tag = TaskStepEntity(taskId = taskId, title = "MultiDay Tag")
+            val tagId = stepRepo.addStep(tag)
 
-            // Events at 3 different timestamps (different Jalali days)
-            // STEP_CREATED is auto-created by repository; use NOTE_ADDED for custom timestamp
+            // Tags are metadata — no auto STEP_CREATED event
             activityRepo.addEvent(
-                ActivityEventEntity(taskId = taskId, stepId = stepId, eventType = ActivityEventType.NOTE_ADDED.name, description = "Day -2", timestamp = dayMinus2 + 1000L)
+                ActivityEventEntity(taskId = taskId, stepId = tagId, eventType = ActivityEventType.NOTE_ADDED.name, description = "Day -2", timestamp = dayMinus2 + 1000L)
             )
             activityRepo.addEvent(
-                ActivityEventEntity(taskId = taskId, stepId = stepId, eventType = ActivityEventType.STEP_COMPLETED.name, description = "Day -1", timestamp = dayMinus1 + 2000L)
+                ActivityEventEntity(taskId = taskId, stepId = tagId, eventType = ActivityEventType.NOTE_ADDED.name, description = "Day -1", timestamp = dayMinus1 + 2000L)
             )
             activityRepo.addEvent(
-                ActivityEventEntity(taskId = taskId, stepId = stepId, eventType = ActivityEventType.STEP_REOPENED.name, description = "Today", timestamp = todayMs + 3000L)
+                ActivityEventEntity(taskId = taskId, stepId = tagId, eventType = ActivityEventType.NOTE_ADDED.name, description = "Today", timestamp = todayMs + 3000L)
             )
-            details.add("Created 4 events (1 auto STEP_CREATED + 3 explicit) spanning 3 Jalali days")
+            details.add("Created 3 events (all NOTE_ADDED) spanning 3 Jalali days")
 
             // Group by JalaliDate group key
-            val events = activityRepo.getEventsByStepId(stepId)
+            val events = activityRepo.getEventsByStepId(tagId)
             val groups = events.groupBy { JalaliDate.toEpochMs(JalaliDate.fromEpochMs(it.timestamp)) }
             val groupDates = groups.keys.sorted().map { JalaliDate.fromEpochMs(it).toEnglishString() }
             details.add("Events form ${groups.size} Jalali day group(s): $groupDates")
@@ -279,14 +261,14 @@ class ActivityScenarioViewModel(application: Application) : AndroidViewModel(app
                 passed = false
             }
 
-            val rereadEvents = activityRepo.getEventsByStepId(stepId)
+            val rereadEvents = activityRepo.getEventsByStepId(tagId)
             if (rereadEvents.size == 2) {
-                val hasCreated = rereadEvents.any { it.eventType == ActivityEventType.STEP_CREATED.name }
+                val hasNote = rereadEvents.any { it.eventType == ActivityEventType.NOTE_ADDED.name }
                 val hasCompleted = rereadEvents.any { it.eventType == ActivityEventType.STEP_COMPLETED.name }
-                if (hasCreated && hasCompleted) {
+                if (hasNote && hasCompleted) {
                     details.add("PASS: Both events persisted (${rereadEvents.size})")
                 } else {
-                    details.add("FAIL: Missing event types — created=$hasCreated, completed=$hasCompleted")
+                    details.add("FAIL: Missing event types — note=$hasNote, completed=$hasCompleted")
                     passed = false
                 }
             } else {
@@ -295,11 +277,11 @@ class ActivityScenarioViewModel(application: Application) : AndroidViewModel(app
             }
 
             // Verify findLatestEvent works
-            val latestCreated = activityRepo.findLatestEvent(taskId, ActivityEventType.STEP_CREATED.name)
-            if (latestCreated != null && latestCreated.stepId == stepId) {
+            val latestNote = activityRepo.findLatestEvent(taskId, ActivityEventType.NOTE_ADDED.name)
+            if (latestNote != null && latestNote.stepId == tagId) {
                 details.add("PASS: findLatestEvent returns correct result")
             } else {
-                details.add("FAIL: findLatestEvent returned null or wrong step")
+                details.add("FAIL: findLatestEvent returned null or wrong tag")
                 passed = false
             }
 
@@ -330,31 +312,25 @@ class ActivityScenarioViewModel(application: Application) : AndroidViewModel(app
         details.add("Created task id=$taskId, dateEpochMs=5 days ago, range=[today, $fiveDaysAgoMs]")
 
         try {
-            val step = TaskStepEntity(taskId = taskId, title = "Range Step")
-            val stepId = stepRepo.addStep(step)
+            val tag = TaskStepEntity(taskId = taskId, title = "Range Tag")
+            val tagId = stepRepo.addStep(tag)
 
-            // Event at the earliest boundary (task.dateEpochMs)
-            // STEP_CREATED is auto-created by repository; use FILE_ADDED for custom timestamp
+            // Events at 3 different timestamps (different Jalali days)
+            // Tags are metadata — all events are user activities (NOTE_ADDED)
             activityRepo.addEvent(
-                ActivityEventEntity(taskId = taskId, stepId = stepId, eventType = ActivityEventType.FILE_ADDED.name, description = "Boundary start", timestamp = fiveDaysAgoMs)
+                ActivityEventEntity(taskId = taskId, stepId = tagId, eventType = ActivityEventType.FILE_ADDED.name, description = "Boundary start", timestamp = fiveDaysAgoMs)
             )
-
-            // Event at the latest boundary (today)
             activityRepo.addEvent(
-                ActivityEventEntity(taskId = taskId, stepId = stepId, eventType = ActivityEventType.STEP_COMPLETED.name, description = "Boundary end", timestamp = todayMs)
+                ActivityEventEntity(taskId = taskId, stepId = tagId, eventType = ActivityEventType.NOTE_ADDED.name, description = "Boundary end", timestamp = todayMs)
             )
-
-            // Event inside the range
-            val midRange = fiveDaysAgoMs + 2 * 86400000L
             activityRepo.addEvent(
-                ActivityEventEntity(taskId = taskId, stepId = stepId, eventType = ActivityEventType.STEP_REOPENED.name, description = "Mid range", timestamp = midRange)
+                ActivityEventEntity(taskId = taskId, stepId = tagId, eventType = ActivityEventType.NOTE_ADDED.name, description = "Mid range", timestamp = midRange)
             )
-
-            details.add("Created 4 events (1 auto STEP_CREATED + 3 explicit) spanning timeline range")
+            details.add("Created 3 events spanning timeline range")
 
             // Verify all events are retrievable with correct timestamps
-            val events = activityRepo.getEventsByStepId(stepId).sortedBy { it.timestamp }
-            if (events.size == 4) {
+            val events = activityRepo.getEventsByStepId(tagId).sortedBy { it.timestamp }
+            if (events.size == 3) {
                 val timestamps = events.map { it.timestamp }
                 val boundaryPresent = timestamps.contains(fiveDaysAgoMs) && timestamps.contains(todayMs)
 

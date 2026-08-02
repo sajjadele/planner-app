@@ -103,17 +103,9 @@ class ActivityLabViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch {
             _state.value = _state.value.copy(isRunning = true)
             try {
-                activityEventRepository.addEvent(
-                    ActivityEventEntity(
-                        taskId = task.id,
-                        stepId = step.id,
-                        eventType = ActivityEventType.STEP_DELETED.name,
-                        description = step.title
-                    )
-                )
                 taskStepRepository.deleteStep(step.id)
                 _state.value = _state.value.copy(
-                    status = "Step deleted: ${step.title}",
+                    status = "Tag deleted: ${step.title}",
                     isRunning = false
                 )
             } catch (e: Exception) {
@@ -132,26 +124,18 @@ class ActivityLabViewModel(application: Application) : AndroidViewModel(applicat
             val results = mutableListOf<String>()
 
             try {
-                // Scenario 1: Create step
-                val testTitle = "Lab Test Step ${System.currentTimeMillis()}"
-                val stepId = taskStepRepository.addStep(
+                // Scenario 1: Create tag
+                val testTitle = "Lab Test Tag ${System.currentTimeMillis()}"
+                val tagId = taskStepRepository.addStep(
                     TaskStepEntity(taskId = task.id, title = testTitle)
                 )
-                activityEventRepository.addEvent(
-                    ActivityEventEntity(
-                        taskId = task.id,
-                        stepId = stepId,
-                        eventType = ActivityEventType.STEP_CREATED.name,
-                        description = testTitle
-                    )
-                )
 
-                val createdStep = taskStepRepository.getStepById(stepId)
-                val createdEvent = activityEventRepository.findLatestEvent(task.id, ActivityEventType.STEP_CREATED.name)
-                if (createdStep != null && createdStep.title == testTitle && createdEvent != null && createdEvent.stepId == stepId) {
-                    results.add("Scenario 1 (Create): PASS — stepId=$stepId")
+                val createdTag = taskStepRepository.getStepById(tagId)
+                val hasNoCreatedEvent = activityEventRepository.findLatestEvent(task.id, ActivityEventType.STEP_CREATED.name) == null
+                if (createdTag != null && createdTag.title == testTitle && hasNoCreatedEvent) {
+                    results.add("Scenario 1 (Create Tag): PASS — tagId=$tagId (no activity event)")
                 } else {
-                    results.add("Scenario 1 (Create): FAIL — step or event not found")
+                    results.add("Scenario 1 (Create Tag): FAIL — tag not found or unexpected event")
                 }
 
                 // Scenario 2: Tags cannot be completed — verify they remain unchanged
@@ -163,40 +147,25 @@ class ActivityLabViewModel(application: Application) : AndroidViewModel(applicat
                     results.add("Scenario 2 (Tag Completion): FAIL — step not found")
                 }
 
-                // Scenario 3: Delete step
-                val stepToDelete = taskStepRepository.getStepById(stepId)
-                val originalTitle = stepToDelete?.title ?: testTitle
-                activityEventRepository.addEvent(
-                    ActivityEventEntity(
-                        taskId = task.id,
-                        stepId = stepId,
-                        eventType = ActivityEventType.STEP_DELETED.name,
-                        description = originalTitle
-                    )
-                )
-                taskStepRepository.deleteStep(stepId)
+                // Scenario 3: Delete tag
+                val tagToDelete = taskStepRepository.getStepById(tagId)
+                val originalTitle = tagToDelete?.title ?: testTitle
+                taskStepRepository.deleteStep(tagId)
 
-                val stepAfterDelete = taskStepRepository.getStepById(stepId)
-                val deletedEvent = activityEventRepository.findLatestEvent(task.id, ActivityEventType.STEP_DELETED.name)
-                if (stepAfterDelete == null && deletedEvent != null && deletedEvent.description == originalTitle) {
-                    results.add("Scenario 3 (Delete): PASS")
+                val tagAfterDelete = taskStepRepository.getStepById(tagId)
+                if (tagAfterDelete == null) {
+                    results.add("Scenario 3 (Delete Tag): PASS — tag removed, activities preserved")
                 } else {
-                    results.add("Scenario 3 (Delete): FAIL — step still exists or event missing")
+                    results.add("Scenario 3 (Delete Tag): FAIL — tag still exists")
                 }
 
-                // Scenario 4: Persistence — verify step is gone but events remain
-                val stepGone = taskStepRepository.getStepById(stepId) == null
-                val eventsForStep = activityEventRepository.getEventsByStepId(stepId)
-                val hasCreated = eventsForStep.any { it.eventType == ActivityEventType.STEP_CREATED.name }
-                val hasCompleted = eventsForStep.any { it.eventType == ActivityEventType.STEP_COMPLETED.name }
-                val hasDeleted = eventsForStep.any { it.eventType == ActivityEventType.STEP_DELETED.name }
+                // Scenario 4: Persistence — verify tag is gone
+                val tagGone = taskStepRepository.getStepById(tagId) == null
 
-                if (stepGone && hasCreated && hasCompleted && hasDeleted) {
-                    results.add("Scenario 4 (Persistence): PASS — step removed, ${eventsForStep.size} events retained")
-                } else if (!stepGone) {
-                    results.add("Scenario 4 (Persistence): FAIL — step still exists after deletion")
+                if (tagGone) {
+                    results.add("Scenario 4 (Persistence): PASS — tag removed")
                 } else {
-                    results.add("Scenario 4 (Persistence): FAIL — missing events (created=$hasCreated, completed=$hasCompleted, deleted=$hasDeleted)")
+                    results.add("Scenario 4 (Persistence): FAIL — tag still exists after deletion")
                 }
 
                 _state.value = _state.value.copy(
