@@ -155,30 +155,28 @@ fun TaskDetailScreen(
         }
     )
 
+    // ── File picker (multi-select) ──
+    @Suppress("DEPRECATION")
     val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(arrayOf("*/*")),
-        onResult = { uris: List<Uri> ->
-            if (uris.isNotEmpty()) {
-                val attachments = uris.map { uri ->
-                    runCatching {
-                        context.contentResolver.takePersistableUriPermission(
-                            uri,
-                            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        )
-                    }
-                    // Get actual file name from ContentResolver
-                    val fileName = context.contentResolver.query(
+        contract = ActivityResultContracts.OpenDocument(),
+        onResult = { uri: Uri? ->
+            if (uri != null) {
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
                         uri,
-                        arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
-                        null, null, null
-                    )?.use { cursor ->
-                        val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                        if (cursor.moveToFirst() && nameIndex >= 0) cursor.getString(nameIndex) else null
-                    } ?: uri.lastPathSegment ?: "فایل"
-                    ActivityAttachment.File(uri.toString(), fileName)
+                        android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
                 }
+                val fileName = context.contentResolver.query(
+                    uri,
+                    arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                    null, null, null
+                )?.use { cursor ->
+                    val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (cursor.moveToFirst() && nameIndex >= 0) cursor.getString(nameIndex) else null
+                } ?: uri.lastPathSegment ?: "فایل"
                 viewModel.createActivity(
-                    ActivityDraft(attachments = attachments)
+                    ActivityDraft(attachments = listOf(ActivityAttachment.File(uri.toString(), fileName)))
                 )
             }
         }
