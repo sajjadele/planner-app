@@ -6,7 +6,14 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "task_events",
-    indices = [Index("taskId"), Index("eventType")]
+    indices = [
+        Index("taskId"),
+        Index("eventType"),
+        Index(
+            value = ["eventType", "timestamp"],
+            name = "index_task_events_type_timestamp"
+        )
+    ]
 )
 data class TaskEventEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
