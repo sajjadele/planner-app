@@ -11,7 +11,7 @@ import org.junit.Test
  * Phase 5.7.1 — ActivityMessageDisplayContent Tests
  *
  * Validates the simplified 3-type classification:
- * TextContent, MediaContent, MediaWithText
+ * TextContent, MultiMediaContent, EmptyMessage, DeletedMessage
  */
 class ActivityMessageDisplayContentTest {
 
@@ -38,20 +38,20 @@ class ActivityMessageDisplayContentTest {
     }
 
     // ════════════════════════════════════════════════════════════════
-    // MediaContent (image only)
+    // MultiMediaContent (image only)
     // ════════════════════════════════════════════════════════════════
 
     @Test
-    fun `image only message resolves to MediaContent as image`() {
+    fun `image only message resolves to MultiMediaContent as image`() {
         val msg = createMessage(
             text = null,
             attachments = listOf(ActivityAttachment.Image("content://test.jpg"))
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue(content is ActivityMessageDisplayContent.MediaContent)
-        val mc = content as ActivityMessageDisplayContent.MediaContent
-        assertTrue(mc.isImage)
-        assertTrue(mc.attachment is ActivityAttachment.Image)
+        assertTrue(content is ActivityMessageDisplayContent.MultiMediaContent)
+        val mc = content as ActivityMessageDisplayContent.MultiMediaContent
+        assertTrue(mc.images.isNotEmpty())
+        assertTrue(mc.images.first() is ActivityAttachment.Image)
     }
 
     @Test
@@ -64,58 +64,58 @@ class ActivityMessageDisplayContentTest {
             canEdit = true, canDelete = true
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue(content is ActivityMessageDisplayContent.MediaContent)
+        assertTrue(content is ActivityMessageDisplayContent.MultiMediaContent)
     }
 
     // ════════════════════════════════════════════════════════════════
-    // MediaWithText (image + text)
+    // MultiMediaContent (image + text)
     // ════════════════════════════════════════════════════════════════
 
     @Test
-    fun `text with image resolves to MediaWithText`() {
+    fun `text with image resolves to MultiMediaContent`() {
         val msg = createMessage(
             text = "Check this out!",
             attachments = listOf(ActivityAttachment.Image("content://pic.jpg"))
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue(content is ActivityMessageDisplayContent.MediaWithText)
-        val mwt = content as ActivityMessageDisplayContent.MediaWithText
+        assertTrue(content is ActivityMessageDisplayContent.MultiMediaContent)
+        val mwt = content as ActivityMessageDisplayContent.MultiMediaContent
         assertEquals("Check this out!", mwt.text)
-        assertTrue(mwt.isImage)
+        assertTrue(mwt.images.isNotEmpty())
     }
 
     // ════════════════════════════════════════════════════════════════
-    // MediaContent (file only)
+    // MultiMediaContent (file only)
     // ════════════════════════════════════════════════════════════════
 
     @Test
-    fun `file only message resolves to MediaContent as file`() {
+    fun `file only message resolves to MultiMediaContent as file`() {
         val msg = createMessage(
             text = null,
             attachments = listOf(ActivityAttachment.File("content://doc.pdf", "report.pdf"))
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue(content is ActivityMessageDisplayContent.MediaContent)
-        val mc = content as ActivityMessageDisplayContent.MediaContent
-        assertFalse(mc.isImage)
-        assertTrue(mc.attachment is ActivityAttachment.File)
+        assertTrue(content is ActivityMessageDisplayContent.MultiMediaContent)
+        val mc = content as ActivityMessageDisplayContent.MultiMediaContent
+        assertTrue(mc.files.isNotEmpty())
+        assertTrue(mc.files.first() is ActivityAttachment.File)
     }
 
     // ════════════════════════════════════════════════════════════════
-    // MediaWithText (file + text)
+    // MultiMediaContent (file + text)
     // ════════════════════════════════════════════════════════════════
 
     @Test
-    fun `text with file resolves to MediaWithText as file`() {
+    fun `text with file resolves to MultiMediaContent as file`() {
         val msg = createMessage(
             text = "See attached file",
             attachments = listOf(ActivityAttachment.File("content://data.csv", "data.csv"))
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue(content is ActivityMessageDisplayContent.MediaWithText)
-        val mwt = content as ActivityMessageDisplayContent.MediaWithText
+        assertTrue(content is ActivityMessageDisplayContent.MultiMediaContent)
+        val mwt = content as ActivityMessageDisplayContent.MultiMediaContent
         assertEquals("See attached file", mwt.text)
-        assertFalse(mwt.isImage)
+        assertTrue(mwt.files.isNotEmpty())
     }
 
     // ════════════════════════════════════════════════════════════════

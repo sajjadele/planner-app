@@ -177,7 +177,7 @@ class ReminderTimeStateTest {
     }
 
     @Test
-    fun `selectHour coerces out-of-range to 1..12`() {
+    fun `selectHour coerces out-of-range to 1-12`() {
         val picker = ReminderTimePickerState(ReminderTimeState(8, 0, DayPeriod.AM))
         picker.selectHour(0)
         assertEquals(1, picker.timeState.hour)

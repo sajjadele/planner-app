@@ -28,10 +28,10 @@ class ActivityMessageRenderingOrderTest {
             canEdit = true, canDelete = true
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue("Image-only should be MediaContent",
-            content is ActivityMessageDisplayContent.MediaContent)
-        val mc = content as ActivityMessageDisplayContent.MediaContent
-        assertTrue("Attachment should be image", mc.isImage)
+        assertTrue("Image-only should be MultiMediaContent",
+            content is ActivityMessageDisplayContent.MultiMediaContent)
+        val mc = content as ActivityMessageDisplayContent.MultiMediaContent
+        assertTrue("Attachment should be image", mc.images.isNotEmpty())
     }
 
     @Test
@@ -44,11 +44,11 @@ class ActivityMessageRenderingOrderTest {
             canEdit = true, canDelete = true
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue("Text+Image should be MediaWithText",
-            content is ActivityMessageDisplayContent.MediaWithText)
-        val mwt = content as ActivityMessageDisplayContent.MediaWithText
+        assertTrue("Text+Image should be MultiMediaContent",
+            content is ActivityMessageDisplayContent.MultiMediaContent)
+        val mwt = content as ActivityMessageDisplayContent.MultiMediaContent
         assertEquals("Design review", mwt.text)
-        assertTrue(mwt.isImage)
+        assertTrue(mwt.images.isNotEmpty())
         // Media renders before text in UI (enforced by MessageContent composable)
     }
 
@@ -62,7 +62,7 @@ class ActivityMessageRenderingOrderTest {
             canEdit = true, canDelete = true
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue("Text-only should be TextContent (not MediaWithText)",
+        assertTrue("Text-only should be TextContent (not MultiMediaContent)",
             content is ActivityMessageDisplayContent.TextContent)
     }
 
@@ -76,12 +76,13 @@ class ActivityMessageRenderingOrderTest {
             canEdit = true, canDelete = true
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue("Text+File should be MediaWithText",
-            content is ActivityMessageDisplayContent.MediaWithText)
-        val mwt = content as ActivityMessageDisplayContent.MediaWithText
+        assertTrue("Text+File should be MultiMediaContent",
+            content is ActivityMessageDisplayContent.MultiMediaContent)
+        val mwt = content as ActivityMessageDisplayContent.MultiMediaContent
         assertEquals("See attached file", mwt.text)
-        assertFalse(mwt.isImage)
-        assertEquals("report.xlsx", (mwt.attachment as ActivityAttachment.File).name)
+        assertTrue(mwt.files.isNotEmpty())
+        assertFalse(mwt.images.isNotEmpty())
+        assertEquals("report.xlsx", mwt.files.first().name)
     }
 
     @Test
@@ -126,8 +127,8 @@ class ActivityMessageRenderingOrderTest {
             canEdit = true, canDelete = true
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue("Image-only is compact MediaContent, not MediaWithText",
-            content is ActivityMessageDisplayContent.MediaContent)
+        assertTrue("Image-only is compact MultiMediaContent, not MediaWithText",
+            content is ActivityMessageDisplayContent.MultiMediaContent)
         // No text, no duration, just media — minimal bubble height
     }
 
@@ -141,13 +142,13 @@ class ActivityMessageRenderingOrderTest {
             canEdit = true, canDelete = true
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        // Must resolve to MediaContent, not EmptyMessage
-        assertTrue("Even with null text, attachment should produce MediaContent",
-            content is ActivityMessageDisplayContent.MediaContent)
+        // Must resolve to MultiMediaContent, not EmptyMessage
+        assertTrue("Even with null text, attachment should produce MultiMediaContent",
+            content is ActivityMessageDisplayContent.MultiMediaContent)
         // No text field should contain JSON
         val textValue = when (content) {
             is ActivityMessageDisplayContent.TextContent -> content.text
-            is ActivityMessageDisplayContent.MediaWithText -> content.text
+            is ActivityMessageDisplayContent.MultiMediaContent -> content.text
             else -> null
         }
         assertNull("No JSON text should leak to display", textValue)

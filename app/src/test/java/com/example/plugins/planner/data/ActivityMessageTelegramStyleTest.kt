@@ -34,14 +34,14 @@ class ActivityMessageTelegramStyleTest {
             canEdit = true, canDelete = true
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue(content is ActivityMessageDisplayContent.MediaContent)
-        // No text field in MediaContent — ensures no empty text area
-        val mc = content as ActivityMessageDisplayContent.MediaContent
-        assertNotNull(mc.attachment)
+        assertTrue(content is ActivityMessageDisplayContent.MultiMediaContent)
+        // No text field in MultiMediaContent when images only — ensures no empty text area
+        val mc = content as ActivityMessageDisplayContent.MultiMediaContent
+        assertNotNull(mc.images)
     }
 
     @Test
-    fun `image renders before text in MediaWithText`() {
+    fun `image renders before text in MultiMediaContent`() {
         val msg = ActivityMessageModel(
             id = 1, taskId = 1, stepId = null,
             text = "Caption text",
@@ -50,10 +50,10 @@ class ActivityMessageTelegramStyleTest {
             canEdit = true, canDelete = true
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue(content is ActivityMessageDisplayContent.MediaWithText)
-        val mwt = content as ActivityMessageDisplayContent.MediaWithText
+        assertTrue(content is ActivityMessageDisplayContent.MultiMediaContent)
+        val mwt = content as ActivityMessageDisplayContent.MultiMediaContent
         // Media is the primary entity; text is caption
-        assertNotNull(mwt.attachment)
+        assertNotNull(mwt.images)
         assertEquals("Caption text", mwt.text)
     }
 
@@ -183,8 +183,8 @@ class ActivityMessageTelegramStyleTest {
             canEdit = true, canDelete = true
         )
         val content = ActivityMessageDisplayContent.from(msg)
-        assertTrue(content is ActivityMessageDisplayContent.MediaWithText)
-        val mwt = content as ActivityMessageDisplayContent.MediaWithText
-        assertTrue("Image should be primary attachment", mwt.isImage)
+        assertTrue(content is ActivityMessageDisplayContent.MultiMediaContent)
+        val mwt = content as ActivityMessageDisplayContent.MultiMediaContent
+        assertTrue("Image should be primary attachment", mwt.images.isNotEmpty())
     }
 }

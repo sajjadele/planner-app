@@ -1,5 +1,6 @@
 package com.example.plugins.planner.data
 
+import com.example.plugins.planner.ui.components.parseColorHex
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
