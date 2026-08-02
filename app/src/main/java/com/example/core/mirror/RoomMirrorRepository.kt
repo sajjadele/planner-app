@@ -19,7 +19,9 @@ class RoomMirrorRepository(
 ) : MirrorRepository {
 
     override fun observeRescheduleCounts(): Flow<List<RescheduleSummary>> =
-        insightRepository.observeRescheduleCounts().map { list ->
+        insightRepository.observeRescheduleCounts(
+            System.currentTimeMillis() - MIRROR_LOOKBACK_MS
+        ).map { list ->
             list.map { RescheduleSummary(it.taskId, it.taskTitle, it.rescheduleCount, 0L, false) }
         }
 
@@ -115,4 +117,9 @@ class RoomMirrorRepository(
 
     override suspend fun render(signals: List<MirrorSignal>): List<MirrorInsight> =
         signals.map { MirrorEngine.render(it) }
+
+    companion object {
+        /** Mirror needs more history than insight screen for pattern detection — 365 days. */
+        private const val MIRROR_LOOKBACK_MS = 365L * 86_400_000L
+    }
 }
