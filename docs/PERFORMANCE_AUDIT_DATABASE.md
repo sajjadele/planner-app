@@ -1,153 +1,186 @@
-# Database Layer — Performance Audit Report
+# Database Layer — Performance Audit Report (Comprehensive)
 
 > **Date:** 2026-08-02
-> **Scope:** Database queries, DAOs, indexes, snapshot system, ViewModel data flow
-> **Status:** Read-only audit — no code changes
+> **Scope:** DAO queries, Repository patterns, Snapshot system, Flow efficiency, Index coverage, Migration safety
+> **Status:** Read-only audit — no code changes implemented yet
 
 ---
 
-## Executive Summary
+## 0. Architecture Overview
 
-The database layer is **architecturally sound** — N+1 patterns were eliminated in Phase 5.4, bulk queries use `GROUP BY`, and ViewModel lazy computation is well-designed. However, with growing data volume, **3 categories of risk** will cause noticeable lag within 3–6 months of active use:
-
-1. **Missing indexes** on frequently queried columns
-2. **Unbounded queries** that load entire tables
-3. **Snapshot backfill cost** that grows linearly with usage history
-
----
-
-## 1. Current Index Inventory
-
-| Table | Index | Added In | Covers |
-|-------|-------|----------|--------|
-| `tasks` | `dateEpochMs` | v10→v11 | Day-scoped queries, insight BETWEEN |
-| `tasks` | — | — | Goal lookup, completion filter |
-| `task_events` | `eventType` | v10→v11 | Reschedule/completion aggregation |
-| `task_events` | — | — | Timestamp range, taskId subquery |
-| `goals` | `status` | v10→v11 | Status-filtered dashboard loads |
-| `goal_events` | `goalId` | v7→v8 | Goal lifecycle events |
-| `goal_progress_snapshot` | `goalId` | v8→v9 | Goal progress observation |
-| `activity_events` | `taskId` | v12→v13 | Activity by task |
-| `activity_events` | `timestamp` | v12→v13 | Timestamp range queries |
-| `task_steps` | `taskId` | v13→v14 | Steps by task |
-
-**Total: 9 indexes across 5 tables.**
-
----
-
-## 2. Missing Indexes (High Priority)
-
-### 2.1 `tasks(goalId)` — 🔴 CRITICAL
-
-**Impact:** Every Goal Detail screen load triggers `getTasksByGoalId()` which does a full table scan on `tasks`.
-
-**Query:**
-```sql
-SELECT * FROM tasks WHERE goalId = :goalId ORDER BY id DESC
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        UI Layer                              │
+│  PlannerViewModel · GoalDetailViewModel · GoalViewModel     │
+│  WeeklyInsightViewModel · TaskDetailViewModel                │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ StateFlow / combine
+┌──────────────────────────┴──────────────────────────────────┐
+│                     Repository Layer                         │
+│  TaskRepository · GoalRepository · InsightRepository        │
+│  SnapshotRepository · ActivityEventRepository                │
+│  TaskStepRepository · NoteRepository                         │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌──────────────────────────┴──────────────────────────────────┐
+│                        DAO Layer                             │
+│  TaskDao · GoalDao · TaskEventDao · InsightDao               │
+│  SnapshotDao · ActivityEventDao · TaskStepDao                │
+│  GoalEventDao · NoteDao · ModuleSettingsDao                  │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌──────────────────────────┴──────────────────────────────────┐
+│                   Room Database (v15)                        │
+│  10 tables · 10 DAOs · Manual DI (no Hilt/Koin)            │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-**Frequency:** Every time a user opens any Goal Detail screen. Also used by `allTasks` in `GoalDetailViewModel` which powers the graph, mirror, calendar, and task list.
-
-**Growth:** 6 months → ~360 tasks. Full scan on 360 rows is fast, but at 2000+ rows (1–2 years of heavy use) it becomes noticeable.
-
-**Fix:** Add in next migration (v15→v16):
-```sql
-CREATE INDEX IF NOT EXISTS index_tasks_goalId ON tasks(goalId)
-```
+### Tables
+| Table | Rows (6mo est.) | Growth Rate | Primary Use |
+|-------|-----------------|-------------|-------------|
+| `goals` | 10–30 | Slow | Goal lifecycle |
+| `tasks` | 360–1,080 | 2–6/day | Daily execution |
+| `task_events` | 540–1,620 | 3/task lifecycle | Behavioral signal |
+| `activity_events` | 180–540 | 1–3/day | User activities |
+| `task_steps` | 0–200 | Optional | Tags/metadata |
+| `goal_events` | 20–60 | Per lifecycle change | Goal audit trail |
+| `goal_progress_snapshot` | 180 × N goals | 1/day/goal | Progress projection |
+| `behavior_snapshot` | 180 | 1/day | Behavior projection |
+| `notes` | 100–500 | Variable | User notes |
+| `module_settings` | 1–5 | Rare | App settings |
 
 ---
 
-### 2.2 `task_events(timestamp)` — 🟡 MEDIUM
+## 1. Index Audit
 
-**Impact:** `observeCompletedTimestamps()` and `observeRescheduleCountBetween()` filter by timestamp range without an index.
+### 1.1 Existing Indexes (Verified)
 
-**Queries:**
+Room Entity annotations auto-create indices at table creation. Migrations added indices for existing tables during upgrades. Both are correct.
+
+| Table | Column | Source | Covers |
+|-------|--------|--------|--------|
+| `tasks` | `goalId` | `@Entity(indices)` ✅ | `getTasksByGoalId()`, bulk JOINs |
+| `tasks` | `dateEpochMs` | `@Entity(indices)` + Migration v10→11 ✅ | Day-scoped queries, BETWEEN |
+| `task_events` | `taskId` | `@Entity(indices)` ✅ | `deleteEventsForGoal()` subquery |
+| `task_events` | `eventType` | `@Entity(indices)` + Migration v10→11 ✅ | Reschedule/completion filter |
+| `activity_events` | `taskId` | `@Entity(indices)` + Migration v12→13 ✅ | `observeByTaskId()` |
+| `activity_events` | `timestamp` | `@Entity(indices)` + Migration v12→13 ✅ | Timestamp range queries |
+| `goals` | `status` | `@Entity(indices)` + Migration v10→11 ✅ | Dashboard status filter |
+| `goal_events` | `goalId` | Migration v7→8 ✅ | Goal lifecycle events |
+| `goal_progress_snapshot` | `goalId` | Migration v8→9 ✅ | Goal progress observation |
+| `task_steps` | `taskId` | Migration v13→14 ✅ | Steps by task |
+
+**Total: 10 indexes across 7 tables.**
+
+### 1.2 Missing Indexes
+
+#### `task_events(timestamp)` — 🟡 MEDIUM
+
+**Not indexed.** `eventType` is indexed but `timestamp` is not.
+
+**Affected queries:**
 ```sql
--- observeCompletedTimestamps — NO timestamp filter, but used in streak calc
-SELECT timestamp FROM task_events WHERE eventType = 'completed'
-
--- observeRescheduleCountBetween — timestamp BETWEEN
+-- observeRescheduleCountBetween — filters on eventType + timestamp range
 SELECT COUNT(*) FROM task_events
 WHERE eventType = 'rescheduled' AND timestamp BETWEEN :start AND :end
+
+-- observeCompletedTimestamps — no timestamp filter, but results are used for streak
+SELECT timestamp FROM task_events WHERE eventType = 'completed'
 ```
 
-**Frequency:** `observeRescheduleCountBetween` called by `SnapshotAggregator.recordDay()` on every user action. `observeCompletedTimestamps` called on every snapshot computation.
+**Impact:** `observeRescheduleCountBetween` is called by `SnapshotAggregator.recordDay()` on every user action. Without a timestamp index, the BETWEEN filter requires a full scan of matching eventType rows.
 
-**Fix:** Add index:
+**Recommendation:** Add composite index `(eventType, timestamp)` — covers both eventType-only queries AND eventType+timestamp range queries.
+
 ```sql
-CREATE INDEX IF NOT EXISTS index_task_events_timestamp ON task_events(timestamp)
-```
-
----
-
-### 2.3 `activity_events(stepId)` — 🟢 LOW
-
-**Impact:** `getEventsByStepId()` and `clearStepId()` filter by stepId without index.
-
-**Frequency:** Only on tag management operations (rare).
-
-**Fix:** Add index:
-```sql
-CREATE INDEX IF NOT EXISTS index_activity_events_stepId ON activity_events(stepId)
-```
-
----
-
-### 2.4 Composite Index for Snapshot Queries — 🟡 MEDIUM
-
-**Impact:** `observeRescheduleCountBetween()` filters on both `eventType` AND `timestamp`. A composite index would be more efficient than two separate indexes.
-
-**Fix:**
-```sql
-CREATE INDEX IF NOT EXISTS index_task_events_type_time
+CREATE INDEX IF NOT EXISTS index_task_events_type_timestamp
 ON task_events(eventType, timestamp)
 ```
 
-This covers both the eventType-only queries AND the eventType+timestamp range queries.
+**Storage cost:** Minimal. 3 columns × ~1000 rows = negligible.
 
 ---
 
-## 3. Unbounded Queries
+#### `activity_events(stepId)` — 🟢 LOW
 
-### 3.1 `observeCompletedTimestamps()` — 🔴 CRITICAL
+**Not indexed.**
 
-**Current behavior:**
+**Affected queries:**
+```sql
+-- getEventsByStepId
+SELECT * FROM activity_events WHERE stepId = :stepId ORDER BY timestamp DESC
+
+-- clearStepId
+UPDATE activity_events SET stepId = NULL WHERE stepId = :stepId
+```
+
+**Impact:** Only triggered on tag management operations (rare). StepId is nullable and low-cardinality.
+
+**Recommendation:** Defer. Add only if tag filtering becomes a common operation.
+
+---
+
+### 1.3 Duplicate Index Check
+
+**No duplicates found.** Entity annotations and migrations are complementary:
+- Entity annotations create indices for **new installs** (Room creates table + indices)
+- Migrations add indices for **upgrading users** (table exists without indices)
+
+Both are necessary and correct.
+
+---
+
+## 2. Unbounded Historical Queries
+
+### 2.1 `observeCompletedTimestamps()` — 🔴 CRITICAL
+
+**DAO:**
 ```sql
 SELECT timestamp FROM task_events WHERE eventType = 'completed'
 ```
 
-Loads **ALL** completion timestamps ever recorded. No LIMIT, no date filter.
-
-**Growth projection:**
-| Usage Duration | Tasks/Day | Rows Returned |
-|----------------|-----------|---------------|
-| 1 month | 3 | ~90 |
-| 6 months | 3 | ~540 |
-| 1 year | 3 | ~1,080 |
-| 2 years | 3 | ~2,160 |
+**No date filter. No LIMIT.** Loads ALL completion timestamps ever recorded.
 
 **Consumers:**
-- `WeeklyInsightViewModel.observeInsight()` — streak calculation
-- `SnapshotAggregator.recordDay()` — streak calculation per day
-- Streak is computed from timestamps grouped by day
+1. `WeeklyInsightViewModel.observeInsight()` → streak calculation
+2. `SnapshotAggregator.recordDay()` → streak calculation per day
 
-**The streak only needs the last ~60 days** (a streak can't be longer than 60 days in the window used). The rest of the data is waste.
+**How streak works (InsightCalculator.computeStreak):**
+```kotlin
+fun computeStreak(completedTimestamps: List<Long>, nowMillis: Long): Int {
+    val daySet = completedTimestamps.map { ts -> dayKey(cal.apply { timeInMillis = ts }) }.toSet()
+    // walks backward from today counting consecutive days
+}
+```
+
+The streak only walks backward from today. A streak can't exceed ~365 days in practice. **The algorithm only needs timestamps from the last ~400 days** (safety margin). Anything older is wasted memory and query time.
+
+**Growth projection:**
+| Duration | Tasks/Day | Rows | Memory (approx) |
+|----------|-----------|------|------------------|
+| 1 month | 3 | ~90 | ~1 KB |
+| 6 months | 3 | ~540 | ~6 KB |
+| 1 year | 3 | ~1,080 | ~12 KB |
+| 2 years | 3 | ~2,160 | ~24 KB |
+
+At 2 years, the list is still small in absolute terms but grows linearly with no bound.
 
 **Proposed fix:**
 ```sql
--- Only load last 90 days of completion timestamps (covers any realistic streak)
+-- Add fromEpochMs parameter (e.g., 400 days ago)
 SELECT timestamp FROM task_events
-WHERE eventType = 'completed'
-AND timestamp > :ninetyDaysAgo
+WHERE eventType = 'completed' AND timestamp >= :fromEpochMs
 ```
 
-Add a `ninetyDaysAgo` parameter calculated as `System.currentTimeMillis() - 90 * DAY_MS`.
+Both consumers already have access to `System.currentTimeMillis()`, so computing `fromEpochMs = now - 400L * DAY_MS` is trivial.
+
+**Risk:** Very low. The 400-day window covers any realistic streak. No behavioral data is lost — older timestamps remain in the table for future AI analysis.
 
 ---
 
-### 3.2 `observeRescheduleCounts()` — 🟡 MEDIUM
+### 2.2 `observeRescheduleCounts()` — 🟡 MEDIUM
 
-**Current behavior:**
+**DAO:**
 ```sql
 SELECT te.taskId, t.title, t.timestamp, COUNT(*) AS rescheduleCount
 FROM task_events te
@@ -156,174 +189,427 @@ WHERE te.eventType = 'rescheduled'
 GROUP BY te.taskId
 ```
 
-Loads **ALL** rescheduled tasks globally. Used by WeeklyInsightViewModel.
+**No date filter.** Loads ALL rescheduled tasks globally, including completed/archived ones.
 
-**Growth projection:** Rescheduled tasks accumulate forever. Even completed/archived tasks remain in the result.
+**Consumer:** `WeeklyInsightViewModel.observeInsight()` — procrastination alerts.
 
-**Proposed fix:** Filter to recent tasks only (e.g., tasks created in last 90 days):
+**The insight screen shows "tasks with ≥3 reschedules."** Old completed tasks with high reschedule counts are noise — the user already dealt with them.
+
+**Proposed fix:**
 ```sql
+-- Filter to tasks created in last 90 days (active concern window)
 WHERE te.eventType = 'rescheduled'
 AND t.timestamp > :ninetyDaysAgo
 ```
 
+**Risk:** Low. Procrastination alerts for tasks older than 90 days are not actionable.
+
 ---
 
-### 3.3 `getAllEvents()` and `getAllTasks()` — 🟢 LOW
+### 2.3 `observeAllEvents()` in GoalEventDao — 🟢 LOW
 
-**Current behavior:**
+**DAO:**
 ```sql
--- TaskEventDao
-SELECT * FROM task_events ORDER BY timestamp DESC
+SELECT * FROM goal_events ORDER BY timestamp DESC
+```
 
--- TaskDao
+**Consumer:** `RoomGoalRepository.observeGoalEvents()` — used by GoalDetailViewModel for lifecycle display.
+
+**Impact:** Goal events are low-volume (20–60 in 6 months). No fix needed.
+
+---
+
+### 2.4 `getAllTasks()` in TaskDao — 🟢 LOW
+
+**DAO:**
+```sql
 SELECT * FROM tasks ORDER BY id DESC
 ```
 
-These load **everything** but I couldn't find active UI consumers. They may be debug-only.
+**Consumer:** Not found in active ViewModel code. Likely debug-only.
 
-**Proposed fix:** Remove if unused, or add LIMIT.
+**Recommendation:** Verify usage. Remove if unused, or add LIMIT.
 
 ---
 
-## 4. Snapshot System Analysis
+## 3. Snapshot System Efficiency
 
-### 4.1 `recordDay()` Cost
+### 3.1 `recordDay()` — Called on Every User Action
 
-Called on **every user action** (task add/toggle/delete/reschedule). Each call:
+**Trigger points (PlannerViewModel):**
+- `addTask()` → `recordDay(today)`
+- `toggleTaskCompletion()` → `recordDay(today)`
+- `undoLastComplete()` → `recordDay(today)`
+- `deleteTask()` → `recordDay(today)`
+- `rescheduleTask()` → `recordDay(today)`
+
+**What each `recordDay()` call executes:**
 
 ```
 recordDay(dateEpochMs):
-  1. observeCompletedCount(start, end)     — 1 query
-  2. observeCreatedCount(start, end)       — 1 query
-  3. observeCompletedTimestamps()           — 1 query (UNBOUNDED!)
-  4. observeCompletedCount(prevDay)         — 1 query
-  5. observeCreatedCount(prevDay)           — 1 query
-  6. observeRescheduleCountBetween()        — 1 query
-  7. getActiveGoals()                       — 1 query
-  8. FOR EACH goal: getGoalDayCounts()     — N queries
+  1. observeCompletedCount(start, end)          — 1 query
+  2. observeCreatedCount(start, end)            — 1 query
+  3. observeCompletedTimestamps()                — 1 query (UNBOUNDED!)
+  4. observeCompletedCount(prevStart, prevEnd)   — 1 query
+  5. observeCreatedCount(prevStart, prevEnd)     — 1 query
+  6. observeRescheduleCountBetween(start, end)   — 1 query
+  7. getActiveGoals()                            — 1 query
+  8. FOR EACH active goal:
+     getGoalDayCounts(goalId, start, end)        — 1 query per goal
 ```
 
-**Total: 7 + N queries per user action** (where N = number of active goals).
+**Total: 7 + N queries** (N = active goals count)
 
-For a user with 5 active goals: **12 queries per action**. For 10 goals: **17 queries**.
+| Active Goals | Total Queries/Action |
+|--------------|---------------------|
+| 3 | 10 |
+| 5 | 12 |
+| 10 | 17 |
 
-### 4.2 `backfillMissing()` Cost
+**Problem:** Rapid user actions (completing 5 tasks quickly) trigger 5 separate `recordDay()` calls = 50–85 queries in quick succession.
 
-```
-backfillMissing():
-  FOR each day from earliest task to today:
-    recordDay(day)  — 7 + N queries per day
-```
+### 3.2 Debouncing Opportunity — 🔴 HIGH PRIORITY
 
-**Growth projection:**
-| History | Days | Active Goals | Total Queries |
-|---------|------|--------------|---------------|
-| 1 month | 30 | 3 | ~300 |
-| 6 months | 180 | 5 | ~2,160 |
-| 1 year | 365 | 5 | ~4,380 |
+**Current:** No debouncing. Each action triggers immediate `recordDay()`.
 
-First launch after DB upgrade triggers full backfill. 6 months of history = ~2,160 queries in a single suspend function.
-
-### 4.3 `recordDay()` on Every Action — Batching Opportunity
-
-Currently, rapid user actions (e.g., completing 5 tasks quickly) trigger 5 separate `recordDay()` calls, each doing 7+ queries. The snapshot for today is the same regardless of which action triggered it.
-
-**Proposed fix:** Debounce `recordDay()` calls. Use a debounce window (e.g., 500ms) so rapid actions coalesce into a single snapshot refresh.
-
+**Proposed:**
 ```kotlin
 private var recordDayJob: Job? = null
 
 fun recordDayDebounced(dateEpochMs: Long) {
     recordDayJob?.cancel()
     recordDayJob = viewModelScope.launch {
-        delay(500) // debounce window
-        recordDay(dateEpochMs)
+        delay(300) // coalesce rapid actions
+        snapshotAggregator.recordDay(dateEpochMs)
     }
 }
 ```
 
+**Impact:** 5 rapid actions → 1 `recordDay()` call instead of 5. Reduces query count by ~80% during active use.
+
+**Risk:** Low. The 300ms delay is imperceptible. Snapshot is a projection, not user-facing data.
+
 ---
 
-## 5. WeeklyInsightViewModel — 10-Flow Combine
+### 3.3 `backfillMissing()` — Linear Growth
 
-### Current:
+**Algorithm:**
+```
+FOR each day from earliest task to today:
+    IF day NOT in coveredDates:
+        recordDay(day)  — 7 + N queries
+```
+
+**Growth:**
+| History | Days | Active Goals | Total Queries |
+|---------|------|--------------|---------------|
+| 1 month | 30 | 3 | ~300 |
+| 6 months | 180 | 5 | ~2,160 |
+| 1 year | 365 | 5 | ~4,380 |
+
+**Trigger:** App launch when `latest.dateEpochMs < today`. First launch after DB upgrade or fresh install with historical data.
+
+**Optimization opportunities:**
+1. **Batch in transaction:** Wrap all `recordDay()` calls in a single Room `@Transaction` — reduces WAL overhead.
+2. **Limit backfill window:** Backfill only last 90 days. Older snapshots can be regenerated on demand.
+3. **Progressive backfill:** Backfill in chunks (e.g., 30 days per launch) to avoid startup lag.
+
+**Recommendation:** Implement option 2 (limit to 90 days) as the simplest safe fix.
+
+---
+
+### 3.4 Snapshot Redundancy Check
+
+**Question:** Do multiple observers trigger redundant snapshot calculations?
+
+**Analysis:**
+- `SnapshotAggregator.recordDay()` is called explicitly by ViewModel actions — NOT by Room Flow observation.
+- Room Flows (`observeGoalProgress`, `observeBehaviorRange`) are READ-ONLY — they don't trigger writes.
+- No double-write pattern found. ✅
+
+**However:** The `recordDay()` call uses `Flow.first()` internally (one-shot reads):
+```kotlin
+val completed = insightRepository.observeCompletedCount(start, end).first()
+```
+
+Each `.first()` creates a one-shot subscription. **7 one-shot subscriptions per call.** This is fine for individual calls but adds up during rapid actions.
+
+---
+
+## 4. Flow / Repository Query Audit
+
+### 4.1 `WeeklyInsightViewModel` — 10-Flow Combine
+
 ```kotlin
 combine(
-    observeCompletedCount,          // 1
-    observeCreatedCount,            // 2
-    observeCompletionByLifeArea,    // 3
-    observeUnorganizedCount,        // 4
-    observeCompletedTimestamps,     // 5 — UNBOUNDED
-    observeCompletionByDay,         // 6
-    observeRescheduleCounts,        // 7 — UNBOUNDED
-    observeGoalCompletionRates,     // 8
-    observePreviousWeekCompleted,   // 9
-    observePreviousWeekCreated      // 10
+    observeCompletedCount,          // 1 — window-scoped ✅
+    observeCreatedCount,            // 2 — window-scoped ✅
+    observeCompletionByLifeArea,    // 3 — window-scoped ✅
+    observeUnorganizedCount,        // 4 — window-scoped ✅
+    observeCompletedTimestamps,     // 5 — UNBOUNDED 🔴
+    observeCompletionByDay,         // 6 — window-scoped ✅
+    observeRescheduleCounts,        // 7 — UNBOUNDED 🟡
+    observeGoalCompletionRates,     // 8 — global (acceptable, low volume) ✅
+    observePreviousWeekCompleted,   // 9 — window-scoped ✅
+    observePreviousWeekCreated      // 10 — window-scoped ✅
 )
 ```
 
-### Problem:
-Every change to `tasks` or `task_events` triggers ALL 10 queries to re-run. The screen shows weekly data that doesn't change that frequently.
+**Problem:** Every change to `tasks` or `task_events` triggers ALL 10 queries to re-run. The insight screen shows weekly data that doesn't need real-time updates.
 
-### Proposed fix:
-1. **Debounce the combine output** — add `.debounce(300)` before `.collect`
-2. **Scope queries to current/previous week** where possible (some already are)
-3. **Cap `observeCompletedTimestamps`** to last 90 days (see §3.1)
-
----
-
-## 6. Data Volume Projections (6-Month Active Use)
-
-| Table | Estimated Rows | Growth Rate |
-|-------|----------------|-------------|
-| `tasks` | 360–1,080 | 2–6/day |
-| `task_events` | 540–1,620 | 3/task lifecycle |
-| `activity_events` | 180–540 | 1–3/day |
-| `task_steps` | 0–200 | Optional |
-| `goal_progress_snapshot` | 180 × N goals | 1/day/goal |
-| `behavior_snapshot` | 180 | 1/day |
-| `goals` | 10–30 | Slow |
-| `goal_events` | 20–60 | Per lifecycle change |
-
-**At these volumes, the missing indexes and unbounded queries won't cause visible lag yet.** But at 1–2 years of heavy use (2,000+ tasks, 3,000+ events), the issues become noticeable.
-
----
-
-## 7. Recommended Priority Order
-
-### Priority 1 (Before Phase 7) — Schema Migration
-Add missing indexes in a single v15→v16 migration:
-```sql
-CREATE INDEX IF NOT EXISTS index_tasks_goalId ON tasks(goalId);
-CREATE INDEX IF NOT EXISTS index_task_events_timestamp ON task_events(timestamp);
-CREATE INDEX IF NOT EXISTS index_task_events_type_time ON task_events(eventType, timestamp);
-CREATE INDEX IF NOT EXISTS index_activity_events_stepId ON activity_events(stepId);
+**Proposed fix:** Add `.debounce(300)` before `.collect`:
+```kotlin
+combine(/* 10 flows */) { results -> ... }
+    .debounce(300)  // coalesce rapid changes
+    .collect { _insightState.value = it }
 ```
 
-### Priority 2 (Before Phase 7) — Bound Unbounded Queries
-Cap `observeCompletedTimestamps()` to last 90 days. This is the single highest-impact fix.
-
-### Priority 3 (Before Phase 7) — Snapshot Debouncing
-Debounce `recordDay()` to coalesce rapid user actions.
-
-### Priority 4 (Nice to have) — WeeklyInsight Debounce
-Add `.debounce(300)` to the 10-flow combine output.
-
-### Priority 5 (Deferred) — Snapshot Backfill Optimization
-Batch backfill by processing multiple days in a single transaction, or limit backfill to last 90 days.
+**Impact:** Reduces re-computation during rapid user actions.
 
 ---
 
-## 8. What's Already Good (Don't Touch)
+### 4.2 `GoalDetailViewModel` — Graph Pipeline
 
-- ✅ Bulk GROUP BY queries in `observeGoalActivityBulk` / `observeGoalActivityBulkInWindow`
-- ✅ Projection query `getTaskDayKeysBetween` (avoids full entity materialization)
-- ✅ Lazy Graph/Mirror computation in `GoalDetailViewModel`
-- ✅ `WhileSubscribed(5000)` on all StateFlows
-- ✅ `flatMapLatest` for date-driven task queries (proper cancellation)
-- ✅ `stateIn` with `emptyList()` initial values (no blocking)
-- ✅ Repository abstraction layer (thin delegation, no logic duplication)
+```kotlin
+combine(goal, allTasks, goalProgress, _visibilityLevel) { g, ts, progress, level ->
+    // Attention computation
+    // VisibilityResolver
+    // Triple(visibleGraph, title, progress)
+}
+```
+
+**Analysis:** This combine runs on every `allTasks` emission (any task change for this goal). The graph is only visible when the sheet is open, and `startGraphComputation()` / `stopGraphComputation()` properly gate collection. ✅
+
+**However:** The `graphSource()` flow uses `combine(goal, allTasks, goalProgress, _visibilityLevel)` — 4 upstream flows. When any one changes, the entire pipeline re-runs. This includes attention computation and visibility resolution.
+
+**Optimization:** The graph sheet already has lazy computation. No immediate fix needed, but consider `.distinctUntilChanged()` on the output if recomputation becomes expensive.
 
 ---
 
-*This report covers Database Layer only. UI/Compose and Domain/Processing audits are separate.*
+### 4.3 `PlannerViewModel` — Task List
+
+```kotlin
+val tasks: StateFlow<List<TaskEntity>> = _selectedDateEpochMs
+    .flatMapLatest { date -> repository.getTasksForDay(date) }
+    .onEach { _isTasksLoaded.value = true }
+    .stateIn(...)
+```
+
+**Analysis:** `flatMapLatest` properly cancels previous query when date changes. `getTasksForDay` is a single-day query (bounded). ✅
+
+**No issues found.**
+
+---
+
+### 4.4 `GoalViewModel` — Dashboard
+
+```kotlin
+val goalsByTab: StateFlow<List<DashboardGoalItem>> = _selectedTab
+    .flatMapLatest { status ->
+        combine(
+            observeGoalsByStatus(status),           // 1
+            observeGoalCompletionRatesByStatus(status), // 2
+            observeGoalActivityBulk(status),        // 3
+            observeGoalActivityBulkInWindow(status, from, to) // 4
+        ) { ... }
+    }
+```
+
+**Analysis:** 4 bulk queries combined. All use `GROUP BY` — efficient. `flatMapLatest` cancels on tab switch. ✅
+
+**No issues found.**
+
+---
+
+### 4.5 `TaskDetailViewModel` — Activity Feed
+
+```kotlin
+val activities: StateFlow<List<ActivityEventEntity>> = activityEventRepository
+    .observeActivities(taskId)  // observeByTaskId
+    .stateIn(...)
+
+val activityMessages: StateFlow<List<ActivityMessageModel>> = activities
+    .map { ActivityMessageMapper.toMessages(it) }
+    .stateIn(...)
+```
+
+**Analysis:** `observeByTaskId` filters by `taskId` (indexed). Activity feed is per-task, not global. ✅
+
+**However:** The filter is applied in-memory after loading all activities:
+```kotlin
+val filteredActivityMessages = combine(activityMessages, _filterState, _selectedActivityDate) {
+    messages, filter, selectedDate -> applyFilter(messages, filter, selectedDate)
+}
+```
+
+**For tasks with many activities (100+),** the in-memory filter re-runs on every filter change. This is acceptable because:
+1. Activities are per-task (bounded by task lifetime)
+2. Filter changes are user-initiated (not rapid)
+3. The list is already loaded and cached in `activityMessages`
+
+---
+
+## 5. Large List Safety
+
+### 5.1 Activity Feed (Global)
+
+**Finding:** There is NO global `getAllActivities()` query. Activity feeds are always scoped by `taskId`. ✅
+
+The `ActivityEventDao` has `observeByTaskId(taskId)` — always filtered. No unbounded global activity query exists.
+
+### 5.2 Task Lists
+
+| Query | Scope | Bounded? |
+|-------|-------|----------|
+| `getAllTasks()` | Global | ❌ No LIMIT — but not used in active UI |
+| `getTasksForDay(date)` | Single day | ✅ |
+| `getTasksBetween(start, end)` | Date range | ✅ |
+| `getTasksByGoalId(goalId)` | Per goal | ✅ |
+| `getRecentTasks(limit)` | Limited | ✅ |
+| `getTaskDayKeysBetween(start, end)` | Projection only | ✅ |
+
+### 5.3 Goal Lists
+
+| Query | Scope | Bounded? |
+|-------|-------|----------|
+| `getAllGoals()` | Global | ❌ No LIMIT — but goals are low-volume (10–30) |
+| `getActiveGoals()` | Status-filtered | ✅ |
+| `getGoalsByStatus(status)` | Status-filtered | ✅ |
+
+### 5.4 Snapshot Lists
+
+| Query | Scope | Bounded? |
+|-------|-------|----------|
+| `observeGoalProgress(goalId)` | Per goal | ✅ |
+| `observeBehaviorRange(start, end)` | Date range | ✅ |
+| `getCoveredDates()` | All dates | ❌ No LIMIT — but used only in backfill check |
+
+### 5.5 Summary
+
+No dangerous unbounded lists in the active UI path. The only unbounded queries are:
+1. `observeCompletedTimestamps()` — **fix proposed in §2.1**
+2. `observeRescheduleCounts()` — **fix proposed in §2.2**
+3. `getAllTasks()` — verify usage, remove if unused
+4. `getCoveredDates()` — acceptable (low volume)
+
+---
+
+## 6. Migration Safety
+
+### 6.1 Current Schema Version: 15
+
+Migration chain: 5→6→7→8→9→10→11→12→13→14→15
+
+All migrations are additive or non-destructive:
+- v5→6: ADD COLUMN (dateEpochMs)
+- v6→7: Recreate table (DROP COLUMN not supported)
+- v7→8: CREATE TABLE (goal_events)
+- v8→9: CREATE TABLE (snapshots)
+- v9→10: ADD COLUMN (why, deadlineEpochMs)
+- v10→11: CREATE INDEX (performance)
+- v11→12: ADD COLUMN (deadlineEpochMs on tasks)
+- v12→13: CREATE TABLE (activity_events)
+- v13→14: CREATE TABLE (task_steps)
+- v14→15: ADD COLUMN (colorHex)
+
+### 6.2 Proposed v15→v16 Migration
+
+**Change:** Add composite index on `task_events(eventType, timestamp)`
+
+```sql
+CREATE INDEX IF NOT EXISTS index_task_events_type_timestamp
+ON task_events(eventType, timestamp)
+```
+
+**Risk assessment:**
+- ✅ Additive only — no schema change, no data loss
+- ✅ `CREATE INDEX IF NOT EXISTS` is idempotent
+- ✅ Covers existing `eventType` index usage AND adds timestamp range support
+- ✅ `fallbackToDestructiveMigration()` remains as safety net
+- ✅ No entity annotation change needed (index is migration-only for backward compatibility)
+
+**Rollback risk:** None. Index can be dropped in a future migration if needed.
+
+### 6.3 Entity Annotation Consideration
+
+The proposed composite index `(eventType, timestamp)` is NOT added to `@Entity(indices=...)` because:
+1. The Entity already has `Index("taskId")` and `Index("eventType")`
+2. Room creates indices from Entity annotations at table creation
+3. The composite index is for optimization only — not required for correctness
+4. Keeping it migration-only avoids changing the Entity definition
+
+---
+
+## 7. Recommended Implementation Plan
+
+### Priority 1: Debounce `recordDay()` (High Impact, Low Risk)
+
+**File:** `PlannerViewModel.kt`
+**Change:** Replace direct `snapshotAggregator.recordDay()` calls with debounced version
+**Impact:** ~80% reduction in snapshot queries during rapid user actions
+**Risk:** Very low — snapshot is a projection, 300ms delay is imperceptible
+
+### Priority 2: Bound `observeCompletedTimestamps()` (High Impact, Low Risk)
+
+**File:** `InsightDao.kt`, `InsightRepository.kt`, `RoomInsightRepository.kt`, `SnapshotAggregator.kt`
+**Change:** Add `fromEpochMs` parameter (400 days ago)
+**Impact:** Caps streak calculation input at ~400 days
+**Risk:** Very low — streak can't exceed 365 days
+
+### Priority 3: Add Composite Index (Medium Impact, Zero Risk)
+
+**File:** `AppDatabase.kt` (new migration v15→v16)
+**Change:** `CREATE INDEX index_task_events_type_timestamp ON task_events(eventType, timestamp)`
+**Impact:** Faster `observeRescheduleCountBetween()` and `observeCompletedTimestamps()`
+**Risk:** None — additive only
+
+### Priority 4: Bound `observeRescheduleCounts()` (Medium Impact, Low Risk)
+
+**File:** `InsightDao.kt`, `InsightRepository.kt`, `RoomInsightRepository.kt`
+**Change:** Filter to tasks created in last 90 days
+**Impact:** Reduces procrastination alert computation
+**Risk:** Low — old completed tasks with high reschedules are not actionable
+
+### Priority 5: Debounce WeeklyInsightViewModel (Low Impact, Zero Risk)
+
+**File:** `WeeklyInsightViewModel.kt`
+**Change:** Add `.debounce(300)` before `.collect`
+**Impact:** Reduces re-computation during rapid actions
+**Risk:** None
+
+### Priority 6: Verify `getAllTasks()` Usage (Cleanup)
+
+**File:** `TaskDao.kt`
+**Action:** Search for callers. Remove if unused.
+
+---
+
+## 8. What NOT to Change
+
+- ✅ Do not remove event tables (`task_events`, `activity_events`, `goal_events`)
+- ✅ Do not remove snapshot tables (`goal_progress_snapshot`, `behavior_snapshot`)
+- ✅ Do not change business logic in calculators
+- ✅ Do not change Entity definitions unless absolutely necessary
+- ✅ Do not add pagination to per-task activity feeds (already bounded)
+- ✅ Do not change the snapshot projection philosophy (rebuildable, not authoritative)
+- ✅ Do not introduce WorkManager or network calls
+
+---
+
+## 9. Files Affected (Proposed Changes)
+
+| File | Change | Priority |
+|------|--------|----------|
+| `PlannerViewModel.kt` | Debounce `recordDay()` | P1 |
+| `GoalDetailViewModel.kt` | Use debounced `recordDay()` | P1 |
+| `InsightDao.kt` | Add `fromEpochMs` to `observeCompletedTimestamps` | P2 |
+| `InsightRepository.kt` | Update interface signature | P2 |
+| `RoomInsightRepository.kt` | Update implementation | P2 |
+| `SnapshotAggregator.kt` | Pass `fromEpochMs` to `observeCompletedTimestamps` | P2 |
+| `AppDatabase.kt` | Add migration v15→v16 (composite index) | P3 |
+| `InsightDao.kt` | Add `ninetyDaysAgo` to `observeRescheduleCounts` | P4 |
+| `WeeklyInsightViewModel.kt` | Add `.debounce(300)` | P5 |
+
+---
+
+*Report complete. Awaiting review before implementation.*
