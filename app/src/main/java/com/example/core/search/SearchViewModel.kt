@@ -32,6 +32,12 @@ sealed class SearchResult {
     ) : SearchResult()
 }
 
+enum class SearchFilter(val label: String) {
+    ALL("همه"),
+    TASKS("تسک‌ها"),
+    GOALS("اهداف")
+}
+
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getDatabase(application)
     private val taskDao = database.taskDao()
@@ -40,6 +46,9 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
+
+    private val _searchFilter = MutableStateFlow(SearchFilter.ALL)
+    val searchFilter: StateFlow<SearchFilter> = _searchFilter
 
     /** Recent tasks based on search history (last clicked from search) */
     private val recentTaskResults: StateFlow<List<SearchResult>> = combine(
@@ -103,46 +112,51 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
 
     val searchResults: StateFlow<List<SearchResult>> = combine(
         _searchQuery,
+        _searchFilter,
         taskDao.getAllTasks(),
         goalDao.getAllGoals()
-    ) { query, tasks, goals ->
+    ) { query, filter, tasks, goals ->
         if (query.isBlank()) {
             emptyList()
         } else {
             val normalizedQuery = query.trim().normalizeForSearch()
             val results = mutableListOf<SearchResult>()
             
-            // Search tasks (by title or value tag)
-            tasks.filter { task ->
-                task.title.normalizeForSearch().contains(normalizedQuery) ||
-                    task.valueTag?.normalizeForSearch()?.contains(normalizedQuery) == true
-            }.forEach { task ->
-                val dayIdx = persianDayIndex(task.dateEpochMs)
-                val dayName = DateConstants.persianDayNames.getOrElse(dayIdx) {
-                    DateConstants.persianDayNames.first()
+            // Search tasks (if filter allows)
+            if (filter != SearchFilter.GOALS) {
+                tasks.filter { task ->
+                    task.title.normalizeForSearch().contains(normalizedQuery) ||
+                        task.valueTag?.normalizeForSearch()?.contains(normalizedQuery) == true
+                }.forEach { task ->
+                    val dayIdx = persianDayIndex(task.dateEpochMs)
+                    val dayName = DateConstants.persianDayNames.getOrElse(dayIdx) {
+                        DateConstants.persianDayNames.first()
+                    }
+                    results.add(SearchResult.TaskResult(
+                        id = task.id,
+                        title = task.title,
+                        priority = task.priority,
+                        isCompleted = task.isCompleted,
+                        dateEpochMs = task.dateEpochMs,
+                        dayName = dayName
+                    ))
                 }
-                results.add(SearchResult.TaskResult(
-                    id = task.id,
-                    title = task.title,
-                    priority = task.priority,
-                    isCompleted = task.isCompleted,
-                    dateEpochMs = task.dateEpochMs,
-                    dayName = dayName
-                ))
             }
             
-            // Search goals (by title, description, or why)
-            goals.filter { goal ->
-                goal.title.normalizeForSearch().contains(normalizedQuery) ||
-                    goal.description?.normalizeForSearch()?.contains(normalizedQuery) == true ||
-                    goal.why?.normalizeForSearch()?.contains(normalizedQuery) == true
-            }.forEach { goal ->
-                results.add(SearchResult.GoalResult(
-                    id = goal.id,
-                    title = goal.title,
-                    status = goal.status,
-                    description = goal.description
-                ))
+            // Search goals (if filter allows)
+            if (filter != SearchFilter.TASKS) {
+                goals.filter { goal ->
+                    goal.title.normalizeForSearch().contains(normalizedQuery) ||
+                        goal.description?.normalizeForSearch()?.contains(normalizedQuery) == true ||
+                        goal.why?.normalizeForSearch()?.contains(normalizedQuery) == true
+                }.forEach { goal ->
+                    results.add(SearchResult.GoalResult(
+                        id = goal.id,
+                        title = goal.title,
+                        status = goal.status,
+                        description = goal.description
+                    ))
+                }
             }
             
             results
@@ -155,6 +169,10 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
 
     fun updateQuery(query: String) {
         _searchQuery.value = query
+    }
+
+    fun updateFilter(filter: SearchFilter) {
+        _searchFilter.value = filter
     }
 
     /**

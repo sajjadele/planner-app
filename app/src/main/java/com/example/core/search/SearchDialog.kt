@@ -14,10 +14,7 @@ import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.PauseCircle
-import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Flag
-import androidx.compose.material.icons.filled.PauseCircle
 import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -39,6 +36,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.example.core.search.SearchResult
+import com.example.core.search.SearchFilter
 import com.example.core.util.RTL
 import com.example.ui.components.VisionText
 
@@ -54,6 +52,7 @@ fun SearchDialog(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
     val recentResults: List<SearchResult> by viewModel.recentResults.collectAsState()
+    val searchFilter by viewModel.searchFilter.collectAsState()
 
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -151,6 +150,33 @@ fun SearchDialog(
                     )
 
                     Spacer(modifier = Modifier.height(20.dp))
+
+                    // Filter chips
+                    if (searchQuery.isNotBlank()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            SearchFilter.entries.forEach { filter ->
+                                FilterChip(
+                                    selected = searchFilter == filter,
+                                    onClick = { viewModel.updateFilter(filter) },
+                                    label = {
+                                        Text(
+                                            text = filter.label,
+                                            fontSize = 12.sp
+                                        )
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                )
+                            }
+                        }
+                    }
 
                     // Results content
                     if (searchQuery.isBlank()) {
