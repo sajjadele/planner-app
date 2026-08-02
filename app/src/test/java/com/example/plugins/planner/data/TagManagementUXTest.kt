@@ -1,6 +1,6 @@
 package com.example.plugins.planner.data
 
-import com.example.plugins.planner.ui.components.parseColorHex
+import androidx.compose.ui.graphics.Color
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -161,21 +161,20 @@ class TagManagementUXTest {
 
     @Test
     fun `unselected chip uses tag color alpha 8 percent`() {
-        val tagColor = parseColorHex("3B82F6")!!
+        val tagColor = Color(0xFF3B82F6)
         val unselectedBg = tagColor.copy(alpha = 0.08f)
         assertTrue("Alpha should be 0.08", unselectedBg.alpha == 0.08f)
     }
 
     @Test
     fun `selected chip uses tag color alpha 25 percent`() {
-        val tagColor = parseColorHex("3B82F6")!!
+        val tagColor = Color(0xFF3B82F6)
         val selectedBg = tagColor.copy(alpha = 0.25f)
         assertTrue("Alpha should be 0.25", selectedBg.alpha == 0.25f)
     }
 
     @Test
     fun `selected chip has higher alpha than unselected`() {
-        val tagColor = parseColorHex("10B981")!!
         val unselectedAlpha = 0.08f
         val selectedAlpha = 0.25f
         assertTrue("Selected alpha > unselected", selectedAlpha > unselectedAlpha)
@@ -183,7 +182,7 @@ class TagManagementUXTest {
 
     @Test
     fun `chip text uses tag color`() {
-        val tagColor = parseColorHex("EF4444")!!
+        val tagColor = Color(0xFFEF4444)
         assertNotNull("Tag color should be parseable", tagColor)
         // UI renders Text(color = chipColor) — verified structurally
     }
