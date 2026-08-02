@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -798,28 +799,51 @@ private fun TaskDetailOverviewContent(
                 .padding(16.dp)
         ) {
             // ── Editable Title ──
-            OutlinedTextField(
-                value = editableTitle,
-                onValueChange = onEditableTitleChange,
-                label = { Text("${RTL}عنوان تسک", fontSize = 12.sp) },
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                ),
-                shape = RoundedCornerShape(12.dp),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = {
-                    if (editableTitle.isNotBlank() && editableTitle != task?.title) {
-                        onUpdateTitle(editableTitle.trim())
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = editableTitle,
+                    onValueChange = onEditableTitleChange,
+                    label = { Text("${RTL}عنوان تسک", fontSize = 12.sp) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = {
+                        if (editableTitle.isNotBlank() && editableTitle != task?.title) {
+                            onUpdateTitle(editableTitle.trim())
+                        }
+                        focusManager.clearFocus()
+                    })
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                // Save button — visible only when title has changed
+                if (editableTitle.isNotBlank() && editableTitle != task?.title) {
+                    IconButton(
+                        onClick = {
+                            onUpdateTitle(editableTitle.trim())
+                            focusManager.clearFocus()
+                        },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "ذخیره عنوان",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
-                    focusManager.clearFocus()
-                })
-            )
+                }
+            }
 
             Spacer(modifier = Modifier.height(12.dp))
 
