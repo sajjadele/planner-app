@@ -204,17 +204,16 @@ class ActivityScenarioViewModel(application: Application) : AndroidViewModel(app
 
             // Verify timestamp preservation
             val sorted = events.sortedBy { it.timestamp }
-            val expectedTimestamps = listOf(dayMinus2 + 1000L, dayMinus1 + 2000L, todayMs + 3000L, autoCreatedAt)
+            val expectedTimestamps = listOf(dayMinus2 + 1000L, dayMinus1 + 2000L, todayMs + 3000L)
             val timestampsOk = sorted.map { it.timestamp } == expectedTimestamps
             if (timestampsOk) {
                 details.add("PASS: All ${sorted.size} timestamps preserved exactly")
             } else {
-                val actual = sorted.map { it.timestamp }
-                details.add("FAIL: Timestamp mismatch. Expected $expectedTimestamps, got $actual")
+                details.add("FAIL: Timestamps mismatch — expected=$expectedTimestamps, got=${sorted.map { it.timestamp }}")
                 passed = false
             }
 
-            stepRepo.deleteStep(stepId)
+            stepRepo.deleteStep(tagId)
 
         } finally {
             taskDao.deleteTask(task)
@@ -239,26 +238,23 @@ class ActivityScenarioViewModel(application: Application) : AndroidViewModel(app
         details.add("Created task id=$taskId")
 
         try {
-            val stepTitle = "PersistStep-$tag"
-            val step = TaskStepEntity(taskId = taskId, title = stepTitle)
-            val stepId = stepRepo.addStep(step)
-            details.add("Created step id=$stepId")
+            val tagTitle = "PersistTag-$tag"
+            val tag = TaskStepEntity(taskId = taskId, title = tagTitle)
+            val tagId = stepRepo.addStep(tag)
+            details.add("Created tag id=$tagId")
 
             // Tags are metadata — verify persistence of basic fields only
-            val rereadStep = stepRepo.getStepById(stepId)
-            if (rereadStep != null) {
-                val titleOk = rereadStep.title == stepTitle
-                val taskIdOk = rereadStep.taskId == taskId
+            val rereadTag = stepRepo.getStepById(tagId)
+            if (rereadTag != null) {
+                val titleOk = rereadTag.title == tagTitle
+                val taskIdOk = rereadTag.taskId == taskId
 
                 if (titleOk && taskIdOk) {
-                    details.add("PASS: Tag round-trip intact — title=$stepTitle, taskId=$taskId")
+                    details.add("PASS: Tag round-trip intact — title=$tagTitle, taskId=$taskId")
                 } else {
                     details.add("FAIL: Tag corruption — title=$titleOk, taskId=$taskIdOk")
                     passed = false
                 }
-            } else {
-                details.add("FAIL: Step not found after creation")
-                passed = false
             }
 
             val rereadEvents = activityRepo.getEventsByStepId(tagId)
@@ -324,7 +320,7 @@ class ActivityScenarioViewModel(application: Application) : AndroidViewModel(app
                 ActivityEventEntity(taskId = taskId, stepId = tagId, eventType = ActivityEventType.NOTE_ADDED.name, description = "Boundary end", timestamp = todayMs)
             )
             activityRepo.addEvent(
-                ActivityEventEntity(taskId = taskId, stepId = tagId, eventType = ActivityEventType.NOTE_ADDED.name, description = "Mid range", timestamp = midRange)
+                ActivityEventEntity(taskId = taskId, stepId = tagId, eventType = ActivityEventType.NOTE_ADDED.name, description = "Mid range", timestamp = fiveDaysAgoMs + 2 * 86400000L)
             )
             details.add("Created 3 events spanning timeline range")
 

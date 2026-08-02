@@ -139,8 +139,8 @@ class ActivityLabViewModel(application: Application) : AndroidViewModel(applicat
                 }
 
                 // Scenario 2: Tags cannot be completed — verify they remain unchanged
-                val stepBefore2 = taskStepRepository.getStepById(stepId)
-                if (stepBefore2 != null) {
+                val tagBefore2 = taskStepRepository.getStepById(tagId)
+                if (tagBefore2 != null) {
                     // Tags are metadata — no completion state exists
                     results.add("Scenario 2 (Tag Completion): SKIPPED — tags cannot be completed")
                 } else {
