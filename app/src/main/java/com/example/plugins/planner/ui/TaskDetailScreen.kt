@@ -191,7 +191,7 @@ fun TaskDetailScreen(
                 )
             }
             ActivityCreationAction.File -> {
-                filePickerLauncher.launch("*/*")
+                filePickerLauncher.launch(arrayOf("*/*"))
             }
             ActivityCreationAction.ManualActivity -> {
                 showActivityComposer = true
