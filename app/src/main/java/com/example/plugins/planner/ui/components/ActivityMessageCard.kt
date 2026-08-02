@@ -8,6 +8,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Reply
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +36,9 @@ import com.example.plugins.planner.data.ActivityMessageAction
 import com.example.plugins.planner.data.ActivityMessageCapability
 import com.example.plugins.planner.data.ActivityMessageDisplayContent
 import com.example.plugins.planner.data.ActivityMessageModel
+import com.example.ui.screens.components.VisionMenuDivider
+import com.example.ui.screens.components.VisionMenuItem
+import com.example.ui.screens.components.VisionPopupMenu
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -138,11 +146,31 @@ fun ActivityMessageCard(
                             onAttachmentClick = onAttachmentClick
                         )
 
-                        // ── Metadata: edited + timestamp ──
-                        MessageMetadataRow(
-                            isEdited = message.isEdited,
-                            createdAt = message.createdAt
-                        )
+                        // ── Metadata: edited + timestamp + menu button ──
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            MessageMetadataRow(
+                                isEdited = message.isEdited,
+                                createdAt = message.createdAt,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (capability.canEdit || capability.canDelete || capability.canReply) {
+                                IconButton(
+                                    onClick = { showMenu = true },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MoreVert,
+                                        contentDescription = "${RTL}بیشتر",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -300,11 +328,11 @@ private fun FilePreview(
 @Composable
 private fun MessageMetadataRow(
     isEdited: Boolean,
-    createdAt: Long
+    createdAt: Long,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
             .padding(top = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.End
@@ -387,29 +415,32 @@ private fun ContextMenu(
     messageId: Long,
     onAction: ((ActivityMessageAction) -> Unit)?
 ) {
-    DropdownMenu(
+    VisionPopupMenu(
         expanded = showMenu,
         onDismissRequest = onDismiss
     ) {
         if (capability.canReply) {
-            DropdownMenuItem(
-                text = { Text("${RTL}پاسخ", fontSize = 13.sp) },
+            VisionMenuItem(
+                text = "${RTL}پاسخ",
                 onClick = { onDismiss(); onAction?.invoke(ActivityMessageAction.Reply(messageId)) },
-                leadingIcon = { Text("↩️", fontSize = 14.sp) }
+                leadingIcon = Icons.Default.Reply
             )
         }
         if (capability.canEdit) {
-            DropdownMenuItem(
-                text = { Text("${RTL}ویرایش", fontSize = 13.sp) },
+            VisionMenuItem(
+                text = "${RTL}ویرایش",
                 onClick = { onDismiss(); onAction?.invoke(ActivityMessageAction.Edit(messageId)) },
-                leadingIcon = { Text("✏️", fontSize = 14.sp) }
+                leadingIcon = Icons.Default.Edit
             )
         }
         if (capability.canDelete) {
-            DropdownMenuItem(
-                text = { Text("${RTL}حذف", fontSize = 13.sp) },
+            VisionMenuDivider()
+            VisionMenuItem(
+                text = "${RTL}حذف",
                 onClick = { onDismiss(); onAction?.invoke(ActivityMessageAction.Delete(messageId)) },
-                leadingIcon = { Text("🗑", fontSize = 14.sp) }
+                leadingIcon = Icons.Default.DeleteOutline,
+                iconTint = MaterialTheme.colorScheme.error,
+                textColor = MaterialTheme.colorScheme.error
             )
         }
     }
