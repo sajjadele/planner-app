@@ -114,39 +114,8 @@ class ActivityScenarioViewModel(application: Application) : AndroidViewModel(app
                 passed = false
             }
 
-            // Step A: complete
-            stepRepo.updateStep(
-                stepRepo.getStepById(stepAId)!!.copy(isCompleted = true, completedAt = System.currentTimeMillis())
-            )
-            activityRepo.addEvent(
-                ActivityEventEntity(taskId = taskId, stepId = stepAId, eventType = ActivityEventType.STEP_COMPLETED.name, description = stepA.title)
-            )
-            val stepACompleted = stepRepo.getStepById(stepAId)
-            if (stepACompleted?.isCompleted == true && stepACompleted.completedAt != null) {
-                details.add("PASS: STEP_COMPLETED updated state correctly")
-            } else {
-                details.add("FAIL: STEP_COMPLETED state mismatch")
-                passed = false
-            }
-
-            // Step A: reopen
-            stepRepo.updateStep(stepACompleted!!.copy(isCompleted = false, completedAt = null))
-            activityRepo.addEvent(
-                ActivityEventEntity(taskId = taskId, stepId = stepAId, eventType = ActivityEventType.STEP_REOPENED.name, description = stepA.title)
-            )
-            val stepAReopened = stepRepo.getStepById(stepAId)
-            if (stepAReopened?.isCompleted == false && stepAReopened.completedAt == null) {
-                details.add("PASS: STEP_REOPENED updated state correctly")
-            } else {
-                details.add("FAIL: STEP_REOPENED state mismatch")
-                passed = false
-            }
-
-            // Step A: complete again (ensure re-complete works)
-            stepRepo.updateStep(stepAReopened!!.copy(isCompleted = true, completedAt = System.currentTimeMillis()))
-            activityRepo.addEvent(
-                ActivityEventEntity(taskId = taskId, stepId = stepAId, eventType = ActivityEventType.STEP_COMPLETED.name, description = stepA.title)
-            )
+            // Tags are metadata — no completion state to test
+            details.add("SKIP: Tag completion state (tags are metadata only)")
 
             // Step B: create + delete
             val stepB = TaskStepEntity(taskId = taskId, title = "Step B-$tag")
@@ -293,24 +262,16 @@ class ActivityScenarioViewModel(application: Application) : AndroidViewModel(app
             val stepId = stepRepo.addStep(step)
             details.add("Created step id=$stepId")
 
-            // STEP_CREATED is auto-created by repository
-            val completionTime = System.currentTimeMillis()
-            stepRepo.updateStep(stepRepo.getStepById(stepId)!!.copy(isCompleted = true, completedAt = completionTime))
-            activityRepo.addEvent(
-                ActivityEventEntity(taskId = taskId, stepId = stepId, eventType = ActivityEventType.STEP_COMPLETED.name, description = stepTitle)
-            )
-
-            // Re-read and verify
+            // Tags are metadata — verify persistence of basic fields only
             val rereadStep = stepRepo.getStepById(stepId)
             if (rereadStep != null) {
                 val titleOk = rereadStep.title == stepTitle
-                val completedOk = rereadStep.isCompleted
-                val completedAtOk = rereadStep.completedAt == completionTime
+                val taskIdOk = rereadStep.taskId == taskId
 
-                if (titleOk && completedOk && completedAtOk) {
-                    details.add("PASS: Step round-trip intact — title=$stepTitle, isCompleted=true, completedAt=$completionTime")
+                if (titleOk && taskIdOk) {
+                    details.add("PASS: Tag round-trip intact — title=$stepTitle, taskId=$taskId")
                 } else {
-                    details.add("FAIL: Step corruption — title=$titleOk, isCompleted=$completedOk, completedAt=$completedAtOk")
+                    details.add("FAIL: Tag corruption — title=$titleOk, taskId=$taskIdOk")
                     passed = false
                 }
             } else {

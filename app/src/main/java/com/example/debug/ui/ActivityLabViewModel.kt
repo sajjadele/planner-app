@@ -91,37 +91,11 @@ class ActivityLabViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun toggleStepCompletion(step: TaskStepEntity) {
-        val task = _state.value.selectedTask ?: return
-        viewModelScope.launch {
-            _state.value = _state.value.copy(isRunning = true)
-            try {
-                val nowCompleted = !step.isCompleted
-                val updated = step.copy(
-                    isCompleted = nowCompleted,
-                    completedAt = if (nowCompleted) System.currentTimeMillis() else null
-                )
-                taskStepRepository.updateStep(updated)
-                if (nowCompleted) {
-                    activityEventRepository.addEvent(
-                        ActivityEventEntity(
-                            taskId = task.id,
-                            stepId = step.id,
-                            eventType = ActivityEventType.STEP_COMPLETED.name,
-                            description = step.title
-                        )
-                    )
-                }
-                _state.value = _state.value.copy(
-                    status = if (nowCompleted) "Step completed: ${step.title}" else "Step reopened: ${step.title}",
-                    isRunning = false
-                )
-            } catch (e: Exception) {
-                _state.value = _state.value.copy(
-                    status = "Error: ${e.message}",
-                    isRunning = false
-                )
-            }
-        }
+        // Tags are metadata only — they cannot be completed.
+        _state.value = _state.value.copy(
+            status = "Tags cannot be completed: ${step.title}",
+            isRunning = false
+        )
     }
 
     fun deleteStep(step: TaskStepEntity) {
@@ -180,32 +154,13 @@ class ActivityLabViewModel(application: Application) : AndroidViewModel(applicat
                     results.add("Scenario 1 (Create): FAIL — step or event not found")
                 }
 
-                // Scenario 2: Complete step
-                val stepBefore = taskStepRepository.getStepById(stepId)
-                if (stepBefore != null) {
-                    val completedStep = stepBefore.copy(
-                        isCompleted = true,
-                        completedAt = System.currentTimeMillis()
-                    )
-                    taskStepRepository.updateStep(completedStep)
-                    activityEventRepository.addEvent(
-                        ActivityEventEntity(
-                            taskId = task.id,
-                            stepId = stepId,
-                            eventType = ActivityEventType.STEP_COMPLETED.name,
-                            description = testTitle
-                        )
-                    )
-
-                    val stepAfter = taskStepRepository.getStepById(stepId)
-                    val completedEvent = activityEventRepository.findLatestEvent(task.id, ActivityEventType.STEP_COMPLETED.name)
-                    if (stepAfter != null && stepAfter.isCompleted && stepAfter.completedAt != null && completedEvent != null && completedEvent.stepId == stepId) {
-                        results.add("Scenario 2 (Complete): PASS")
-                    } else {
-                        results.add("Scenario 2 (Complete): FAIL — step state or event mismatch")
-                    }
+                // Scenario 2: Tags cannot be completed — verify they remain unchanged
+                val stepBefore2 = taskStepRepository.getStepById(stepId)
+                if (stepBefore2 != null) {
+                    // Tags are metadata — no completion state exists
+                    results.add("Scenario 2 (Tag Completion): SKIPPED — tags cannot be completed")
                 } else {
-                    results.add("Scenario 2 (Complete): FAIL — step not found")
+                    results.add("Scenario 2 (Tag Completion): FAIL — step not found")
                 }
 
                 // Scenario 3: Delete step

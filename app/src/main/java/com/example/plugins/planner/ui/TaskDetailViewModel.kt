@@ -545,35 +545,16 @@ class TaskDetailViewModel(
 
     /** Toggle step completion status and log the activity event */
     @Deprecated(
-        "Step completion as container behavior is removed. " +
-        "Steps are now tags/metadata only. " +
+        "Tag completion is not supported. " +
+        "Tags are metadata only — they cannot be completed. " +
         "Use the Activity Feed for tracking progress.",
         level = DeprecationLevel.WARNING
     )
     fun toggleStepCompletion(step: TaskStepEntity) {
-        viewModelScope.launch {
-            val nowCompleted = !step.isCompleted
-            val updated = step.copy(
-                isCompleted = nowCompleted,
-                completedAt = if (nowCompleted) System.currentTimeMillis() else null
-            )
-            taskStepRepository.updateStep(updated)
-
-            val eventType = if (nowCompleted)
-                ActivityEventType.STEP_COMPLETED
-            else
-                ActivityEventType.STEP_REOPENED
-
-            activityEventRepository.addEvent(
-                ActivityEventEntity(
-                    taskId = taskId,
-                    stepId = step.id,
-                    eventType = eventType.name,
-                    description = step.title
-                )
-            )
-        }
+        // Tags are metadata only — they cannot be completed.
+        // This method is a no-op for backward compatibility.
     }
+
     /**
      * Delete a tag.
      *

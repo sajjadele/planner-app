@@ -120,7 +120,6 @@ fun DeveloperLabDialog(
                     onSelectTask = { activityLabViewModel.selectTask(it) },
                     onStepInputChange = { activityLabViewModel.updateStepInput(it) },
                     onAddStep = { activityLabViewModel.addStep() },
-                    onToggleStep = { activityLabViewModel.toggleStepCompletion(it) },
                     onDeleteStep = { activityLabViewModel.deleteStep(it) },
                     onRunVerification = { activityLabViewModel.runVerification() }
                 )
@@ -428,7 +427,6 @@ private fun ActivityLabSection(
     onSelectTask: (TaskEntity) -> Unit,
     onStepInputChange: (String) -> Unit,
     onAddStep: () -> Unit,
-    onToggleStep: (TaskStepEntity) -> Unit,
     onDeleteStep: (TaskStepEntity) -> Unit,
     onRunVerification: () -> Unit
 ) {
@@ -553,10 +551,9 @@ private fun ActivityLabSection(
                                 .padding(horizontal = 10.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Checkbox(
-                                checked = step.isCompleted,
-                                onCheckedChange = { onToggleStep(step) },
-                                modifier = Modifier.size(20.dp)
+                            Text(
+                                text = step.title,
+                                modifier = Modifier.weight(1f)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Column(modifier = Modifier.weight(1f)) {
