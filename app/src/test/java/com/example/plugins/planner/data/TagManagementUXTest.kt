@@ -59,7 +59,6 @@ class TagManagementUXTest {
             taskId = 1,
             title = "Android",
             colorHex = "8B5CF6",
-            isCompleted = false,
             createdAt = 1000L
         )
         val updated = original.copy(
@@ -70,7 +69,6 @@ class TagManagementUXTest {
         assertEquals(1, updated.taskId)
         assertEquals("Kotlin", updated.title)
         assertEquals("3B82F6", updated.colorHex)
-        assertEquals(false, updated.isCompleted)
         assertEquals(1000L, updated.createdAt)
     }
 

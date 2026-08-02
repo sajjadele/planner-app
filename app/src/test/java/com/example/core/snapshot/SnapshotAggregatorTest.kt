@@ -30,7 +30,7 @@ class SnapshotAggregatorTest {
         val insightRepo = mockk<InsightRepository>()
         io.mockk.every { insightRepo.observeCompletedCount(any(), any()) } returns flowOf(5)
         io.mockk.every { insightRepo.observeCreatedCount(any(), any()) } returns flowOf(10)
-        io.mockk.every { insightRepo.observeCompletedTimestamps() } returns flowOf(listOf(day))
+        io.mockk.every { insightRepo.observeCompletedTimestamps(any()) } returns flowOf(listOf(day))
         io.mockk.every { insightRepo.observeRescheduleCountBetween(any(), any()) } returns flowOf(2)
         io.mockk.coEvery { insightRepo.getGoalDayCounts(any(), any(), any()) } returns GoalDayCount(total = 10, completed = 4)
 
