@@ -281,7 +281,7 @@ class ActivityScenarioViewModel(application: Application) : AndroidViewModel(app
                 passed = false
             }
 
-            stepRepo.deleteStep(stepId)
+            stepRepo.deleteStep(tagId)
 
         } finally {
             taskDao.deleteTask(task)
@@ -341,7 +341,7 @@ class ActivityScenarioViewModel(application: Application) : AndroidViewModel(app
                 passed = false
             }
 
-            stepRepo.deleteStep(stepId)
+            stepRepo.deleteStep(tagId)
 
         } finally {
             taskDao.deleteTask(task)
