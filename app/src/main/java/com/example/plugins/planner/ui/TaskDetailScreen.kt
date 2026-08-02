@@ -107,7 +107,7 @@ fun TaskDetailScreen(
     val timelineStartDate by viewModel.timelineStartDate.collectAsState()
     val timelineEndDate by viewModel.timelineEndDate.collectAsState()
 
-    var editableTitle by remember(task) { mutableStateOf(task?.title ?: "") }
+    val editableTitle by viewModel.editableTitle.collectAsState()
     var showGoalDropdown by remember { mutableStateOf(false) }
     var logInput by remember { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
@@ -330,7 +330,7 @@ fun TaskDetailScreen(
                 0 -> TaskDetailOverviewContent(
                     task = task,
                     editableTitle = editableTitle,
-                    onEditableTitleChange = { editableTitle = it },
+                    onEditableTitleChange = { viewModel.updateEditableTitle(it) },
                     showGoalDropdown = showGoalDropdown,
                     onShowGoalDropdownChange = { showGoalDropdown = it },
                     currentGoalName = currentGoalName,

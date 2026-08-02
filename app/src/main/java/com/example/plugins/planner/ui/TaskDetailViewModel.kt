@@ -62,6 +62,15 @@ class TaskDetailViewModel(
         createStepUseCase = CreateStepUseCase(database)
     }
 
+    /** Editable title — owned by ViewModel so it stays in sync with task updates */
+    private val _editableTitle = MutableStateFlow("")
+    val editableTitle: StateFlow<String> = _editableTitle.asStateFlow()
+
+    /** Update the editable title (called from Compose on user input) */
+    fun updateEditableTitle(title: String) {
+        _editableTitle.value = title
+    }
+
     /** Loading gate: true once the first Room emission arrives for this task. */
     private val _isTaskLoaded = MutableStateFlow(false)
     val isTaskLoaded: StateFlow<Boolean> = _isTaskLoaded.asStateFlow()
@@ -224,24 +233,25 @@ class TaskDetailViewModel(
     // Phase 5.5b: Context-Aware Activity Creation
     // ════════════════════════════════════════════════════════════════
 
-    /** Current creation context derived from the active filter state. */
-    val creationContext: StateFlow<ActivityCreationContext> = _filterState
-        .map { filter ->
-            if (filter.selectedStepId != null) {
-                val step = steps.value.find { it.id.toLong() == filter.selectedStepId }
-                ActivityCreationContext(
-                    stepId = filter.selectedStepId,
-                    stepName = step?.title
-                )
-            } else {
-                ActivityCreationContext.DEFAULT
-            }
+    /** Current creation context derived from the active filter state.
+     *  Reacts to both filter changes AND steps/tags changes. */
+    val creationContext: StateFlow<ActivityCreationContext> = combine(
+        _filterState, steps
+    ) { filter, stepList ->
+        if (filter.selectedStepId != null) {
+            val step = stepList.find { it.id.toLong() == filter.selectedStepId }
+            ActivityCreationContext(
+                stepId = filter.selectedStepId,
+                stepName = step?.title
+            )
+        } else {
+            ActivityCreationContext.DEFAULT
         }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = ActivityCreationContext.DEFAULT
-        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = ActivityCreationContext.DEFAULT
+    )
 
     /** Timeline navigation range — today's start in epoch ms */
     private val _timelineStartDate = MutableStateFlow(JalaliDate.toEpochMs(JalaliDate.today()))
@@ -263,6 +273,7 @@ class TaskDetailViewModel(
         viewModelScope.launch {
             task.collect { t ->
                 if (t != null) {
+                    _editableTitle.value = t.title
                     val end = normalizeToDayStart(t.dateEpochMs)
                     _timelineEndDate.value = end
                     _selectedActivityDate.value?.let { sel ->
