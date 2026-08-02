@@ -128,6 +128,11 @@ fun TaskDetailScreen(
     var selectedMessageId: Long? by remember { mutableStateOf(null) }
     var scrollToMessageId: Long? by remember { mutableStateOf(null) }
 
+    // ── Multi-select state (Telegram-style) ──
+    var selectedMessageIds by remember { mutableStateOf(setOf<Long>()) }
+    val isSelectionMode = selectedMessageIds.isNotEmpty()
+    var showBatchDeleteConfirm by remember { mutableStateOf(false) }
+
     // ── Image picker for direct FAB action ──
     val context = LocalContext.current
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -269,6 +274,13 @@ fun TaskDetailScreen(
             is ActivityMessageAction.ReplyNavigation -> {
                 scrollToMessageId = action.messageId
             }
+            is ActivityMessageAction.Select -> {
+                selectedMessageIds = if (action.messageId in selectedMessageIds) {
+                    selectedMessageIds - action.messageId
+                } else {
+                    selectedMessageIds + action.messageId
+                }
+            }
         }
     } }
 
@@ -302,7 +314,16 @@ fun TaskDetailScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            TaskDetailTopBar(onBack = onBack)
+            // ── Top Bar: Selection mode or normal ──
+            if (isSelectionMode) {
+                SelectionModeTopBar(
+                    selectedCount = selectedMessageIds.size,
+                    onClose = { selectedMessageIds = emptySet() },
+                    onDelete = { showBatchDeleteConfirm = true }
+                )
+            } else {
+                TaskDetailTopBar(onBack = onBack)
+            }
 
             TaskDetailTabSelector(
                 selectedTab = selectedTab,
@@ -338,12 +359,20 @@ fun TaskDetailScreen(
                     steps = steps,
                     filterState = filterState,
                     selectedMessageId = selectedMessageId,
+                    isSelectionMode = isSelectionMode,
                     selectedDate = selectedActivityDate,
                     timelineStartDate = timelineStartDate,
                     timelineEndDate = timelineEndDate,
                     onTapComposer = { showActivityComposer = true },
                     onSelectAction = handleCreationAction,
                     onMessageAction = handleMessageAction,
+                    onLongPress = { messageId ->
+                        selectedMessageIds = if (messageId in selectedMessageIds) {
+                            selectedMessageIds - messageId
+                        } else {
+                            selectedMessageIds + messageId
+                        }
+                    },
                     onShowAll = { viewModel.showAllActivities() },
                     onFilterByStep = { stepId -> viewModel.filterByStep(stepId) },
                     onAddTag = { showAddTagDialog = true },
@@ -398,6 +427,22 @@ fun TaskDetailScreen(
                 confirmText = "${RTL}حذف",
                 dismissText = "${RTL}لغو",
                 onConfirm = { viewModel.deleteActivity(msgId) },
+                isDestructive = true
+            )
+        }
+
+        // ── Batch Delete Confirmation ──
+        if (showBatchDeleteConfirm) {
+            VisionConfirmDialog(
+                onDismissRequest = { showBatchDeleteConfirm = false },
+                title = "${RTL}حذف پیام‌ها",
+                message = "${RTL}${selectedMessageIds.size} پیام حذف خواهد شد.\n${RTL}این عملیات قابل بازگشت نیست.",
+                confirmText = "${RTL}حذف",
+                dismissText = "${RTL}لغو",
+                onConfirm = {
+                    selectedMessageIds.forEach { viewModel.deleteActivity(it) }
+                    selectedMessageIds = emptySet()
+                },
                 isDestructive = true
             )
         }
@@ -662,9 +707,46 @@ private fun TaskDetailTopBar(
     }
 }
 
-// ════════════════════════════════════════════════════════════════
+@Composable
+private fun SelectionModeTopBar(
+    selectedCount: Int,
+    onClose: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onClose) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "${RTL}بستن",
+                tint = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+        Text(
+            text = "${RTL}${selectedCount}",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(onClick = onDelete) {
+            Icon(
+                imageVector = Icons.Default.DeleteOutline,
+                contentDescription = "${RTL}حذف",
+                tint = MaterialTheme.colorScheme.error
+            )
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
 // TAB SELECTOR
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 
 @Composable
 private fun TaskDetailTabSelector(
@@ -860,12 +942,14 @@ private fun TaskDetailActivityContent(
     steps: List<TaskStepEntity>,
     filterState: ActivityFeedFilterState,
     selectedMessageId: Long? = null,
+    isSelectionMode: Boolean = false,
     selectedDate: Long? = null,
     timelineStartDate: Long = 0L,
     timelineEndDate: Long = 0L,
     onTapComposer: () -> Unit,
     onSelectAction: (ActivityCreationAction) -> Unit,
     onMessageAction: ((ActivityMessageAction) -> Unit)? = null,
+    onLongPress: ((Long) -> Unit)? = null,
     onShowAll: () -> Unit = {},
     onFilterByStep: (Long) -> Unit = {},
     onAddTag: () -> Unit = {},
@@ -949,8 +1033,10 @@ private fun TaskDetailActivityContent(
                     ActivityMessageCard(
                         message = message,
                         repliedToMessage = repliedTo,
-                        isSelected = message.id == selectedMessageId,
+                        isSelected = message.id in selectedMessageIds,
+                        isSelectionMode = isSelectionMode,
                         onAction = onMessageAction,
+                        onLongPress = { onLongPress?.invoke(message.id) },
                         onAttachmentClick = { attachment ->
                             when (attachment) {
                                 is ActivityAttachment.Image -> {

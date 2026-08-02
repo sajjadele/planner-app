@@ -43,4 +43,9 @@ sealed class ActivityMessageAction {
     data class ReplyNavigation(
         val messageId: Long
     ) : ActivityMessageAction()
+
+    /** Select/deselect a message for batch operations. */
+    data class Select(
+        val messageId: Long
+    ) : ActivityMessageAction()
 }

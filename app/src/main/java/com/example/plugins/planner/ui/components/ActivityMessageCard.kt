@@ -11,7 +11,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Reply
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -58,7 +57,9 @@ fun ActivityMessageCard(
     message: ActivityMessageModel,
     repliedToMessage: ActivityMessageModel? = null,
     isSelected: Boolean = false,
+    isSelectionMode: Boolean = false,
     onAction: ((ActivityMessageAction) -> Unit)? = null,
+    onLongPress: (() -> Unit)? = null,
     onAttachmentClick: ((ActivityAttachment) -> Unit)? = null,
     onReplyReferenceClick: ((Long) -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -107,11 +108,19 @@ fun ActivityMessageCard(
                     modifier = Modifier
                         .fillMaxWidth(maxBubbleWidthFraction)
                         .combinedClickable(
-                            onClick = { if (showMenu) showMenu = false },
-                            onLongClick = {
-                                if (capability.canEdit || capability.canDelete || capability.canReply) {
-                                    showMenu = true
+                            onClick = {
+                                if (isSelectionMode) {
+                                    // In selection mode: toggle select/deselect
+                                    onLongPress?.invoke()
+                                } else {
+                                    // Normal mode: toggle context menu
+                                    if (showMenu) showMenu = false
+                                    else if (capability.canEdit || capability.canDelete || capability.canReply) showMenu = true
                                 }
+                            },
+                            onLongClick = {
+                                // Always enter selection mode
+                                onLongPress?.invoke()
                             }
                         ),
                     color = backgroundColor,
@@ -146,31 +155,11 @@ fun ActivityMessageCard(
                             onAttachmentClick = onAttachmentClick
                         )
 
-                        // ── Metadata: edited + timestamp + menu button ──
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            MessageMetadataRow(
-                                isEdited = message.isEdited,
-                                createdAt = message.createdAt,
-                                modifier = Modifier.weight(1f)
-                            )
-                            if (capability.canEdit || capability.canDelete || capability.canReply) {
-                                IconButton(
-                                    onClick = { showMenu = true },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.MoreVert,
-                                        contentDescription = "${RTL}بیشتر",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
-                            }
-                        }
+                        // ── Metadata: edited + timestamp ──
+                        MessageMetadataRow(
+                            isEdited = message.isEdited,
+                            createdAt = message.createdAt
+                        )
                     }
                 }
             }
@@ -328,11 +317,11 @@ private fun FilePreview(
 @Composable
 private fun MessageMetadataRow(
     isEdited: Boolean,
-    createdAt: Long,
-    modifier: Modifier = Modifier
+    createdAt: Long
 ) {
     Row(
-        modifier = modifier
+        modifier = Modifier
+            .fillMaxWidth()
             .padding(top = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.End
