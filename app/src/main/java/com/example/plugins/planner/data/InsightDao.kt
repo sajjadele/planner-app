@@ -35,18 +35,21 @@ interface InsightDao {
     """)
     fun observeCreatedCount(start: Long, end: Long): Flow<Int>
 
-    // ──────────────────────────────────────────────
-    // Streak: raw timestamps of 'completed' events
-    // Uses task_events.timestamp (actual completion time), NOT dateEpochMs.
-    // A streak is about user action on a calendar day, not scheduled dates.
-    // ──────────────────────────────────────────────
-
-    @Query("""
+    /**
+     * Raw timestamps of 'completed' events.
+     * Uses task_events.timestamp (actual completion time), NOT dateEpochMs.
+     * A streak is about user action on a calendar day, not scheduled dates.
+     *
+     * @param fromEpochMs lower bound — only completions after this timestamp are returned.
+     *                    Caps streak calculation at ~400 days (any realistic streak length).
+     */
+    @Query(
+        """
         SELECT timestamp FROM task_events
-        WHERE eventType = 'completed'
-    """)
-    fun observeCompletedTimestamps(): Flow<List<Long>>
-
+        WHERE eventType = 'completed' AND timestamp >= :fromEpochMs
+        """
+    )
+    fun observeCompletedTimestamps(fromEpochMs: Long): Flow<List<Long>>
     // ──────────────────────────────────────────────
     // Life area breakdown
     // ──────────────────────────────────────────────
@@ -99,16 +102,19 @@ interface InsightDao {
     // Tracks how many times each task has been rescheduled.
     // Tasks with ≥ 3 reschedules signal procrastination patterns.
     // Joins tasks to resolve the title without a blocking lookup.
+    //
+    // @param fromEpochMs lower bound — only tasks created after this timestamp are returned.
+    //                     Caps procrastination alerts at ~90 days (active concern window).
     // ──────────────────────────────────────────────
 
     @Query("""
         SELECT te.taskId AS taskId, t.title AS taskTitle, t.timestamp AS taskCreatedAt, COUNT(*) AS rescheduleCount
         FROM task_events te
         JOIN tasks t ON t.id = te.taskId
-        WHERE te.eventType = 'rescheduled'
+        WHERE te.eventType = 'rescheduled' AND t.timestamp >= :fromEpochMs
         GROUP BY te.taskId
     """)
-    fun observeRescheduleCounts(): Flow<List<TaskRescheduleWithTitle>>
+    fun observeRescheduleCounts(fromEpochMs: Long): Flow<List<TaskRescheduleWithTitle>>
 
     @Query("""
         SELECT te.taskId AS taskId, t.title AS taskTitle, t.timestamp AS taskCreatedAt, COUNT(*) AS rescheduleCount

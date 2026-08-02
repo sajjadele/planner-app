@@ -38,7 +38,7 @@ import com.example.plugins.planner.data.TaskStepEntity
         ActivityEventEntity::class,
         TaskStepEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -293,6 +293,24 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v15 → v16: Performance — composite index on task_events.
+         *
+         * Adds a composite index on (eventType, timestamp) to speed up:
+         * - observeRescheduleCountBetween() — filters on eventType + timestamp range
+         * - observeCompletedTimestamps() — filters on eventType + timestamp >=
+         *
+         * Purely additive, non-destructive. No schema/column change.
+         */
+        private val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_task_events_type_timestamp " +
+                    "ON task_events(eventType, timestamp)"
+                )
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -310,7 +328,8 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_11_12,
                     MIGRATION_12_13,
                     MIGRATION_13_14,
-                    MIGRATION_14_15
+                    MIGRATION_14_15,
+                    MIGRATION_15_16
                 )
                 .fallbackToDestructiveMigration()
                 .build()

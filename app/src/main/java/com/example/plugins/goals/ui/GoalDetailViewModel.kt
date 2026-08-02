@@ -35,7 +35,9 @@ import com.example.core.receiver.ReminderScheduler
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -95,6 +97,17 @@ class GoalDetailViewModel(
     private val graphPreferences: GraphViewPreferences
 
     private val windowDays = 30
+
+    /** Debounced snapshot refresh — coalesces rapid user actions into one recordDay() call. */
+    private var recordDayJob: Job? = null
+
+    private fun recordDayDebounced(dateEpochMs: Long) {
+        recordDayJob?.cancel()
+        recordDayJob = viewModelScope.launch {
+            delay(RECORD_DAY_DEBOUNCE_MS)
+            snapshotAggregator.recordDay(dateEpochMs)
+        }
+    }
 
     init {
         val database = AppDatabase.getDatabase(application)
@@ -587,7 +600,7 @@ class GoalDetailViewModel(
             } else if (updated.reminderHour != null && updated.reminderMinute != null) {
                 ReminderScheduler.schedule(getApplication(), updated)
             }
-            snapshotAggregator.recordDay(todayDateEpochMs())
+            recordDayDebounced(todayDateEpochMs())
             if (_showMirrorSheet.value) refreshMirror()
         }
     }
@@ -644,3 +657,6 @@ class GoalDetailViewModel(
         }
     }
 }
+
+/** Debounce window for snapshot refresh — coalesces rapid user actions. */
+private const val RECORD_DAY_DEBOUNCE_MS = 300L

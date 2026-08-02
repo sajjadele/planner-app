@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 
 class WeeklyInsightViewModel(application: Application) : AndroidViewModel(application) {
@@ -60,9 +61,13 @@ class WeeklyInsightViewModel(application: Application) : AndroidViewModel(applic
                 insightRepository.observeCreatedCount(curStart, curEnd),
                 insightRepository.observeCompletionByLifeArea(curStart, curEnd),
                 insightRepository.observeUnorganizedCount(curStart, curEnd),
-                insightRepository.observeCompletedTimestamps(),
+                insightRepository.observeCompletedTimestamps(
+                    System.currentTimeMillis() - STREAK_LOOKBACK_MS
+                ),
                 insightRepository.observeCompletionByDay(curStart, curEnd),
-                insightRepository.observeRescheduleCounts(),
+                insightRepository.observeRescheduleCounts(
+                    System.currentTimeMillis() - RESCHEDULE_LOOKBACK_MS
+                ),
                 insightRepository.observeGoalCompletionRates(),
                 insightRepository.observePreviousWeekCompletedCount(prevStart, prevEnd),
                 insightRepository.observePreviousWeekCreatedCount(prevStart, prevEnd)
@@ -125,7 +130,7 @@ class WeeklyInsightViewModel(application: Application) : AndroidViewModel(applic
                         weeklyVelocityPercent = velocityDiff
                     )
                 }
-            }.collect { _insightState.value = it }
+            }.debounce(INSIGHT_DEBOUNCE_MS).collect { _insightState.value = it }
         }
 
         // Observe unorganized tasks list
@@ -134,3 +139,10 @@ class WeeklyInsightViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 }
+
+/** Cap streak calculation input at ~400 days. Any realistic streak is within this window. */
+private const val STREAK_LOOKBACK_MS = 400L * 86_400_000L
+/** Cap procrastination alerts at ~90 days. Old completed tasks with high reschedules are not actionable. */
+private const val RESCHEDULE_LOOKBACK_MS = 90L * 86_400_000L
+/** Debounce window for insight recomputation — coalesces rapid task changes. */
+private const val INSIGHT_DEBOUNCE_MS = 300L

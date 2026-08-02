@@ -36,7 +36,10 @@ class SnapshotAggregator(
 
         val completed = insightRepository.observeCompletedCount(start, end).first()
         val created = insightRepository.observeCreatedCount(start, end).first()
-        val completedTimestamps = insightRepository.observeCompletedTimestamps().first()
+        // Cap streak input at ~400 days — any realistic streak is well within this window.
+        val completedTimestamps = insightRepository.observeCompletedTimestamps(
+            System.currentTimeMillis() - STREAK_LOOKBACK_DAYS * DAY_MS
+        ).first()
 
         val prevStart = start - DAY_MS
         val prevEnd = end - DAY_MS
@@ -142,5 +145,7 @@ class SnapshotAggregator(
 
     companion object {
         private const val DAY_MS = 86400000L
+        /** Cap streak calculation input at ~400 days. Any realistic streak is within this window. */
+        private const val STREAK_LOOKBACK_DAYS = 400L
     }
 }

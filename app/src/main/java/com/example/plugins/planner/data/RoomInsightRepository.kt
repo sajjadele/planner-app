@@ -22,14 +22,14 @@ class RoomInsightRepository(private val insightDao: InsightDao) : InsightReposit
     override fun observeUnorganizedTasks(): Flow<List<UncategorizedTask>> =
         insightDao.observeUnorganizedTasks()
 
-    override fun observeCompletedTimestamps(): Flow<List<Long>> =
-        insightDao.observeCompletedTimestamps()
+    override fun observeCompletedTimestamps(fromEpochMs: Long): Flow<List<Long>> =
+        insightDao.observeCompletedTimestamps(fromEpochMs)
 
     override fun observeCompletionByDay(start: Long, end: Long): Flow<List<DayCompletion>> =
         insightDao.observeCompletionByDay(start, end)
 
-    override fun observeRescheduleCounts(): Flow<List<TaskRescheduleWithTitle>> =
-        insightDao.observeRescheduleCounts()
+    override fun observeRescheduleCounts(fromEpochMs: Long): Flow<List<TaskRescheduleWithTitle>> =
+        insightDao.observeRescheduleCounts(fromEpochMs)
 
     override fun observeRescheduleCountsByGoal(goalId: Int): Flow<List<TaskRescheduleWithTitle>> =
         insightDao.observeRescheduleCountsByGoal(goalId)

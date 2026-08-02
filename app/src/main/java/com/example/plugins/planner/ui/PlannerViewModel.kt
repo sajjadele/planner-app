@@ -16,6 +16,8 @@ import com.example.plugins.planner.data.TaskEventEntity
 import com.example.plugins.planner.data.TaskRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.onEach
@@ -37,6 +39,17 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
 
     private val _lastCompletedTask = MutableStateFlow<TaskEntity?>(null)
     val lastCompletedTask: StateFlow<TaskEntity?> = _lastCompletedTask
+
+    /** Debounced snapshot refresh — coalesces rapid user actions into one recordDay() call. */
+    private var recordDayJob: Job? = null
+
+    private fun recordDayDebounced(dateEpochMs: Long) {
+        recordDayJob?.cancel()
+        recordDayJob = viewModelScope.launch {
+            delay(RECORD_DAY_DEBOUNCE_MS)
+            snapshotAggregator.recordDay(dateEpochMs)
+        }
+    }
 
     /** One-shot event used to trigger the completion snackbar exactly once. */
     private val _completionEvents = Channel<TaskEntity>(Channel.BUFFERED)
@@ -191,7 +204,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
                 val finalTask = task.copy(id = generatedId.toInt())
                 ReminderScheduler.schedule(getApplication(), finalTask)
             }
-            snapshotAggregator.recordDay(getTodayDateEpochMs())
+            recordDayDebounced(getTodayDateEpochMs())
         }
     }
 
@@ -215,7 +228,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
                     ReminderScheduler.schedule(getApplication(), updatedTask)
                 }
             }
-            snapshotAggregator.recordDay(getTodayDateEpochMs())
+            recordDayDebounced(getTodayDateEpochMs())
         }
     }
 
@@ -231,7 +244,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
             if (reopened.reminderHour != null && reopened.reminderMinute != null) {
                 ReminderScheduler.schedule(getApplication(), reopened)
             }
-            snapshotAggregator.recordDay(getTodayDateEpochMs())
+            recordDayDebounced(getTodayDateEpochMs())
         }
     }
 
@@ -242,7 +255,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
             )
             repository.deleteTask(task)
             ReminderScheduler.cancel(getApplication(), task)
-            snapshotAggregator.recordDay(getTodayDateEpochMs())
+            recordDayDebounced(getTodayDateEpochMs())
         }
     }
 
@@ -261,7 +274,7 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
             if (updated.reminderHour != null && updated.reminderMinute != null && !updated.isCompleted) {
                 ReminderScheduler.schedule(getApplication(), updated)
             }
-            snapshotAggregator.recordDay(getTodayDateEpochMs())
+            recordDayDebounced(getTodayDateEpochMs())
         }
     }
 
@@ -292,6 +305,8 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
 /** Bounded window (days each side of today) for the "days with tasks" indicator. */
 private const val TASK_DAY_WINDOW_DAYS = 60
 private const val DAY_MS = 86_400_000L
+/** Debounce window for snapshot refresh — coalesces rapid user actions. */
+private const val RECORD_DAY_DEBOUNCE_MS = 300L
 
 /**
  * Pure grouping of tasks by goal. Tasks with a known goal are grouped under that goal; tasks with a
