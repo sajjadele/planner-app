@@ -1,17 +1,17 @@
 package com.example.plugins.planner.data
 
 /**
- * StepDraftResolver — Handles Step (Tag) creation logic.
+ * TagDraftResolver — Handles Tag creation logic.
  *
- * Phase 5.5d: Step is metadata/tag only. No initial activities.
+ * Phase 5.5d: Tag is metadata only. No initial activities.
  *
  * Responsibility:
- * - Extract step title from StepDraft
- * - Step is now pure tag creation
+ * - Extract tag title from TagDraft
+ * - Tag is pure metadata
  *
  * Flow:
  * ```
- * StepDraft → getStepTitle → String
+ * TagDraft → getTagTitle → String
  * ```
  */
 object StepDraftResolver {

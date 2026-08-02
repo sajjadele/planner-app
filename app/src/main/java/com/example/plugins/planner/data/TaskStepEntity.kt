@@ -22,7 +22,5 @@ data class TaskStepEntity(
     val taskId: Int,
     val title: String,
     val colorHex: String? = null,
-    val isCompleted: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis(),
-    val completedAt: Long? = null
+    val createdAt: Long = System.currentTimeMillis()
 )

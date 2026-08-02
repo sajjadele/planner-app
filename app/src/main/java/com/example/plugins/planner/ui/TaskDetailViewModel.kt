@@ -376,10 +376,9 @@ class TaskDetailViewModel(
     /**
      * Create a Tag (دسته/برچسب) — standalone tag creation.
      *
-     * Phase 5.9.2: Dedicated Tag Creation UX.
+     * Phase 5.9.2: Dedicated tag creation UX.
      * Phase 5.9.3: Optional colorHex for tag display.
-     * Creates TaskStepEntity + STEP_CREATED event only.
-     * No ActivityEventEntity for activities — tags are metadata only.
+     * Creates TaskStepEntity only — no ActivityEventEntity (tags are metadata, not user actions).
      */
     fun createTag(name: String, colorHex: String? = null) {
         viewModelScope.launch {
@@ -388,7 +387,7 @@ class TaskDetailViewModel(
     }
 
     /**
-     * Rename an existing tag (Step). Only title changed — color preserved.
+     * Rename a tag. Only title changed — color preserved.
      */
     fun renameStep(step: TaskStepEntity, newTitle: String) {
         viewModelScope.launch {
@@ -398,7 +397,7 @@ class TaskDetailViewModel(
     }
 
     /**
-     * Update an existing tag in-place — preserves stepId so linked activities stay connected.
+     * Update a tag in-place — preserves stepId so linked activities stay connected.
      *
      * Phase 5.9.4: In-place tag update (no delete+recreate).
      * This is the ONLY correct way to edit a tag — never delete+create.
@@ -411,10 +410,10 @@ class TaskDetailViewModel(
     }
 
     /**
-     * Create a Step (Tag) from a StepDraft.
+     * Create a Tag from a TagDraft.
      *
-     * Phase 5.5d: Pure tag creation — no initial activities.
-     * Creates TaskStepEntity + STEP_CREATED event only.
+     * Phase 5.5d: Tag is metadata only — no initial activities.
+     * Creates TaskStepEntity only (no ActivityEventEntity).
      */
     fun createStep(draft: StepDraft) {
         viewModelScope.launch {
@@ -464,11 +463,11 @@ class TaskDetailViewModel(
     // LEGACY: Keep for backward compatibility (can be removed later)
     // ════════════════════════════════════════════════════════════════
 
-    /** Create a step — STEP_CREATED event is handled by the repository */
+    /** Create a tag — STEP_CREATED event is handled by the repository */
     @Deprecated(
-        "Step creation now uses createStep(StepDraft) via composer. " +
-        "Plain addStep creates orphan steps with no UI path.",
-        replaceWith = ReplaceWith("createStep(StepDraft(title = title))")
+        "Tag creation now uses createTag() via composer. " +
+        "Plain addStep creates orphan tags with no UI path.",
+        replaceWith = ReplaceWith("createTag(name, colorHex)")
     )
     fun addStep(title: String) {
         viewModelScope.launch {
@@ -575,26 +574,19 @@ class TaskDetailViewModel(
             )
         }
     }
-
-    /** Delete a step (tag) and log the activity event.
+    /**
+     * Delete a tag.
      *
      * Phase 5.9.4: Before deleting the tag, all activity events referencing
-     * this step get their stepId nullified — activities are preserved but unlinked.
+     * this tag get their stepId nullified — activities are preserved but unlinked.
+     *
+     * Tags are metadata — no activity event is created for deletion.
      */
     fun deleteStep(step: TaskStepEntity) {
         viewModelScope.launch {
-            // 1. Log the deletion event
-            activityEventRepository.addEvent(
-                ActivityEventEntity(
-                    taskId = taskId,
-                    stepId = step.id,
-                    eventType = ActivityEventType.STEP_DELETED.name,
-                    description = step.title
-                )
-            )
-            // 2. Unlink activities from this tag (set stepId = NULL)
+            // 1. Unlink activities from this tag (set stepId = NULL)
             activityEventRepository.clearStepId(step.id)
-            // 3. Delete the tag itself
+            // 2. Delete the tag itself
             taskStepRepository.deleteStep(step.id)
         }
     }

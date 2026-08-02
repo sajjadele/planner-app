@@ -1,23 +1,23 @@
 package com.example.plugins.planner.data
 
 /**
- * StepDraft — Domain model for creating a Step (Tag).
+ * TagDraft — Domain model for creating a Tag.
  *
- * Phase 5.5d: Step is metadata/tag only. No initial activities.
+ * Phase 5.5d: Tag is metadata only. No initial activities.
  * Phase 5.9.3: Added optional colorHex for tag color.
  *
  * Responsibility:
- * - Represents the user's intent to create a Step (Tag)
- * - Contains step title and optional color
- * - Step is pure metadata — activities are created independently
+ * - Represents the user's intent to create a Tag
+ * - Contains tag title and optional color
+ * - Tag is pure metadata — activities are created independently
  *
  * Flow:
  * ```
- * StepDraft
+ * TagDraft
  *     ↓
- * CreateStepUseCase.execute()
+ * CreateTagUseCase.execute()
  *     ↓
- * TaskStepEntity + STEP_CREATED event
+ * TaskStepEntity (no ActivityEventEntity)
  * ```
  */
 data class StepDraft(

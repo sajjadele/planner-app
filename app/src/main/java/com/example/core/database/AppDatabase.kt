@@ -38,7 +38,7 @@ import com.example.plugins.planner.data.TaskStepEntity
         ActivityEventEntity::class,
         TaskStepEntity::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -311,6 +311,38 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v16 → v17: Step → Tag cleanup.
+         *
+         * Removes completion state from task_steps (isCompleted, completedAt).
+         * Tags are metadata only — they cannot be "completed."
+         *
+         * Recreates the table (SQLite cannot DROP COLUMN on all supported API levels).
+         * Preserves: id, taskId, title, colorHex, createdAt.
+         * Drops: isCompleted (always false), completedAt (always null).
+         */
+        private val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE task_steps RENAME TO task_steps_old")
+                db.execSQL("""
+                    CREATE TABLE task_steps (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        taskId INTEGER NOT NULL,
+                        title TEXT NOT NULL,
+                        colorHex TEXT,
+                        createdAt INTEGER NOT NULL,
+                        FOREIGN KEY(taskId) REFERENCES tasks(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    INSERT INTO task_steps (id, taskId, title, colorHex, createdAt)
+                    SELECT id, taskId, title, colorHex, createdAt FROM task_steps_old
+                """.trimIndent())
+                db.execSQL("DROP TABLE task_steps_old")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_task_steps_taskId ON task_steps(taskId)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -329,7 +361,8 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_12_13,
                     MIGRATION_13_14,
                     MIGRATION_14_15,
-                    MIGRATION_15_16
+                    MIGRATION_15_16,
+                    MIGRATION_16_17
                 )
                 .fallbackToDestructiveMigration()
                 .build()

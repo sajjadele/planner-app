@@ -7,32 +7,28 @@ class TaskStepRepository(
     private val activityEventDao: ActivityEventDao
 ) {
 
+    /** Observe all tags for a task. */
     fun observeSteps(taskId: Int): Flow<List<TaskStepEntity>> =
         dao.observeStepsByTaskId(taskId)
 
+    /**
+     * Add a tag. Tags are metadata — no activity event is created.
+     * Activities reference tags via stepId but tag creation is not a user action.
+     */
     suspend fun addStep(step: TaskStepEntity): Int {
         val id = dao.insert(step).toInt()
-        check(id > 0) { "Failed to generate step ID for task ${step.taskId}" }
-        activityEventDao.insert(
-            ActivityEventEntity(
-                taskId = step.taskId,
-                stepId = id,
-                eventType = ActivityEventType.STEP_CREATED.name,
-                description = step.title
-            )
-        )
+        check(id > 0) { "Failed to generate tag ID for task ${step.taskId}" }
         return id
     }
 
-    suspend fun updateStep(step: TaskStepEntity) =
-        dao.update(step)
+    /** Update a tag in-place (title and/or color). */
+    suspend fun updateStep(step: TaskStepEntity) = dao.update(step)
 
-    suspend fun deleteStep(stepId: Int) =
-        dao.delete(stepId)
+    /** Delete a tag. Activities referencing this tag are unlinked (stepId → null). */
+    suspend fun deleteStep(stepId: Int) = dao.delete(stepId)
 
-    suspend fun getStepById(stepId: Int): TaskStepEntity? =
-        dao.getById(stepId)
+    suspend fun getStepById(stepId: Int): TaskStepEntity? = dao.getById(stepId)
 
-    suspend fun getStepsByTaskId(taskId: Int): List<TaskStepEntity> =
-        dao.getByTaskId(taskId)
+    /** Get all tags for a task. */
+    suspend fun getStepsByTaskId(taskId: Int): List<TaskStepEntity> = dao.getByTaskId(taskId)
 }

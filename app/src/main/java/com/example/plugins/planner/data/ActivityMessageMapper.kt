@@ -14,10 +14,7 @@ package com.example.plugins.planner.data
  * - Return null for system events and unrecognizable formats
  *
  * System events (invisible to UI):
- * - STEP_CREATED
- * - STEP_COMPLETED
- * - STEP_REOPENED
- * - STEP_DELETED
+ * - STEP_CREATED, STEP_COMPLETED, STEP_REOPENED, STEP_DELETED — debug-only
  *
  * User messages (visible in UI):
  * - NOTE_ADDED
