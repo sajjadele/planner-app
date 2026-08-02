@@ -53,7 +53,7 @@ fun SearchDialog(
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
-    val recentTasks: List<SearchResult> by viewModel.recentTasks.collectAsState()
+    val recentResults: List<SearchResult> by viewModel.recentResults.collectAsState()
 
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -154,7 +154,7 @@ fun SearchDialog(
 
                     // Results content
                     if (searchQuery.isBlank()) {
-                        if (recentTasks.isNotEmpty()) {
+                        if (recentResults.isNotEmpty()) {
                             // Show recent tasks
                             LazyColumn(
                                 modifier = Modifier
@@ -171,8 +171,8 @@ fun SearchDialog(
                                         modifier = Modifier.padding(bottom = 4.dp)
                                     )
                                 }
-                                items(recentTasks.size) { index ->
-                                    val result = recentTasks[index]
+                                items(recentResults.size) { index ->
+                                    val result = recentResults[index]
                                     when (result) {
                                         is SearchResult.TaskResult -> {
                                             SearchTaskItem(
@@ -193,7 +193,7 @@ fun SearchDialog(
                                             SearchGoalItem(
                                                 goal = result,
                                                 onClick = {
-                                                    viewModel.recordTaskAccess(result.id)
+                                                    viewModel.recordGoalAccess(result.id)
                                                     onNavigateToGoalDetails(result.id)
                                                     onDismissRequest()
                                                 }
@@ -295,7 +295,7 @@ fun SearchDialog(
                                         SearchGoalItem(
                                             goal = result,
                                             onClick = {
-                                                viewModel.recordTaskAccess(result.id)
+                                                viewModel.recordGoalAccess(result.id)
                                                 onNavigateToGoalDetails(result.id)
                                                 onDismissRequest()
                                             }
@@ -429,13 +429,16 @@ fun SearchTaskItem(
         // Edit button
         IconButton(
             onClick = onEdit,
-            modifier = Modifier.size(32.dp)
+            modifier = Modifier
+                .size(32.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                .testTag("task_edit_button")
         ) {
             Icon(
                 imageVector = Icons.Default.Edit,
                 contentDescription = "جزئیات",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier.size(18.dp)
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
             )
         }
     }

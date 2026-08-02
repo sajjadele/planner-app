@@ -30,10 +30,10 @@ fun GoalDashboardScreen(
 ) {
     val selectedTab by viewModel.selectedTab.collectAsState()
     val goalsByTab by viewModel.goalsByTab.collectAsState()
+    val selectedGoalId by viewModel.selectedGoalId.collectAsState()
     val plannerViewModel: PlannerViewModel = viewModel()
     val daysWithTasks by plannerViewModel.daysWithTasks.collectAsState()
 
-    var selectedGoalId by remember { mutableStateOf<Int?>(null) }
     var showGoalMenu by remember { mutableStateOf(false) }
     var selectedGoal by remember { mutableStateOf<GoalEntity?>(null) }
     var showEditGoalDialog by remember { mutableStateOf(false) }
@@ -44,7 +44,7 @@ fun GoalDashboardScreen(
     // Reset internal navigation when resetTrigger changes (same tab re-clicked)
     LaunchedEffect(resetTrigger) {
         if (resetTrigger > 0) {
-            selectedGoalId = null
+            viewModel.closeGoalDetail()
         }
     }
 
@@ -52,7 +52,7 @@ fun GoalDashboardScreen(
     LaunchedEffect(Unit) {
         OnboardingDeepLink.consume()?.let { (id, hint) ->
             homeHintFor = hint
-            selectedGoalId = id
+            viewModel.openGoalDetail(id)
         }
     }
 
@@ -60,7 +60,7 @@ fun GoalDashboardScreen(
     selectedGoalId?.let { goalId ->
         GoalDetailScreen(
             goalId = goalId,
-            onBack = { selectedGoalId = null },
+            onBack = { viewModel.closeGoalDetail() },
             isOnboarding = homeHintFor
         )
         return
@@ -166,7 +166,7 @@ fun GoalDashboardScreen(
                         val goalId = item.goal.id
                         // Cache the per-item action lambdas once per goal so GoalCard stays skippable
                         // (Phase 5.4 / ADR-0009). Lambdas close over stable ids, not the item object.
-                        val onOpen = remember(goalId) { { selectedGoalId = goalId } }
+                         val onOpen = remember(goalId) { { viewModel.openGoalDetail(goalId) } }
                         val onEdit = remember(goalId) {
                             {
                                 selectedGoal = item.goal

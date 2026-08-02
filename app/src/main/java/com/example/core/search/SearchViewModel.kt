@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.core.constants.DateConstants
 import com.example.core.database.AppDatabase
 import com.example.core.goal.GoalDao
+import com.example.core.util.normalizeForSearch
 import com.example.plugins.planner.ui.components.persianDayIndex
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -40,20 +41,18 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
-    /** Recent tasks and goals based on search history (last clicked from search) */
-    val recentTasks: StateFlow<List<SearchResult>> = combine(
+    /** Recent tasks based on search history (last clicked from search) */
+    private val recentTaskResults: StateFlow<List<SearchResult>> = combine(
         searchHistory.recentTaskIds,
-        taskDao.getAllTasks(),
-        goalDao.getAllGoals()
-    ) { recentIds, allTasks, allGoals ->
+        taskDao.getAllTasks()
+    ) { recentIds, allTasks ->
         recentIds.mapNotNull { id ->
-            // Try to find as task first
             allTasks.find { it.id == id }?.let { task ->
                 val dayIdx = persianDayIndex(task.dateEpochMs)
                 val dayName = DateConstants.persianDayNames.getOrElse(dayIdx) {
                     DateConstants.persianDayNames.first()
                 }
-                return@mapNotNull SearchResult.TaskResult(
+                SearchResult.TaskResult(
                     id = task.id,
                     title = task.title,
                     priority = task.priority,
@@ -62,17 +61,40 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                     dayName = dayName
                 )
             }
-            // Try to find as goal
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    /** Recent goals based on search history (last clicked from search) */
+    private val recentGoalResults: StateFlow<List<SearchResult>> = combine(
+        searchHistory.recentGoalIds,
+        goalDao.getAllGoals()
+    ) { recentIds, allGoals ->
+        recentIds.mapNotNull { id ->
             allGoals.find { it.id == id }?.let { goal ->
-                return@mapNotNull SearchResult.GoalResult(
+                SearchResult.GoalResult(
                     id = goal.id,
                     title = goal.title,
                     status = goal.status,
                     description = goal.description
                 )
             }
-            null
         }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    /** Combined recent results for display: tasks first, then goals. */
+    val recentResults: StateFlow<List<SearchResult>> = combine(
+        recentTaskResults,
+        recentGoalResults
+    ) { tasks, goals ->
+        tasks + goals
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -87,12 +109,13 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         if (query.isBlank()) {
             emptyList()
         } else {
-            val normalizedQuery = query.trim().lowercase()
+            val normalizedQuery = query.trim().normalizeForSearch()
             val results = mutableListOf<SearchResult>()
             
-            // Search tasks
-            tasks.filter { 
-                it.title.lowercase().contains(normalizedQuery)
+            // Search tasks (by title or value tag)
+            tasks.filter { task ->
+                task.title.normalizeForSearch().contains(normalizedQuery) ||
+                    task.valueTag?.normalizeForSearch()?.contains(normalizedQuery) == true
             }.forEach { task ->
                 val dayIdx = persianDayIndex(task.dateEpochMs)
                 val dayName = DateConstants.persianDayNames.getOrElse(dayIdx) {
@@ -108,9 +131,11 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                 ))
             }
             
-            // Search goals
-            goals.filter {
-                it.title.lowercase().contains(normalizedQuery)
+            // Search goals (by title, description, or why)
+            goals.filter { goal ->
+                goal.title.normalizeForSearch().contains(normalizedQuery) ||
+                    goal.description?.normalizeForSearch()?.contains(normalizedQuery) == true ||
+                    goal.why?.normalizeForSearch()?.contains(normalizedQuery) == true
             }.forEach { goal ->
                 results.add(SearchResult.GoalResult(
                     id = goal.id,
@@ -137,6 +162,14 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
      * Call this before navigating to the task.
      */
     fun recordTaskAccess(taskId: Int) {
-        searchHistory.recordAccess(taskId)
+        searchHistory.recordTaskAccess(taskId)
+    }
+
+    /**
+     * Record that a goal was accessed from search results.
+     * Call this before navigating to the goal.
+     */
+    fun recordGoalAccess(goalId: Int) {
+        searchHistory.recordGoalAccess(goalId)
     }
 }

@@ -141,11 +141,11 @@ fun MainScreen(
 
     var showThemeSettings by remember { mutableStateOf(false) }
     var showSearchDialog by remember { mutableStateOf(false) }
-    var selectedGoalId by remember { mutableStateOf<Int?>(null) }
     val plannerViewModel: PlannerViewModel = viewModel()
-    // Phase 6.5.7 (launch-jank): GoalViewModel is only needed by the Add-Goal dialog, so create it
-    // lazily on first demand rather than eagerly at launch (when the Planner tab is the default).
-    var goalViewModel: GoalViewModel? = null
+    // Phase 6.5.7 (launch-jank): GoalViewModel was previously lazily created to avoid
+    // jank on cold start (Planner tab is default). Now it's also needed for search
+    // navigation, so create it eagerly. The cost is minimal (one ViewModel instance).
+    val goalViewModel: GoalViewModel = viewModel()
 
     // FAB dialog states
     var showAddTaskDialog by remember { mutableStateOf(false) }
@@ -307,11 +307,10 @@ fun MainScreen(
     }
 
     if (showAddGoalDialog) {
-        val goalVm = goalViewModel ?: viewModel<GoalViewModel>().also { goalViewModel = it }
         AddGoalDialog(
             onDismiss = { showAddGoalDialog = false },
             onAddGoal = { title, description, why, deadlineEpochMs ->
-                goalVm.addGoal(title, description, why, deadlineEpochMs)
+                goalViewModel.addGoal(title, description, why, deadlineEpochMs)
                 showAddGoalDialog = false
             }
         )
@@ -340,7 +339,7 @@ fun MainScreen(
                 selectedTabId = "planner"
             },
             onNavigateToGoalDetails = { goalId ->
-                selectedGoalId = goalId
+                goalViewModel.openGoalDetail(goalId)
                 selectedTabId = "goals"
             }
         )

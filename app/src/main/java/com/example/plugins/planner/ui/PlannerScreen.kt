@@ -51,6 +51,7 @@ fun PlannerScreen(
     val tasks by viewModel.tasks.collectAsState()
     val goalTaskGroups by viewModel.goalTaskGroups.collectAsState()
     val daysWithTasks by viewModel.daysWithTasks.collectAsState()
+    val selectedTaskId by viewModel.selectedTaskId.collectAsState()
 
     // Sprint 6 (skeleton): show TaskCard skeletons ONLY while the task list is actually loading.
     // Loading readiness comes from the explicit ViewModel flag `isTasksLoaded` (flipped once after the
@@ -79,7 +80,6 @@ fun PlannerScreen(
     val scope = rememberCoroutineScope()
     var showInsightSheet by remember { mutableStateOf(false) }
 
-    var selectedTaskId by remember { mutableStateOf<Int?>(null) }
     var showCalendarPopup by remember { mutableStateOf(false) }
     var showUncategorizedSheet by remember { mutableStateOf(false) }
     val unorganizedTasks by (resolvedInsightVm?.unorganizedTasks
@@ -88,7 +88,7 @@ fun PlannerScreen(
     // Reset internal navigation when resetTrigger changes (same tab re-clicked)
     LaunchedEffect(resetTrigger) {
         if (resetTrigger > 0) {
-            selectedTaskId = null
+            viewModel.closeTaskDetail()
         }
     }
 
@@ -99,7 +99,7 @@ fun PlannerScreen(
     selectedTaskId?.let { taskId ->
         TaskDetailScreen(
             taskId = taskId,
-            onBack = { selectedTaskId = null }
+            onBack = { viewModel.closeTaskDetail() }
         )
         return
     }
@@ -170,7 +170,7 @@ fun PlannerScreen(
                 tasks = unorganizedTasks,
                 onTaskClick = { taskId ->
                     showUncategorizedSheet = false
-                    selectedTaskId = taskId
+                    viewModel.openTaskDetail(taskId)
                 },
                 onDismiss = { showUncategorizedSheet = false }
             )
@@ -311,7 +311,7 @@ fun PlannerScreen(
                                 task = task,
                                 onToggleCompletion = { viewModel.toggleTaskCompletion(task) },
                                 onDelete = { viewModel.deleteTask(task) },
-                                onEdit = { selectedTaskId = task.id }
+                                onEdit = { viewModel.openTaskDetail(task.id) }
                             )
                         }
                     }

@@ -65,6 +65,10 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
     private val _selectedDateEpochMs = MutableStateFlow(getTodayDateEpochMs())
     val selectedDateEpochMs: StateFlow<Long> = _selectedDateEpochMs
 
+    /** Task whose detail screen should be shown (null = dashboard), driven by search/edit/back. */
+    private val _selectedTaskId = MutableStateFlow<Int?>(null)
+    val selectedTaskId: StateFlow<Int?> = _selectedTaskId
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val tasks: StateFlow<List<TaskEntity>> = _selectedDateEpochMs
         .flatMapLatest { date -> repository.getTasksForDay(date) }
@@ -136,14 +140,28 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         _selectedDateEpochMs.value = dateEpochMs
     }
 
-    /** Select a task by ID — navigates to its day and sets selectedTaskId */
+    /**
+     * Select a task by ID — navigates to its day and opens its detail screen.
+     * Used by search results and task cards.
+     */
     fun selectTask(taskId: Int) {
         viewModelScope.launch {
             val task = repository.getTaskById(taskId)
             if (task != null) {
                 _selectedDateEpochMs.value = task.dateEpochMs
+                _selectedTaskId.value = taskId
             }
         }
+    }
+
+    /** Open a task's detail screen directly (without changing the selected day). */
+    fun openTaskDetail(taskId: Int) {
+        _selectedTaskId.value = taskId
+    }
+
+    /** Close the task detail screen and return to the dashboard. */
+    fun closeTaskDetail() {
+        _selectedTaskId.value = null
     }
 
     fun addTask(title: String, priority: String?, hour: Int?, minute: Int?, goalId: Int?, valueTag: String?, lifeAreaId: Int? = null, dateEpochMs: Long? = null) {

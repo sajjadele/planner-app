@@ -57,8 +57,22 @@ class GoalViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedTab = MutableStateFlow(GoalStatus.ACTIVE)
     val selectedTab: StateFlow<String> = _selectedTab
 
+    /** Goal whose detail screen should be shown (null = dashboard), driven by search/card/back. */
+    private val _selectedGoalId = MutableStateFlow<Int?>(null)
+    val selectedGoalId: StateFlow<Int?> = _selectedGoalId
+
     fun selectTab(status: String) {
         _selectedTab.value = status
+    }
+
+    /** Open a goal's detail screen directly. */
+    fun openGoalDetail(goalId: Int) {
+        _selectedGoalId.value = goalId
+    }
+
+    /** Close the goal detail screen and return to the dashboard. */
+    fun closeGoalDetail() {
+        _selectedGoalId.value = null
     }
 
     /**
