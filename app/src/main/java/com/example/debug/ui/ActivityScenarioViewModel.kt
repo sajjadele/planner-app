@@ -256,28 +256,21 @@ class ActivityScenarioViewModel(application: Application) : AndroidViewModel(app
                     passed = false
                 }
             }
-
+            // Verify no events exist for tag (tags are metadata — no activity events)
             val rereadEvents = activityRepo.getEventsByStepId(tagId)
-            if (rereadEvents.size == 2) {
-                val hasNote = rereadEvents.any { it.eventType == ActivityEventType.NOTE_ADDED.name }
-                val hasCompleted = rereadEvents.any { it.eventType == ActivityEventType.STEP_COMPLETED.name }
-                if (hasNote && hasCompleted) {
-                    details.add("PASS: Both events persisted (${rereadEvents.size})")
-                } else {
-                    details.add("FAIL: Missing event types — note=$hasNote, completed=$hasCompleted")
-                    passed = false
-                }
+            if (rereadEvents.isEmpty()) {
+                details.add("PASS: Tag has no activity events (metadata only)")
             } else {
-                details.add("FAIL: Expected 2 events, found ${rereadEvents.size}")
+                details.add("FAIL: Tag has unexpected events: ${rereadEvents.map { it.eventType }}")
                 passed = false
             }
 
-            // Verify findLatestEvent works
+            // Verify findLatestEvent returns null for tag (no events created)
             val latestNote = activityRepo.findLatestEvent(taskId, ActivityEventType.NOTE_ADDED.name)
-            if (latestNote != null && latestNote.stepId == tagId) {
-                details.add("PASS: findLatestEvent returns correct result")
+            if (latestNote == null) {
+                details.add("PASS: findLatestEvent correctly returns null for tag (no events)")
             } else {
-                details.add("FAIL: findLatestEvent returned null or wrong tag")
+                details.add("FAIL: Unexpected event found for tag")
                 passed = false
             }
 
