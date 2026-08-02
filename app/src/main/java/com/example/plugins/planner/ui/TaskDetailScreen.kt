@@ -981,6 +981,8 @@ private fun TaskDetailActivityContent(
 ) {
     val context = LocalContext.current
     val groups = remember(messages) { groupActivityMessagesByDay(messages) }
+    // F1: precompute reply lookup once per list update (O(n)) instead of per-card `find` (O(n²))
+    val replyMap = remember(messages) { messages.associateBy { it.id } }
     var fullScreenImageUrl by remember { mutableStateOf<String?>(null) }
 
     // ── Fullscreen Image Viewer ──
@@ -1045,9 +1047,7 @@ private fun TaskDetailActivityContent(
                 }
 
                 items(group.messages, key = { it.id }) { message ->
-                    val repliedTo = if (message.replyToMessageId != null) {
-                        messages.find { it.id == message.replyToMessageId }
-                    } else null
+                    val repliedTo = message.replyToMessageId?.let { replyMap[it] }
 
                     ActivityMessageCard(
                         message = message,

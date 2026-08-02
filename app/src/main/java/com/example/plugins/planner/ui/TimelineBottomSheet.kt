@@ -84,6 +84,8 @@ private fun TimelineSheetContent(
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val activityGroups = remember(messages) { groupMessagesByDay(messages) }
+    // F1: precompute reply lookup once per list update (O(n)) instead of per-card `find` (O(n²))
+    val replyMap = remember(messages) { messages.associateBy { it.id } }
     val listState = rememberLazyListState()
 
     val canMovePrevious = selectedDate > timelineStartDate
@@ -186,9 +188,7 @@ private fun TimelineSheetContent(
                         items = group.messages,
                         key = { it.id }
                     ) { message ->
-                        val repliedTo = message.replyToMessageId?.let { replyId ->
-                            messages.find { it.id == replyId }
-                        }
+                        val repliedTo = message.replyToMessageId?.let { replyMap[it] }
                         ActivityMessageCard(
                             message = message,
                             repliedToMessage = repliedTo,
