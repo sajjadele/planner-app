@@ -6,13 +6,11 @@ import com.example.plugins.planner.data.ActivityAttachment.Image as ImageAttachm
 /**
  * ActivityMessageDisplayContent — Classifies message content for display.
  *
- * Phase 5.7.1: Three display types only — TextContent, MediaContent, MediaWithText.
- * No event labels, no step chips, no raw JSON/URI in UI.
+ * Multi-attachment support: activities can contain multiple images + multiple files.
  *
  * Types:
  * - [TextContent]: Plain text (with optional duration)
- * - [MediaContent]: Image or file (no text)
- * - [MediaWithText]: Image/file + text caption
+ * - [MultiMediaContent]: Multiple images/files + optional text
  * - [EmptyMessage]: No displayable content (should not reach UI)
  * - [DeletedMessage]: Soft-deleted message
  */
@@ -24,17 +22,11 @@ sealed class ActivityMessageDisplayContent {
         val durationMinutes: Int? = null
     ) : ActivityMessageDisplayContent()
 
-    /** Media-only (image or file, no text). */
-    data class MediaContent(
-        val attachment: ActivityAttachment,
-        val isImage: Boolean
-    ) : ActivityMessageDisplayContent()
-
-    /** Media + text caption. */
-    data class MediaWithText(
-        val attachment: ActivityAttachment,
-        val text: String,
-        val isImage: Boolean,
+    /** Multi-attachment content: images + files + optional text. */
+    data class MultiMediaContent(
+        val images: List<ImageAttachment>,
+        val files: List<FileAttachment>,
+        val text: String? = null,
         val durationMinutes: Int? = null
     ) : ActivityMessageDisplayContent()
 
@@ -45,11 +37,15 @@ sealed class ActivityMessageDisplayContent {
     data object DeletedMessage : ActivityMessageDisplayContent()
 
     companion object {
+        /** Maximum attachments per activity (for UI compactness). */
+        const val MAX_IMAGES = 5
+        const val MAX_FILES = 5
+
         /**
          * Resolve display content from an ActivityMessageModel.
          *
          * Guarantees: no raw JSON, no URI strings, no event types in UI.
-         * Step/tag metadata is NOT part of display content — it belongs in filter chips.
+         * Supports multiple images + multiple files per activity.
          */
         fun from(message: ActivityMessageModel): ActivityMessageDisplayContent {
             if (message.isDeleted) return DeletedMessage
@@ -59,48 +55,29 @@ sealed class ActivityMessageDisplayContent {
             val files = message.attachments.filterIsInstance<FileAttachment>()
 
             val hasText = text != null
-            val hasImages = images.isNotEmpty()
-            val hasFiles = files.isNotEmpty()
+            val hasMedia = images.isNotEmpty() || files.isNotEmpty()
             val hasDuration = message.durationMinutes != null
 
-            // Determine primary attachment (image takes priority)
-            val primaryAttachment: ActivityAttachment? = when {
-                hasImages -> images.first()
-                hasFiles -> files.first()
-                else -> null
-            }
-            val isImage = primaryAttachment is ImageAttachment
-
             return when {
-                // Media with text caption
-                primaryAttachment != null && hasText ->
-                    MediaWithText(
-                        attachment = primaryAttachment,
-                        text = text!!,
-                        isImage = isImage,
-                        durationMinutes = if (hasDuration) message.durationMinutes else null
-                    )
+                // Media (images/files) with or without text
+                hasMedia -> MultiMediaContent(
+                    images = images.take(MAX_IMAGES),
+                    files = files.take(MAX_FILES),
+                    text = text,
+                    durationMinutes = if (hasDuration) message.durationMinutes else null
+                )
 
-                // Media only (no text)
-                primaryAttachment != null ->
-                    MediaContent(
-                        attachment = primaryAttachment,
-                        isImage = isImage
-                    )
+                // Text only (with optional duration)
+                hasText -> TextContent(
+                    text = text!!,
+                    durationMinutes = message.durationMinutes
+                )
 
-                // Text (with optional duration)
-                hasText ->
-                    TextContent(
-                        text = text!!,
-                        durationMinutes = message.durationMinutes
-                    )
-
-                // Duration-only activity (edge case: no text, no media, only duration)
-                hasDuration ->
-                    TextContent(
-                        text = "⏱ ${message.durationMinutes} دقیقه",
-                        durationMinutes = message.durationMinutes
-                    )
+                // Duration-only activity (edge case)
+                hasDuration -> TextContent(
+                    text = "⏱ ${message.durationMinutes} دقیقه",
+                    durationMinutes = message.durationMinutes
+                )
 
                 // No recognizable content
                 else -> EmptyMessage

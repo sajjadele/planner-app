@@ -190,34 +190,33 @@ private fun MessageContent(
             MessageText(text = displayContent.text)
         }
 
-        is ActivityMessageDisplayContent.MediaContent -> {
-            if (displayContent.isImage) {
-                ImagePreview(
-                    image = displayContent.attachment as ActivityAttachment.Image,
-                    onClick = { onAttachmentClick?.invoke(displayContent.attachment) }
-                )
-            } else {
-                FilePreview(
-                    file = displayContent.attachment as ActivityAttachment.File,
-                    onClick = { onAttachmentClick?.invoke(displayContent.attachment) }
-                )
+        is ActivityMessageDisplayContent.MultiMediaContent -> {
+            // Text first (if exists)
+            if (!displayContent.text.isNullOrBlank()) {
+                MessageText(text = displayContent.text)
+                if (displayContent.images.isNotEmpty() || displayContent.files.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
             }
-        }
 
-        is ActivityMessageDisplayContent.MediaWithText -> {
-            if (displayContent.isImage) {
-                ImagePreview(
-                    image = displayContent.attachment as ActivityAttachment.Image,
-                    onClick = { onAttachmentClick?.invoke(displayContent.attachment) }
-                )
-            } else {
-                FilePreview(
-                    file = displayContent.attachment as ActivityAttachment.File,
-                    onClick = { onAttachmentClick?.invoke(displayContent.attachment) }
+            // Images gallery (compact thumbnails)
+            if (displayContent.images.isNotEmpty()) {
+                ImageGallery(
+                    images = displayContent.images,
+                    onImageClick = { image -> onAttachmentClick?.invoke(image) }
                 )
             }
-            Spacer(modifier = Modifier.height(6.dp))
-            MessageText(text = displayContent.text)
+
+            // Files list (compact)
+            if (displayContent.files.isNotEmpty()) {
+                if (displayContent.images.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+                FileList(
+                    files = displayContent.files,
+                    onFileClick = { file -> onAttachmentClick?.invoke(file) }
+                )
+            }
         }
 
         is ActivityMessageDisplayContent.EmptyMessage,
@@ -245,71 +244,161 @@ private fun MessageText(text: String) {
     }
 }
 
+// ══════════════════════════════════════════════════════════════
+// MULTI-ATTACHMENT COMPOSABLES
+// ══════════════════════════════════════════════════════════════
+
 @Composable
-private fun ImagePreview(
-    image: ActivityAttachment.Image,
-    onClick: () -> Unit
+private fun ImageGallery(
+    images: List<ActivityAttachment.Image>,
+    onImageClick: (ActivityAttachment.Image) -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-    ) {
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .heightIn(max = 260.dp)
+    when (images.size) {
+        1 -> {
+            // Single image: 80×80 thumbnail
+            SingleImageThumbnail(
+                image = images[0],
+                onClick = { onImageClick(images[0]) }
+            )
+        }
+        2 -> {
+            // Two images: 2 thumbnails side by side
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(image.uri)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "${RTL}تصویر",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                images.forEach { image ->
+                    SingleImageThumbnail(
+                        image = image,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onImageClick(image) }
+                    )
+                }
+            }
+        }
+        else -> {
+            // 3+ images: 2 thumbnails + counter badge
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                SingleImageThumbnail(
+                    image = images[0],
+                    modifier = Modifier.weight(1f),
+                    onClick = { onImageClick(images[0]) }
                 )
+                Box(modifier = Modifier.weight(1f)) {
+                    SingleImageThumbnail(
+                        image = images[1],
+                        onClick = { onImageClick(images[1]) }
+                    )
+                    // Counter badge
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(40.dp),
+                        shape = CircleShape,
+                        color = Color.Black.copy(alpha = 0.6f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "+${images.size - 2}",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun FilePreview(
+private fun SingleImageThumbnail(
+    image: ActivityAttachment.Image,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = modifier
+            .size(80.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(image.uri)
+                .size(200, 200) // Thumbnail size for performance
+                .crossfade(true)
+                .build(),
+            contentDescription = "${RTL}تصویر",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+    }
+}
+
+@Composable
+private fun FileList(
+    files: List<ActivityAttachment.File>,
+    onFileClick: (ActivityAttachment.File) -> Unit
+) {
+    val visibleFiles = files.take(3)
+    val remainingCount = files.size - 3
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        visibleFiles.forEach { file ->
+            FileItem(
+                file = file,
+                onClick = { onFileClick(file) }
+            )
+        }
+        if (remainingCount > 0) {
+            Text(
+                text = "${RTL}و ${remainingCount} فایل دیگر",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun FileItem(
     file: ActivityAttachment.File,
     onClick: () -> Unit
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
-        shape = RoundedCornerShape(8.dp)
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(text = "📄", fontSize = 16.sp)
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = file.name ?: "${RTL}فایل پیوست",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            Icon(
+                imageVector = Icons.Default.Description,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = file.name ?: "${RTL}فایل",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }

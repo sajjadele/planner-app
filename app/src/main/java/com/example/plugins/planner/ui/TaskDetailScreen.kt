@@ -133,57 +133,52 @@ fun TaskDetailScreen(
     val isSelectionMode = selectedMessageIds.isNotEmpty()
     var showBatchDeleteConfirm by remember { mutableStateOf(false) }
 
-    // ── Image picker for direct FAB action ──
+    // ── Image picker for direct FAB action (multi-select) ──
     val context = LocalContext.current
     val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-        onResult = { uri: Uri? ->
-            if (uri != null) {
-                // Persist read permission for content:// URIs
-                runCatching {
-                    context.contentResolver.takePersistableUriPermission(
-                        uri,
-                        android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    )
-                }
-                // Create activity directly with the selected image
-                viewModel.createActivity(
-                    ActivityDraft(
-                        attachments = listOf(
-                            ActivityAttachment.Image(uri.toString())
+        contract = ActivityResultContracts.PickMultipleVisualMedia(5),
+        onResult = { uris: List<Uri> ->
+            if (uris.isNotEmpty()) {
+                val attachments = uris.map { uri ->
+                    runCatching {
+                        context.contentResolver.takePersistableUriPermission(
+                            uri,
+                            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
                         )
-                    )
+                    }
+                    ActivityAttachment.Image(uri.toString())
+                }
+                viewModel.createActivity(
+                    ActivityDraft(attachments = attachments)
                 )
             }
         }
     )
 
     val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
-        onResult = { uri: Uri? ->
-            if (uri != null) {
-                runCatching {
-                    context.contentResolver.takePersistableUriPermission(
-                        uri,
-                        android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    )
-                }
-                // Get actual file name from ContentResolver
-                val fileName = context.contentResolver.query(
-                    uri,
-                    arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
-                    null, null, null
-                )?.use { cursor ->
-                    val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                    if (cursor.moveToFirst() && nameIndex >= 0) cursor.getString(nameIndex) else null
-                } ?: uri.lastPathSegment ?: "فایل"
-                // Create activity directly with the selected file
-                viewModel.createActivity(
-                    ActivityDraft(
-                        attachments = listOf(
-                            ActivityAttachment.File(uri.toString(), fileName)
+        contract = ActivityResultContracts.OpenDocument(arrayOf("*/*")),
+        onResult = { uris: List<Uri> ->
+            if (uris.isNotEmpty()) {
+                val attachments = uris.map { uri ->
+                    runCatching {
+                        context.contentResolver.takePersistableUriPermission(
+                            uri,
+                            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
                         )
-                    )
+                    }
+                    // Get actual file name from ContentResolver
+                    val fileName = context.contentResolver.query(
+                        uri,
+                        arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                        null, null, null
+                    )?.use { cursor ->
+                        val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (cursor.moveToFirst() && nameIndex >= 0) cursor.getString(nameIndex) else null
+                    } ?: uri.lastPathSegment ?: "فایل"
+                    ActivityAttachment.File(uri.toString(), fileName)
+                }
+                viewModel.createActivity(
+                    ActivityDraft(attachments = attachments)
                 )
             }
         }

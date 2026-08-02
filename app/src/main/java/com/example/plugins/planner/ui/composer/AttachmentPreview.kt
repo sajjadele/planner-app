@@ -3,6 +3,8 @@ package com.example.plugins.planner.ui.composer
 import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,7 +28,8 @@ import com.example.plugins.planner.data.ActivityAttachment
 /**
  * AttachmentPreview — Shows attached images/files in the composer.
  *
- * Vision Planner styled: Material icons, dark surface, rounded shapes.
+ * Images: Horizontal scrollable row of 60×60 thumbnails.
+ * Files: Vertical list of compact file items.
  */
 @Composable
 fun AttachmentPreview(
@@ -36,57 +39,65 @@ fun AttachmentPreview(
 ) {
     if (attachments.isEmpty()) return
 
+    val images = attachments.filterIsInstance<ActivityAttachment.Image>()
+    val files = attachments.filterIsInstance<ActivityAttachment.File>()
+
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        attachments.forEach { attachment ->
-            when (attachment) {
-                is ActivityAttachment.Image -> {
-                    ImageAttachmentPreview(
-                        uri = attachment.uri,
-                        onRemove = { onRemoveAttachment(attachment) }
-                    )
-                }
-                is ActivityAttachment.File -> {
-                    FileAttachmentPreview(
-                        name = attachment.name ?: "فایل",
-                        onRemove = { onRemoveAttachment(attachment) }
+        // Images: horizontal scrollable thumbnails
+        if (images.isNotEmpty()) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(images) { image ->
+                    ImageThumbnail(
+                        uri = image.uri,
+                        onRemove = { onRemoveAttachment(image) }
                     )
                 }
             }
+        }
+
+        // Files: vertical list
+        files.forEach { file ->
+            FileAttachmentPreview(
+                name = file.name ?: "فایل",
+                onRemove = { onRemoveAttachment(file) }
+            )
         }
     }
 }
 
 @Composable
-private fun ImageAttachmentPreview(
+private fun ImageThumbnail(
     uri: String,
     onRemove: () -> Unit
 ) {
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(160.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .size(60.dp)
+            .clip(RoundedCornerShape(8.dp))
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(Uri.parse(uri))
+                .size(120, 120) // Thumbnail size
                 .crossfade(true)
                 .build(),
             contentDescription = "${RTL}پیش‌نمایش تصویر",
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Fit
+            contentScale = ContentScale.Crop
         )
 
         Surface(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(8.dp)
-                .size(28.dp)
+                .padding(2.dp)
+                .size(18.dp)
                 .clip(CircleShape)
                 .clickable(onClick = onRemove),
             shape = CircleShape,
@@ -97,8 +108,8 @@ private fun ImageAttachmentPreview(
                 contentDescription = "${RTL}حذف تصویر",
                 tint = Color.White,
                 modifier = Modifier
-                    .padding(4.dp)
-                    .size(16.dp)
+                    .padding(2.dp)
+                    .size(10.dp)
             )
         }
     }
@@ -112,43 +123,39 @@ private fun FileAttachmentPreview(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp)),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        shape = RoundedCornerShape(12.dp)
+            .clip(RoundedCornerShape(8.dp)),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Description,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(
-                    text = name,
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
+            Icon(
+                imageVector = Icons.Default.Description,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = name,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
             IconButton(
                 onClick = onRemove,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(20.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
                     contentDescription = "${RTL}حذف فایل",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(12.dp)
                 )
             }
         }
