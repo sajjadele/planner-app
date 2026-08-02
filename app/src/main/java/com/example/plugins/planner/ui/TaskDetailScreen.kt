@@ -76,6 +76,7 @@ import com.example.plugins.planner.ui.components.parseColorHex
 import com.example.plugins.planner.ui.components.FullScreenImageDialog
 import com.example.plugins.planner.ui.components.ReminderSection
 import com.example.plugins.planner.ui.components.skeletonShimmerBrush
+import com.example.ui.components.VisionConfirmDialog
 import com.example.ui.theme.*
 import kotlinx.coroutines.delay
 
@@ -390,48 +391,14 @@ fun TaskDetailScreen(
         }
 
         deletingMessageId?.let { msgId ->
-            AlertDialog(
+            VisionConfirmDialog(
                 onDismissRequest = { deletingMessageId = null },
-                title = {
-                    Text(
-                        "${RTL}حذف پیام",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                text = {
-                    Column {
-                        Text(
-                            "${RTL}این پیام حذف خواهد شد.",
-                            fontSize = 14.sp
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            "${RTL}این عملیات قابل بازگشت نیست.",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        )
-                    }
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            viewModel.deleteActivity(msgId)
-                            deletingMessageId = null
-                        }
-                    ) {
-                        Text(
-                            "${RTL}حذف",
-                            color = MaterialTheme.colorScheme.error,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { deletingMessageId = null }) {
-                        Text("${RTL}لغو")
-                    }
-                }
+                title = "${RTL}حذف پیام",
+                message = "${RTL}آیا از حذف این پیام اطمینان دارید؟\n${RTL}این عملیات قابل بازگشت نیست.",
+                confirmText = "${RTL}حذف",
+                dismissText = "${RTL}لغو",
+                onConfirm = { viewModel.deleteActivity(msgId) },
+                isDestructive = true
             )
         }
 
