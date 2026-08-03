@@ -13,10 +13,16 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 
 sealed interface OnboardingStep {
+    data object Welcome : OnboardingStep
     data object Goal : OnboardingStep
     data object Task : OnboardingStep
+    data object Future : OnboardingStep
 }
 
+/**
+ * 4-step Goal-first onboarding. Steps are presentation-only; the only
+ * persistence is [finish], which commits Goal + Task together on the final CTA.
+ */
 class OnboardingViewModel(application: Application) : AndroidViewModel(application) {
 
     private val database = AppDatabase.getDatabase(application)
@@ -25,7 +31,14 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
     private val taskEventDao = database.taskEventDao()
     private val repo = OnboardingRepository(application)
 
-    private val _step = MutableStateFlow<OnboardingStep>(OnboardingStep.Goal)
+    private val ORDER = listOf(
+        OnboardingStep.Welcome,
+        OnboardingStep.Goal,
+        OnboardingStep.Task,
+        OnboardingStep.Future
+    )
+
+    private val _step = MutableStateFlow<OnboardingStep>(OnboardingStep.Welcome)
     val step: StateFlow<OnboardingStep> = _step
 
     private val _goalTitle = MutableStateFlow("")
@@ -33,14 +46,6 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
 
     private val _taskTitle = MutableStateFlow("")
     val taskTitle: StateFlow<String> = _taskTitle
-
-    /**
-     * The goal the user explicitly linked in Step 2 (via the picker).
-     * Null until they perform the linking micro-action. The submit CTA stays
-     * disabled until this is set — teaching that tasks must be bound to a goal.
-     */
-    private val _selectedGoalTitle = MutableStateFlow<String?>(null)
-    val selectedGoalTitle: StateFlow<String?> = _selectedGoalTitle
 
     private val _isSubmitting = MutableStateFlow(false)
     val isSubmitting: StateFlow<Boolean> = _isSubmitting
@@ -51,27 +56,33 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
     fun onGoalTitleChange(value: String) { _goalTitle.value = value }
     fun onTaskTitleChange(value: String) { _taskTitle.value = value }
 
-    fun onSelectGoal(title: String?) { _selectedGoalTitle.value = title }
-
-    fun goToTask() {
-        if (_goalTitle.value.isNotBlank()) {
-            // Reset any prior link so the lesson is re-experienced if the goal changed.
-            _selectedGoalTitle.value = null
-            _step.value = OnboardingStep.Task
+    /** Forward transition. Only advances when the current step's input is valid. */
+    fun next() {
+        val i = ORDER.indexOf(_step.value)
+        if (i < 0 || i >= ORDER.lastIndex) return
+        val valid = when (_step.value) {
+            OnboardingStep.Goal -> _goalTitle.value.isNotBlank()
+            OnboardingStep.Task -> _taskTitle.value.isNotBlank()
+            else -> true
         }
+        if (valid) _step.value = ORDER[i + 1]
     }
 
-    fun backToGoal() { _step.value = OnboardingStep.Goal }
+    /** Back navigation; Welcome is the root and has no previous step. */
+    fun back() {
+        val i = ORDER.indexOf(_step.value)
+        if (i > 0) _step.value = ORDER[i - 1]
+    }
 
     /**
      * Sequential writes: Goal -> Task (with FK + created event) -> flip flag LAST.
-     * All data is 100% user-created and real; nothing is sample/demo.
+     * The task is ALWAYS bound to the created goal — the relationship is shown by
+     * the UI (animated connector), not selected by the user.
      */
     fun finish(onDone: (Int) -> Unit) {
         val goalTitle = _goalTitle.value.trim()
         val taskTitle = _taskTitle.value.trim()
-        // Required interaction: the user must have linked the task to the goal.
-        if (goalTitle.isBlank() || taskTitle.isBlank() || _selectedGoalTitle.value == null) return
+        if (goalTitle.isBlank() || taskTitle.isBlank()) return
 
         _isSubmitting.value = true
         viewModelScope.launch {

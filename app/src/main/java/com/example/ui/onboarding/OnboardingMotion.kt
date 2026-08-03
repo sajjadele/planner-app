@@ -24,6 +24,11 @@ import androidx.compose.ui.platform.LocalContext
 object OnboardingMotion {
     val EaseOut = CubicBezierEasing(0.23f, 1f, 0.32f, 1f)
     const val STEP_DURATION = 240
+
+    /** Calm ambient motion (welcome sun pulse, connector draw) — slow, tranquil. */
+    val CalmEase = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
+    const val CALM_PULSE_MS = 2400
+    const val CONNECT_DRAW_MS = 700
 }
 
 @Composable

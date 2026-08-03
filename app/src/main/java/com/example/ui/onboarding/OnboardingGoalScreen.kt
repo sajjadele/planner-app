@@ -12,21 +12,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.util.RTL
 import kotlinx.coroutines.delay
 
 private val GOAL_IDEAS = listOf(
-    "یادگیری زبان جدید", "ورزش منظم", "مطالعه هفتگی",
+    "یادگیری زبان انگلیسی", "ورزش منظم", "مطالعه هفتگی",
     "پروژه کاری", "مدیتیشن روزانه", "پس‌انداز مالی"
 )
 
+/**
+ * Step 2 — Goal. Establishes that the product starts from a Goal.
+ * No task language here; only "what do you want to reach?"
+ */
 @Composable
 fun OnboardingGoalScreen(
     goalTitle: String,
     onGoalTitleChange: (String) -> Unit,
     onNext: () -> Unit,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -38,29 +44,34 @@ fun OnboardingGoalScreen(
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(Modifier.height(72.dp))
+        Spacer(Modifier.height(12.dp))
+        OnboardingBackButton(onBack = onBack)
+        Spacer(Modifier.height(20.dp))
+
         Text(
-            text = "چشم‌انداز",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "یک هدف بزرگ، مسیر زندگی‌ت را می‌سازد.",
+            text = "همه‌چیز با یک هدف شروع می‌شود.",
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center,
             lineHeight = 30.sp
         )
-        Spacer(Modifier.height(40.dp))
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "به چه چیزی می‌خواهی برسی؟",
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(32.dp))
+
         OutlinedTextField(
             value = goalTitle,
             onValueChange = onGoalTitleChange,
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(focusRequester),
-            placeholder = { Text("${RTL}یک هدف بزرگ که می‌خواهی بهش برسی؟") },
+            placeholder = { Text("${RTL}مثلاً: یادگیری زبان انگلیسی") },
             singleLine = true,
             shape = RoundedCornerShape(14.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -104,7 +115,7 @@ fun OnboardingGoalScreen(
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
         ) {
             Text(
-                "سفرم را شروع کن",
+                "ادامه",
                 color = MaterialTheme.colorScheme.surface,
                 fontWeight = FontWeight.Bold
             )

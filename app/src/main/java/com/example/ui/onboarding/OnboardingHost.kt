@@ -25,6 +25,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.core.onboarding.OnboardingStep
 import com.example.core.onboarding.OnboardingViewModel
 
+private val STEP_ORDER = listOf(
+    OnboardingStep.Welcome,
+    OnboardingStep.Goal,
+    OnboardingStep.Task,
+    OnboardingStep.Future
+)
+
 @Composable
 fun OnboardingHost(
     modifier: Modifier = Modifier,
@@ -34,7 +41,6 @@ fun OnboardingHost(
     val step by viewModel.step.collectAsState()
     val goalTitle by viewModel.goalTitle.collectAsState()
     val taskTitle by viewModel.taskTitle.collectAsState()
-    val selectedGoalTitle by viewModel.selectedGoalTitle.collectAsState()
     val isSubmitting by viewModel.isSubmitting.collectAsState()
     val reduceMotion = rememberReduceMotion()
 
@@ -57,7 +63,8 @@ fun OnboardingHost(
                     // Strong ease-out, sub-300ms, reduced-motion aware (instant when set).
                     val duration = if (reduceMotion) 0 else OnboardingMotion.STEP_DURATION
                     val easing = OnboardingMotion.EaseOut
-                    val forward = targetState == OnboardingStep.Task
+                    val forward =
+                        STEP_ORDER.indexOf(targetState) > STEP_ORDER.indexOf(initialState)
                     if (forward) {
                         (fadeIn(tween(duration, easing = easing)) +
                             slideInHorizontally(tween(duration, easing = easing)) { it / 2 })
@@ -77,20 +84,29 @@ fun OnboardingHost(
                 label = "OnboardingSteps"
             ) { currentStep ->
                 when (currentStep) {
+                    OnboardingStep.Welcome -> OnboardingWelcomeScreen(
+                        onNext = viewModel::next,
+                        modifier = Modifier.fillMaxSize()
+                    )
                     OnboardingStep.Goal -> OnboardingGoalScreen(
                         goalTitle = goalTitle,
                         onGoalTitleChange = viewModel::onGoalTitleChange,
-                        onNext = viewModel::goToTask,
+                        onNext = viewModel::next,
+                        onBack = viewModel::back,
                         modifier = Modifier.fillMaxSize()
                     )
                     OnboardingStep.Task -> OnboardingTaskScreen(
                         goalTitle = goalTitle,
                         taskTitle = taskTitle,
-                        linkedGoalTitle = selectedGoalTitle,
                         onTaskTitleChange = viewModel::onTaskTitleChange,
-                        onSelectGoal = viewModel::onSelectGoal,
-                        onBack = viewModel::backToGoal,
-                        onSubmit = { viewModel.finish(onFinish) },
+                        onBack = viewModel::back,
+                        onSubmit = { viewModel.next() },
+                        isSubmitting = isSubmitting,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    OnboardingStep.Future -> OnboardingFutureScreen(
+                        onBack = viewModel::back,
+                        onFinish = { viewModel.finish(onFinish) },
                         isSubmitting = isSubmitting,
                         modifier = Modifier.fillMaxSize()
                     )
