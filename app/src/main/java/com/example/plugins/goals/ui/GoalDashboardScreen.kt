@@ -20,6 +20,7 @@ import com.example.core.onboarding.OnboardingDeepLink
 import com.example.core.util.isolated
 import com.example.plugins.goals.ui.AddGoalDialog
 import com.example.plugins.planner.ui.PlannerViewModel
+import com.example.ui.components.VisionConfirmDialog
 import com.example.ui.theme.*
 
 @Composable
@@ -79,21 +80,16 @@ fun GoalDashboardScreen(
     }
 
     if (showDeleteConfirm && selectedGoal != null) {
-        AlertDialog(
+        VisionConfirmDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("حذف هدف", fontWeight = FontWeight.Bold) },
-            text = { Text("حذف این هدف تمام تسک‌ها و رویدادهای مربوط به آن را نیز حذف می‌کند. ادامه می‌دهید؟") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteGoalWithRelated(selectedGoal!!.id)
-                        showDeleteConfirm = false
-                        selectedGoal = null
-                    }
-                ) { Text("حذف", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("انصراف") }
+            title = "حذف هدف",
+            message = "حذف این هدف تمام تسک‌ها و رویدادهای مربوط به آن را نیز حذف می‌کند. ادامه می‌دهید؟",
+            confirmText = "حذف",
+            dismissText = "انصراف",
+            isDestructive = true,
+            onConfirm = {
+                viewModel.deleteGoalWithRelated(selectedGoal!!.id)
+                selectedGoal = null
             }
         )
     }
