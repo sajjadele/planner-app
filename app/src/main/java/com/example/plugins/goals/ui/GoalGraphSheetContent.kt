@@ -260,7 +260,7 @@ fun GoalGraphSheetContent(
                     .fillMaxSize()
                     .pointerInput(visibleGraph, expandedClusterId) {
                         detectTapGestures { offset ->
-                            val hitScale = size.width.toFloat() / (visibleGraph.viewportRadius * 2f)
+                            val hitScale = size.minDimension.toFloat() / (visibleGraph.viewportRadius * 2f)
                             val hit = hitTestVisible(
                                 visibleGraph,
                                 offset.x,

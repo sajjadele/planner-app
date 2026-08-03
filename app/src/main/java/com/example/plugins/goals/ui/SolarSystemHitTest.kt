@@ -100,10 +100,12 @@ internal fun hitTestVisible(
         val chipY = cy + outermostRing * scale + chipGap
         val chipX = cx - chipWidth / 2f
 
-        val left = chipX
-        val right = chipX + chipWidth
-        val top = chipY
-        val bottom = chipY + chipHeight
+        // Generous hit area with padding for reliable touch detection
+        val hitPad = 16f * density
+        val left = chipX - hitPad
+        val right = chipX + chipWidth + hitPad
+        val top = chipY - hitPad
+        val bottom = chipY + chipHeight + hitPad
 
         if (px in left..right && py in top..bottom) {
             return VisibleHit.ShowMore
