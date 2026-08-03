@@ -1113,6 +1113,16 @@ private fun TaskDetailActivityContent(
                             )
                         }
                     )
+                    // Separator between messages (not after last)
+                    if (message.id != group.messages.last().id) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                            thickness = 1.dp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
                 }
             }
         }
