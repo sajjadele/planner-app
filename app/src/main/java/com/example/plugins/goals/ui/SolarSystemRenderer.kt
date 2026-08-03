@@ -89,6 +89,116 @@ internal fun DrawScope.drawVisibleSolarSystem(
     drawShowMoreChip(hiddenHintMeasured, model, expandedClusterId, nodeEntrance, primary)
 }
 
+// ── Zoomed cluster view ──
+
+/**
+ * Draw only the members of a specific cluster, spread across orbits.
+ * Used when task count ≥ ZOOM_THRESHOLD and user taps a cluster.
+ */
+internal fun DrawScope.drawZoomedCluster(
+    model: VisibleGraphModel,
+    clusterId: Int,
+    scale: Float,
+    time: Float,
+    nodeEntrance: Float,
+    selectedId: Int?,
+    clusterCountMap: Map<Int, TextLayoutResult>,
+    onSurface: Color,
+    primary: Color
+) {
+    val center = toCanvas(model, scale, model.centerX, model.centerY)
+    val sunR = SUN_SIZE * scale
+
+    // Draw orbit rings
+    val ringStroke = Stroke(width = 1.0f.dp.toPx())
+    model.orbitBands.forEachIndexed { index, band ->
+        val r = band.radius * scale
+        val alpha = when (index) { 0 -> 0.08f; 1 -> 0.06f; 2 -> 0.05f; else -> 0.04f }
+        drawCircle(
+            color = onSurface.copy(alpha = alpha * nodeEntrance),
+            radius = r, center = center, style = ringStroke
+        )
+    }
+
+    // Draw sun
+    drawSun(center, sunR, nodeEntrance, time)
+
+    // Find the cluster and its member tasks
+    val cluster = model.clusters.firstOrNull { it.clusterId == clusterId } ?: return
+    val memberTasks = model.tasks.filter { it.taskId in cluster.memberIds }
+
+    // Distribute members across available orbits
+    val activeBands = model.orbitBands.filter { it.band != null }
+    val bandCount = activeBands.size.coerceAtLeast(1)
+
+    memberTasks.forEachIndexed { index, task ->
+        val bandIndex = index % bandCount
+        val band = activeBands[bandIndex]
+        val angle = (index.toFloat() / memberTasks.size) * GraphGeometry.TWO_PI +
+            ((task.taskId * 92821) % 1000) / 1000f * 0.3f
+        val pos = GraphGeometry.project(model.centerX, model.centerY, band.radius, angle)
+        val canvasPos = toCanvas(model, scale, pos.first, pos.second)
+
+        val isSelected = task.taskId == selectedId
+        val baseColor = when {
+            task.attentionScore >= 0.7f -> Color(0xFFDC2626)
+            task.attentionScore >= 0.4f -> Color(0xFFF59E0B)
+            else -> AccentPurple
+        }
+        val r = SAT_SIZE * scale * SAT_SIZE_MUL
+
+        // Shadow
+        drawCircle(color = Color.Black.copy(alpha = 0.12f * nodeEntrance), radius = r, center = canvasPos + Offset(0f, 1.dp.toPx()))
+        // Body
+        drawCircle(color = baseColor.copy(alpha = nodeEntrance), radius = r, center = canvasPos)
+        // Specular
+        drawCircle(color = Color.White.copy(alpha = 0.22f * nodeEntrance), radius = r * 0.38f, center = canvasPos + Offset(-r * 0.25f, -r * 0.25f))
+
+        // Selection ring
+        if (isSelected) {
+            drawCircle(color = Color.White.copy(alpha = 0.55f * nodeEntrance), radius = r + 4.dp.toPx(), center = canvasPos, style = Stroke(2.dp.toPx()))
+        }
+
+        // Overdue badge
+        if (task.isOverdue) {
+            drawCircle(color = Color(0xFFDC2626).copy(alpha = 0.7f * nodeEntrance), radius = r * 0.35f, center = canvasPos + Offset(r * 0.7f, -r * 0.7f))
+        }
+        // Boulder ring
+        if (task.isBoulder) {
+            drawCircle(color = Color(0xFFE8703A).copy(alpha = 0.55f * nodeEntrance), radius = r + 3.dp.toPx(), center = canvasPos, style = Stroke(1.5.dp.toPx()))
+        }
+        // Near-deadline ring
+        if (task.isNearDeadline) {
+            drawCircle(color = Color(0xFFF59E0B).copy(alpha = 0.5f * nodeEntrance), radius = r + 5.dp.toPx(), center = canvasPos, style = Stroke(2.dp.toPx()))
+        }
+    }
+
+    // Back button at bottom
+    drawBackButton(center, model, nodeEntrance, primary)
+}
+
+private fun DrawScope.drawBackButton(
+    center: Offset,
+    model: VisibleGraphModel,
+    nodeEntrance: Float,
+    primary: Color
+) {
+    val text = "${RTL}بازگشت"
+    val btnW = 100.dp.toPx()
+    val btnH = 36.dp.toPx()
+    val btnX = center.x - btnW / 2f
+    val btnY = size.height - 50.dp.toPx()
+
+    drawRoundRect(
+        color = primary.copy(alpha = 0.15f * nodeEntrance),
+        topLeft = Offset(btnX, btnY),
+        size = Size(btnW, btnH),
+        cornerRadius = CornerRadius(18.dp.toPx(), 18.dp.toPx())
+    )
+    // Note: text drawing requires TextLayoutResult, so we'll use a simple approach
+    // The back button hit area is handled by hitTestBackButton
+}
+
 // ── Orbit rings ──
 
 private fun DrawScope.drawOrbitRings(

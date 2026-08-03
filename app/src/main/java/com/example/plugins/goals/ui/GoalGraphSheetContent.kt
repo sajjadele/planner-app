@@ -39,6 +39,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 
+/** Minimum task count to activate tap-to-zoom for clusters. */
+private const val ZOOM_THRESHOLD = 20
+
 /**
  * Bottom-sheet body rendering the Behavioral Solar System for a single goal.
  *
@@ -75,6 +78,10 @@ fun GoalGraphSheetContent(
     LaunchedEffect(Unit) {
         if (autoShowEducation) showLegend = true
     }
+
+    // ── Tap-to-zoom state (≥20 tasks) ──
+    var zoomedClusterId by remember { mutableStateOf<Int?>(null) }
+    val isZoomedActive = zoomedClusterId != null && visibleGraph.tasks.size >= ZOOM_THRESHOLD
 
     // ── Entrance animations ──
     val sunEntrance = remember { Animatable(0f) }
@@ -258,9 +265,27 @@ fun GoalGraphSheetContent(
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(visibleGraph, expandedClusterId) {
+                    .pointerInput(visibleGraph, expandedClusterId, zoomedClusterId) {
                         detectTapGestures { offset ->
                             val hitScale = size.minDimension.toFloat() / (visibleGraph.viewportRadius * 2f)
+
+                            // In zoomed mode, only test zoomed cluster members + back button
+                            if (isZoomedActive) {
+                                val backHit = hitTestBackButton(offset.x, offset.y, size.minDimension.toFloat(), density.density)
+                                if (backHit) {
+                                    zoomedClusterId = null
+                                    return@detectTapGestures
+                                }
+                                val memberHit = hitTestZoomedMembers(
+                                    visibleGraph, zoomedClusterId!!, offset.x, offset.y, hitScale
+                                )
+                                if (memberHit != null) {
+                                    onSelectedTaskChange(memberHit)
+                                    onTaskTap(memberHit)
+                                }
+                                return@detectTapGestures
+                            }
+
                             val hit = hitTestVisible(
                                 visibleGraph,
                                 offset.x,
@@ -271,7 +296,13 @@ fun GoalGraphSheetContent(
                                 density.density
                             )
                             when (hit) {
-                                is VisibleHit.Cluster -> onToggleCluster(hit.id)
+                                is VisibleHit.Cluster -> {
+                                    if (visibleGraph.tasks.size >= ZOOM_THRESHOLD) {
+                                        zoomedClusterId = hit.id
+                                    } else {
+                                        onToggleCluster(hit.id)
+                                    }
+                                }
                                 is VisibleHit.Task -> {
                                     onSelectedTaskChange(hit.id)
                                     onTaskTap(hit.id)
@@ -290,24 +321,39 @@ fun GoalGraphSheetContent(
                     }
             ) {
                 val scale = size.minDimension / (visibleGraph.viewportRadius * 2f)
-                drawVisibleSolarSystem(
-                    model = visibleGraph,
-                    scale = scale,
-                    time = t,
-                    sunEntrance = sunEntrance.value,
-                    ringEntrance = ringEntrance.value,
-                    nodeEntrance = nodeEntrance.value,
-                    expandProgress = expandProgress.value,
-                    selectedId = selectedTaskId,
-                    expandedClusterId = expandedClusterId,
-                    titleMeasured = titleMeasured,
-                    clusterCountMap = clusterCountMap,
-                    hiddenHintMeasured = hiddenHintMeasured,
-                    emptyHintMeasured = if (isEmptyGraph) emptyHintMeasured else null,
-                    onSurface = onSurface,
-                    onSurfaceVariant = onSurfaceVariant,
-                    primary = primary
-                )
+                if (isZoomedActive) {
+                    // Zoomed view: only show cluster members
+                    drawZoomedCluster(
+                        model = visibleGraph,
+                        clusterId = zoomedClusterId!!,
+                        scale = scale,
+                        time = t,
+                        nodeEntrance = nodeEntrance.value,
+                        selectedId = selectedTaskId,
+                        clusterCountMap = clusterCountMap,
+                        onSurface = onSurface,
+                        primary = primary
+                    )
+                } else {
+                    drawVisibleSolarSystem(
+                        model = visibleGraph,
+                        scale = scale,
+                        time = t,
+                        sunEntrance = sunEntrance.value,
+                        ringEntrance = ringEntrance.value,
+                        nodeEntrance = nodeEntrance.value,
+                        expandProgress = expandProgress.value,
+                        selectedId = selectedTaskId,
+                        expandedClusterId = expandedClusterId,
+                        titleMeasured = titleMeasured,
+                        clusterCountMap = clusterCountMap,
+                        hiddenHintMeasured = hiddenHintMeasured,
+                        emptyHintMeasured = if (isEmptyGraph) emptyHintMeasured else null,
+                        onSurface = onSurface,
+                        onSurfaceVariant = onSurfaceVariant,
+                        primary = primary
+                    )
+                }
             }
         }
     }

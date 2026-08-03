@@ -123,3 +123,59 @@ internal sealed class VisibleHit {
     data object Sun : VisibleHit()
     data object None : VisibleHit()
 }
+
+// ── Zoomed view hit-test ──
+
+/**
+ * Hit-test for the "بازگشت" (back) button in zoomed cluster view.
+ * Button is centered at bottom of canvas.
+ */
+internal fun hitTestBackButton(px: Float, py: Float, canvasSize: Float, density: Float): Boolean {
+    val btnW = 100f * density
+    val btnH = 36f * density
+    val btnX = canvasSize / 2f - btnW / 2f
+    val btnY = canvasSize - 50f * density
+    val hitPad = 12f * density
+    return px in (btnX - hitPad)..(btnX + btnW + hitPad) &&
+        py in (btnY - hitPad)..(btnY + btnH + hitPad)
+}
+
+/**
+ * Hit-test for individual members of a zoomed cluster.
+ * Returns task ID if hit, null otherwise.
+ */
+internal fun hitTestZoomedMembers(
+    model: VisibleGraphModel,
+    clusterId: Int,
+    px: Float,
+    py: Float,
+    scale: Float
+): Int? {
+    val cluster = model.clusters.firstOrNull { it.clusterId == clusterId } ?: return null
+    val memberTasks = model.tasks.filter { it.taskId in cluster.memberIds }
+    val activeBands = model.orbitBands.filter { it.band != null }
+    val bandCount = activeBands.size.coerceAtLeast(1)
+    val cx = model.viewportRadius * scale
+    val cy = model.viewportRadius * scale
+    val tolerance = 12f * scale
+    val visualR = SAT_SIZE * scale * SAT_SIZE_MUL
+
+    var bestId: Int? = null
+    var bestDist = Float.MAX_VALUE
+
+    memberTasks.forEachIndexed { index, task ->
+        val bandIndex = index % bandCount
+        val band = activeBands[bandIndex]
+        val angle = (index.toFloat() / memberTasks.size) * GraphGeometry.TWO_PI +
+            ((task.taskId * 92821) % 1000) / 1000f * 0.3f
+        val pos = GraphGeometry.project(model.centerX, model.centerY, band.radius, angle)
+        val nx = cx + (pos.first - model.centerX) * scale
+        val ny = cy + (pos.second - model.centerY) * scale
+        val d = GraphGeometry.distance(px, py, nx, ny)
+        if (d <= visualR + tolerance && d < bestDist) {
+            bestDist = d
+            bestId = task.taskId
+        }
+    }
+    return bestId
+}
