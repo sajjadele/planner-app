@@ -266,6 +266,7 @@ private fun ImageGallery(
         2 -> {
             // Two images: 2 thumbnails side by side
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 images.forEach { image ->
