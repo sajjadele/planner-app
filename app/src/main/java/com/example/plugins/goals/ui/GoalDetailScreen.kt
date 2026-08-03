@@ -898,25 +898,28 @@ private fun MirrorSheetContent(insights: List<MirrorInsight>) {
             .padding(horizontal = 20.dp, vertical = 16.dp)
             .padding(bottom = 32.dp)
     ) {
-        Text(
+        VisionText(
             text = "بازتاب هدف",
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(6.dp))
-        Text(
+        VisionText(
             text = "این بازخورد بر اساس فعالیت‌های اخیر این هدف ایجاد شده است.",
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            lineHeight = 18.sp
+            lineHeight = 18.sp,
+            modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(16.dp))
         if (insights.isEmpty()) {
-            Text(
+            VisionText(
                 text = "هنوز الگویی برای نمایش وجود ندارد.",
                 fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth()
             )
         } else {
             insights.forEach { insight ->
@@ -928,18 +931,20 @@ private fun MirrorSheetContent(insights: List<MirrorInsight>) {
                         .padding(vertical = 4.dp)
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
-                        Text(
+                        VisionText(
                             text = insight.title,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(
+                        VisionText(
                             text = insight.message,
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f),
-                            lineHeight = 18.sp
+                            lineHeight = 18.sp,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
