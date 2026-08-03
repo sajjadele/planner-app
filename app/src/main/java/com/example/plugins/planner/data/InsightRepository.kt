@@ -31,4 +31,5 @@ interface InsightRepository {
 
     // ── Phase 2A: Attention — meaningful interaction timestamps ──
     suspend fun getLastMeaningfulInteractionPerTask(goalId: Int): List<TaskLastInteraction>
+    fun observeLastMeaningfulInteractionPerTask(goalId: Int): Flow<List<TaskLastInteraction>>
 }

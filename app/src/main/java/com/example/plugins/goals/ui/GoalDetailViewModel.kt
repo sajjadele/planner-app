@@ -306,30 +306,35 @@ class GoalDetailViewModel(
 
     // ── Behavioral Solar System graph (Phase 6 / 2B+) ──
 
-    /**
-     * Live reschedule counts for this goal's tasks. Fetched on demand when the Graph sheet opens.
-     */
-    private suspend fun loadRescheduleCounts(): Map<Int, Int> =
-        insightRepository.observeRescheduleCountsByGoal(goalId)
-            .map { list -> list.associate { it.taskId to it.rescheduleCount } }
-            .first()
+    // ── Reactive attention signals (Phase 1) ──
+    // rescheduleCountsFlow and meaningfulInteractionsFlow are defined as
+    // StateFlow properties near _attentionResults. No one-shot loading needed.
 
     /**
-     * Reactive graph pipeline (Phase 2B+ migration checkpoint):
+     * Reactive graph pipeline (Phase 2B+ / Phase 1 reactive signals):
      *
-     * allTasks (+ reschedule / meaningful interaction snapshots while open)
-     *   → AttentionProvider (recomputed every emission)
+     * allTasks + rescheduleCounts (reactive) + meaningfulInteractions (reactive)
+     *   → AttentionProvider (recomputed on every emission)
      *   → VisibilityResolver
      *   → VisibleGraphModel
      *
      * Visibility decisions are never made in GoalGraphBuilder or Compose.
+     * All 6 inputs are reactive Flows — no one-shot loading.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    private fun graphSource(
-        rescheduleCounts: Map<Int, Int>,
-        meaningfulInteractions: Map<Int, Long>
-    ): Flow<Triple<VisibleGraphModel, String, Float>> =
-        combine(goal, allTasks, goalProgress, _visibilityLevel) { g, ts, progress, level ->
+    private fun graphSource(): Flow<Triple<VisibleGraphModel, String, Float>> {
+        // Nest combines to handle 6 flows with type safety.
+        val taskInputs = combine(goal, allTasks, _visibilityLevel) { g, ts, level ->
+            Triple(g, ts, level)
+        }
+        val signalInputs = combine(goalProgress, rescheduleCountsFlow, meaningfulInteractionsFlow) { p, r, i ->
+            Triple(p, r, i)
+        }
+
+        return combine(taskInputs, signalInputs) { tasks, signals ->
+            val (g, ts, level) = tasks
+            val (progress, rescheduleCounts, meaningfulInteractions) = signals
+
             if (g == null) return@combine null
 
             val nowMillis = System.currentTimeMillis()
@@ -372,6 +377,7 @@ class GoalDetailViewModel(
 
             Triple(visibleGraph, g.title, progress?.overall ?: 0f)
         }.filterNotNull()
+    }
 
     /**
      * Lazy Behavioral Solar System graph state. Starts as [GraphState.NotRequested]; becomes
@@ -462,7 +468,8 @@ class GoalDetailViewModel(
 
     /**
      * Begin lazily collecting [graphSource]. Re-emits on every source change while open so
-     * attention + visibility stay live during task toggles.
+     * attention + visibility stay live during task toggles, reschedules, and note additions.
+     * All attention signals are now reactive — no one-shot loading.
      */
     private fun startGraphComputation() {
         if (graphCollectionJob?.isActive == true) return
@@ -470,9 +477,7 @@ class GoalDetailViewModel(
             _goalGraphState.value = GraphState.Loading
         }
         graphCollectionJob = viewModelScope.launch {
-            val rescheduleCounts = loadRescheduleCounts()
-            val meaningfulInteractions = loadMeaningfulInteractions()
-            graphSource(rescheduleCounts, meaningfulInteractions).collect { (visible, title, progress) ->
+            graphSource().collect { (visible, title, progress) ->
                 _goalGraphState.value = GraphState.Ready(
                     visibleGraph = visible,
                     goalTitle = title,
@@ -482,14 +487,8 @@ class GoalDetailViewModel(
         }
     }
 
-    /**
-     * Phase 2A: fetch last meaningful interaction timestamp per task for this goal.
-     * Fetched lazily on Graph sheet open (same pattern as reschedule counts).
-     * Returns taskId → last meaningful timestamp (epoch ms).
-     */
-    private suspend fun loadMeaningfulInteractions(): Map<Int, Long> =
-        insightRepository.getLastMeaningfulInteractionPerTask(goalId)
-            .associate { it.taskId to it.lastMeaningfulMs }
+    // ── Phase 2A: Attention — meaningful interaction timestamps ──
+    // Now reactive via meaningfulInteractionsFlow (StateFlow property).
 
     /**
      * Attention results for this goal's active tasks. Updated reactively while the Graph sheet
@@ -497,6 +496,20 @@ class GoalDetailViewModel(
      */
     private val _attentionResults = MutableStateFlow<Map<Int, AttentionResult>>(emptyMap())
     val attentionResults: StateFlow<Map<Int, AttentionResult>> = _attentionResults
+
+    // ── Reactive attention signals (Phase 1: stale-signal fix) ──
+
+    /** Reactive reschedule counts — re-emits when task_events change. */
+    private val rescheduleCountsFlow: StateFlow<Map<Int, Int>> =
+        insightRepository.observeRescheduleCountsByGoal(goalId)
+            .map { list -> list.associate { it.taskId to it.rescheduleCount } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    /** Reactive meaningful-interaction timestamps — re-emits when notes change. */
+    private val meaningfulInteractionsFlow: StateFlow<Map<Int, Long>> =
+        insightRepository.observeLastMeaningfulInteractionPerTask(goalId)
+            .map { list -> list.associate { it.taskId to it.lastMeaningfulMs } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     /**
      * Stop graph collection on sheet close (Sprint 1). The last [GraphState.Ready] is intentionally

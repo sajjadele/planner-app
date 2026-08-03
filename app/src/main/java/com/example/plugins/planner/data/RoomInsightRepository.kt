@@ -57,4 +57,7 @@ class RoomInsightRepository(private val insightDao: InsightDao) : InsightReposit
 
     override suspend fun getLastMeaningfulInteractionPerTask(goalId: Int): List<TaskLastInteraction> =
         insightDao.getLastMeaningfulInteractionPerTask(goalId)
+
+    override fun observeLastMeaningfulInteractionPerTask(goalId: Int): Flow<List<TaskLastInteraction>> =
+        insightDao.observeLastMeaningfulInteractionPerTask(goalId)
 }

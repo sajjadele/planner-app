@@ -254,6 +254,16 @@ interface InsightDao {
         GROUP BY taskId
     """)
     suspend fun getLastMeaningfulInteractionPerTask(goalId: Int): List<TaskLastInteraction>
+
+    /** Reactive Flow variant — re-emits when notes change. */
+    @Query("""
+        SELECT taskId, MAX(timestamp) AS lastMeaningfulMs
+        FROM notes
+        WHERE taskId IS NOT NULL
+        AND taskId IN (SELECT id FROM tasks WHERE goalId = :goalId)
+        GROUP BY taskId
+    """)
+    fun observeLastMeaningfulInteractionPerTask(goalId: Int): Flow<List<TaskLastInteraction>>
 }
 
 /** Result of the meaningful-interaction aggregation query. */
