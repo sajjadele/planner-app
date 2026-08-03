@@ -197,7 +197,8 @@ fun DurationChip(
             Text(
                 text = formatDuration(durationMinutes),
                 fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
             )
 
             IconButton(

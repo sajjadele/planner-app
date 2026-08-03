@@ -106,8 +106,15 @@ fun ActivityMessageCard(
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.Bottom
             ) {
+                // Duration box on the left side (outside bubble)
+                if (message.durationMinutes != null && message.durationMinutes > 0) {
+                    DurationBox(durationMinutes = message.durationMinutes)
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth(maxBubbleWidthFraction)
@@ -158,11 +165,6 @@ fun ActivityMessageCard(
                             displayContent = displayContent,
                             onAttachmentClick = onAttachmentClick
                         )
-
-                        // ── Duration indicator ──
-                        if (message.durationMinutes != null && message.durationMinutes > 0) {
-                            DurationIndicator(durationMinutes = message.durationMinutes)
-                        }
 
                         // ── Metadata: edited + timestamp ──
                         MessageMetadataRow(
@@ -587,40 +589,24 @@ private fun formatTimestamp(timestamp: Long): String {
 }
 
 // ════════════════════════════════════════════════════════════════
-// Duration Indicator
+// Duration Box (outside bubble, left side)
 // ════════════════════════════════════════════════════════════════
 
 @Composable
-private fun DurationIndicator(durationMinutes: Int) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Start
+private fun DurationBox(durationMinutes: Int) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+        modifier = Modifier.size(40.dp)
     ) {
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Schedule,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(12.dp)
-                )
-                Text(
-                    text = formatDuration(durationMinutes),
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium
-                )
-            }
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = formatDuration(durationMinutes),
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }

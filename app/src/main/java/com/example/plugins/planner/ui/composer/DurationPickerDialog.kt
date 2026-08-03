@@ -160,17 +160,11 @@ fun DurationPickerDialog(
 }
 
 /**
- * Format duration as human-readable string.
- * < 60 min → "45 دقیقه"
- * = 60 min → "1 ساعت"
- * > 60 min → "1 ساعت 30 دقیقه"
+ * Format duration as compact clock-style string.
+ * "1:30" for 1h 30m, "0:45" for 45m, "2:00" for 2h
  */
 fun formatDuration(totalMinutes: Int): String {
     val hours = totalMinutes / 60
     val minutes = totalMinutes % 60
-    return when {
-        hours == 0 -> "$minutes دقیقه"
-        minutes == 0 -> "$hours ساعت"
-        else -> "$hours ساعت $minutes دقیقه"
-    }
+    return "$hours:${String.format("%02d", minutes)}"
 }
