@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.sp
 import com.example.core.domain.CalendarDate
 import com.example.core.domain.DayContext
 import com.example.core.domain.Holiday
-import com.example.ui.components.VisionText
 
 /**
  * Level 1 (always visible): selected Jalali date + expand/collapse trigger.
@@ -41,12 +40,11 @@ fun DayContextHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        VisionText(
+        Text(
             text = calendarDate.toJalaliDisplay(),
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.fillMaxWidth()
+            color = MaterialTheme.colorScheme.onSurface
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -80,11 +78,10 @@ fun DayContextDetails(
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         // Gregorian date
-        VisionText(
+        Text(
             text = context.date.toGregorianDisplay(),
             fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth()
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         // Holidays
@@ -120,19 +117,18 @@ private fun HolidayRow(
             fontSize = 14.sp
         )
         Spacer(modifier = Modifier.width(8.dp))
-        VisionText(
+        Text(
+            text = holiday.name,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
             text = "تعطیل رسمی",
             fontSize = 10.sp,
             color = MaterialTheme.colorScheme.tertiary,
             fontWeight = FontWeight.SemiBold
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        VisionText(
-            text = holiday.name,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
         )
     }
 }
