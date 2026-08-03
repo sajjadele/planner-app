@@ -176,6 +176,15 @@ fun ActivityMessageCard(
             }
         }
 
+        // ── Separator line between activities ──
+        HorizontalDivider(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+            thickness = 0.5.dp
+        )
+
         // ── Context Menu (anchored to bubble via Box) ──
         ContextMenu(
             showMenu = showMenu,
