@@ -278,35 +278,21 @@ private fun ImageGallery(
             }
         }
         else -> {
-            // 3+ images: 2 thumbnails + counter badge
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                SingleImageThumbnail(
-                    image = images[0],
-                    modifier = Modifier.weight(1f),
-                    onClick = { onImageClick(images[0]) }
-                )
-                Box(modifier = Modifier.weight(1f)) {
-                    SingleImageThumbnail(
-                        image = images[1],
-                        onClick = { onImageClick(images[1]) }
-                    )
-                    // Counter badge
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .size(40.dp),
-                        shape = CircleShape,
-                        color = Color.Black.copy(alpha = 0.6f)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = "+${images.size - 2}",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
+            // 3+ images: 2-column grid, all clickable
+            val rows = images.chunked(2)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                rows.forEach { rowImages ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        rowImages.forEach { image ->
+                            SingleImageThumbnail(
+                                image = image,
+                                modifier = Modifier.weight(1f),
+                                onClick = { onImageClick(image) }
                             )
+                        }
+                        // Fill empty slot if odd number
+                        if (rowImages.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
                         }
                     }
                 }
