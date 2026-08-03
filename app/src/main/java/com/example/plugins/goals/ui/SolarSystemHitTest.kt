@@ -158,7 +158,7 @@ internal fun hitTestZoomedMembers(
     val cx = model.viewportRadius * scale
     val cy = model.viewportRadius * scale
     val tolerance = 12f * scale
-    val visualR = SAT_SIZE * scale * SAT_SIZE_MUL
+    val visualR = SAT_SIZE * scale * SAT_SIZE_MUL * 0.7f
 
     var bestId: Int? = null
     var bestDist = Float.MAX_VALUE

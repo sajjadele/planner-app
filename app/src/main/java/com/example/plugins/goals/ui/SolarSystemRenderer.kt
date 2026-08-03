@@ -145,7 +145,8 @@ internal fun DrawScope.drawZoomedCluster(
             task.attentionScore >= 0.4f -> Color(0xFFF59E0B)
             else -> AccentPurple
         }
-        val r = SAT_SIZE * scale * SAT_SIZE_MUL
+        // Smaller planets in zoomed view to avoid overlap
+        val r = SAT_SIZE * scale * SAT_SIZE_MUL * 0.7f
 
         // Shadow
         drawCircle(color = Color.Black.copy(alpha = 0.12f * nodeEntrance), radius = r, center = canvasPos + Offset(0f, 1.dp.toPx()))
