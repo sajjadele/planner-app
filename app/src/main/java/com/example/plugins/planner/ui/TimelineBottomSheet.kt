@@ -148,7 +148,29 @@ private fun TimelineSheetContent(
         Spacer(modifier = Modifier.height(4.dp))
 
         // ── Timeline List ──
-        if (messages.isEmpty()) {
+        var showSkeleton by remember { mutableStateOf(true) }
+        LaunchedEffect(messages) {
+            if (messages.isNotEmpty()) {
+                showSkeleton = false
+            } else {
+                kotlinx.coroutines.delay(800)
+                showSkeleton = false
+            }
+        }
+
+        if (showSkeleton && messages.isEmpty()) {
+            // Skeleton loading state
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                repeat(3) {
+                    com.example.plugins.planner.ui.components.ActivityMessageSkeleton()
+                }
+            }
+        } else if (messages.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

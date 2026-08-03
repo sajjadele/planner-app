@@ -136,3 +136,55 @@ fun TaskCardSkeleton(modifier: Modifier = Modifier) {
         }
     }
 }
+
+/**
+ * Skeleton placeholder for ActivityMessageCard.
+ * Mirrors the Telegram-style bubble layout: right-aligned bubble with
+ * shimmer bars for text lines, image thumbnail, and metadata.
+ */
+@Composable
+fun ActivityMessageSkeleton(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.End
+    ) {
+        // Duration box placeholder (left side)
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(skeletonShimmerBrush())
+        )
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // Message bubble placeholder
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.75f),
+            shape = RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+        ) {
+            Column(
+                modifier = Modifier.padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Text lines
+                ShimmerBar(modifier = Modifier.fillMaxWidth(0.8f), height = 12.dp)
+                ShimmerBar(modifier = Modifier.fillMaxWidth(0.5f), height = 10.dp)
+
+                // Image thumbnail placeholder
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(skeletonShimmerBrush())
+                )
+
+                // Timestamp
+                ShimmerBar(modifier = Modifier.fillMaxWidth(0.2f), height = 8.dp)
+            }
+        }
+    }
+}
