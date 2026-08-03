@@ -267,11 +267,11 @@ fun GoalGraphSheetContent(
                     .fillMaxSize()
                     .pointerInput(visibleGraph, expandedClusterId, zoomedClusterId) {
                         detectTapGestures { offset ->
-                            val hitScale = size.minDimension.toFloat() / (visibleGraph.viewportRadius * 2f)
+                            val hitScale = minOf(size.width, size.height).toFloat() / (visibleGraph.viewportRadius * 2f)
 
                             // In zoomed mode, only test zoomed cluster members + back button
                             if (isZoomedActive) {
-                                val backHit = hitTestBackButton(offset.x, offset.y, size.minDimension.toFloat(), density.density)
+                                val backHit = hitTestBackButton(offset.x, offset.y, minOf(size.width, size.height).toFloat(), density.density)
                                 if (backHit) {
                                     zoomedClusterId = null
                                     return@detectTapGestures
