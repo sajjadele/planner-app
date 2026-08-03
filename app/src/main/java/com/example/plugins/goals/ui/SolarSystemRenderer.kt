@@ -333,11 +333,12 @@ private fun DrawScope.drawSatellite(
     val pos = base + Offset(wobble, wobble * 0.6f)
 
     val isSelected = task.taskId == selectedId
+
+    // Color by attention score (proximity to sun)
     val baseColor = when {
-        task.isOverdue -> Color(0xFFDC2626)
-        task.isBoulder -> AccentRed
-        task.isNearDeadline -> Color(0xFFF59E0B)
-        else -> AccentPurple
+        task.attentionScore >= 0.7f -> Color(0xFFDC2626)  // red — high attention
+        task.attentionScore >= 0.4f -> Color(0xFFF59E0B)  // amber — medium
+        else -> AccentPurple                               // purple — low
     }
 
     val baseAlpha = entrance
@@ -351,9 +352,9 @@ private fun DrawScope.drawSatellite(
         center = pos + Offset(x = 0f, y = 1.dp.toPx())
     )
 
-    // Overdue badge
-    if (task.isOverdue && !baseColor.equals(Color(0xFFDC2626))) {
-        val overdueDot = Color(0xFFDC2626).copy(alpha = 0.6f * entrance)
+    // Overdue badge (independent of base color)
+    if (task.isOverdue) {
+        val overdueDot = Color(0xFFDC2626).copy(alpha = 0.7f * entrance)
         drawCircle(color = overdueDot, radius = r * 0.35f, center = pos + Offset(r * 0.7f, -r * 0.7f))
     }
 
