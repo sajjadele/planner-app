@@ -263,7 +263,7 @@ private fun DrawScope.drawEmptyHint(
 
     // Subtle background chip
     drawRoundRect(
-        color = Color(0xFF2A2A2E).copy(alpha = 0.7f * nodeEntrance),
+        color = Color(0xFF3A3A3E).copy(alpha = 0.85f * nodeEntrance),
         topLeft = Offset(chipX, chipY),
         size = Size(chipW, chipH),
         cornerRadius = CornerRadius(20.dp.toPx(), 20.dp.toPx())
