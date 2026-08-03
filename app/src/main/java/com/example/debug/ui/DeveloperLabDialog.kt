@@ -290,23 +290,28 @@ private fun SolarSystemQaSection(
     viewModel: SolarSystemQaViewModel,
     status: String?
 ) {
-    SectionCard(title = "Solar System QA", subtitle = "Test visibility levels") {
+    SectionCard(title = "Solar System QA", subtitle = "Test visual states") {
         val scenarios = listOf(
-            "Scenario A: 5 tasks" to { viewModel.createScenarioA() },
-            "Scenario B: 20 tasks" to { viewModel.createScenarioB() },
-            "Scenario C: 50+ tasks" to { viewModel.createScenarioC() },
-            "Empty Goal: 0 tasks" to { viewModel.createEmptyGoal() }
+            Triple("1. Empty Goal", Color(0xFF6B7280)) { viewModel.createEmptyGoal() },
+            Triple("2. Calm Orbit", Color(0xFF16A34A)) { viewModel.createCalmOrbit() },
+            Triple("3. Urgent Tasks", Color(0xFFDC2626)) { viewModel.createUrgentTasks() },
+            Triple("4. Boulder Field", Color(0xFFEA580C)) { viewModel.createBoulderField() },
+            Triple("5. Near Deadline", Color(0xFFF59E0B)) { viewModel.createNearDeadline() },
+            Triple("6. Priority Mix", Color(0xFF2563EB)) { viewModel.createPriorityMix() },
+            Triple("7. Cluster Stress", Color(0xFF7C3AED)) { viewModel.createClusterStress() },
+            Triple("8. All Completed", Color(0xFF059669)) { viewModel.createAllCompleted() },
+            Triple("9. Activity Rich", Color(0xFF9333EA)) { viewModel.createActivityRich() },
         )
-        scenarios.forEach { (label, action) ->
+        scenarios.forEach { (label, color, action) ->
             Button(
                 onClick = action,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6D28D9)),
+                colors = ButtonDefaults.buttonColors(containerColor = color),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 3.dp)
+                    .padding(vertical = 2.dp)
             ) {
-                Text(label, color = Color.White, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                Text(label, color = Color.White, fontWeight = FontWeight.Medium, fontSize = 12.sp)
             }
         }
         Button(
@@ -315,9 +320,9 @@ private fun SolarSystemQaSection(
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 3.dp)
+                .padding(vertical = 2.dp)
         ) {
-            Text("Clear QA Data", color = Color.White, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+            Text("Clear QA Data", color = Color.White, fontWeight = FontWeight.Medium, fontSize = 12.sp)
         }
         status?.let {
             Spacer(modifier = Modifier.height(4.dp))
