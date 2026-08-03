@@ -239,28 +239,50 @@ interface InsightDao {
     // ──────────────────────────────────────────────
     // Phase 2A: Attention — meaningful interaction timestamps
     //
-    // Sources: notes (user-authored logs linked to tasks).
-    // Future expansion: UNION ALL with subtask_events, photo timestamps, etc.
+    // Sources: activity_events (primary) + notes (backward compatibility).
+    // System events (STEP_CREATED/COMPLETED/REOPENED/DELETED) are excluded.
     // The Attention algorithm receives a single (taskId → timestamp) map and
     // does not know the source — this query is the only place that decides
     // which events count as "meaningful".
     // ──────────────────────────────────────────────
 
     @Query("""
-        SELECT taskId, MAX(timestamp) AS lastMeaningfulMs
-        FROM notes
-        WHERE taskId IS NOT NULL
-        AND taskId IN (SELECT id FROM tasks WHERE goalId = :goalId)
+        SELECT taskId, MAX(lastMeaningfulMs) AS lastMeaningfulMs
+        FROM (
+            SELECT taskId, MAX(timestamp) AS lastMeaningfulMs
+            FROM activity_events
+            WHERE taskId IS NOT NULL
+            AND eventType IN ('NOTE_ADDED','IMAGE_ADDED','FILE_ADDED','MANUAL_ACTIVITY')
+            AND taskId IN (SELECT id FROM tasks WHERE goalId = :goalId)
+            GROUP BY taskId
+            UNION ALL
+            SELECT taskId, MAX(timestamp) AS lastMeaningfulMs
+            FROM notes
+            WHERE taskId IS NOT NULL
+            AND taskId IN (SELECT id FROM tasks WHERE goalId = :goalId)
+            GROUP BY taskId
+        )
         GROUP BY taskId
     """)
     suspend fun getLastMeaningfulInteractionPerTask(goalId: Int): List<TaskLastInteraction>
 
-    /** Reactive Flow variant — re-emits when notes change. */
+    /** Reactive Flow variant — re-emits when activity_events or notes change. */
     @Query("""
-        SELECT taskId, MAX(timestamp) AS lastMeaningfulMs
-        FROM notes
-        WHERE taskId IS NOT NULL
-        AND taskId IN (SELECT id FROM tasks WHERE goalId = :goalId)
+        SELECT taskId, MAX(lastMeaningfulMs) AS lastMeaningfulMs
+        FROM (
+            SELECT taskId, MAX(timestamp) AS lastMeaningfulMs
+            FROM activity_events
+            WHERE taskId IS NOT NULL
+            AND eventType IN ('NOTE_ADDED','IMAGE_ADDED','FILE_ADDED','MANUAL_ACTIVITY')
+            AND taskId IN (SELECT id FROM tasks WHERE goalId = :goalId)
+            GROUP BY taskId
+            UNION ALL
+            SELECT taskId, MAX(timestamp) AS lastMeaningfulMs
+            FROM notes
+            WHERE taskId IS NOT NULL
+            AND taskId IN (SELECT id FROM tasks WHERE goalId = :goalId)
+            GROUP BY taskId
+        )
         GROUP BY taskId
     """)
     fun observeLastMeaningfulInteractionPerTask(goalId: Int): Flow<List<TaskLastInteraction>>
