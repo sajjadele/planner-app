@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.core.util.RTL
+import com.example.plugins.planner.ui.composer.formatDuration
 import com.example.plugins.planner.data.ActivityAttachment
 
 /**
@@ -187,13 +188,13 @@ fun DurationChip(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.Close,
+                imageVector = Icons.Default.Schedule,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(12.dp)
+                modifier = Modifier.size(14.dp)
             )
             Text(
-                text = "$durationMinutes ${RTL}دقیقه",
+                text = formatDuration(durationMinutes),
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.primary
             )

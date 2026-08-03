@@ -37,6 +37,7 @@ import com.example.plugins.planner.data.ActivityMessageAction
 import com.example.plugins.planner.data.ActivityMessageCapability
 import com.example.plugins.planner.data.ActivityMessageDisplayContent
 import com.example.plugins.planner.data.ActivityMessageModel
+import com.example.plugins.planner.ui.composer.formatDuration
 import com.example.ui.screens.components.VisionMenuDivider
 import com.example.ui.screens.components.VisionMenuItem
 import com.example.ui.screens.components.VisionPopupMenu
@@ -156,6 +157,11 @@ fun ActivityMessageCard(
                             displayContent = displayContent,
                             onAttachmentClick = onAttachmentClick
                         )
+
+                        // ── Duration indicator ──
+                        if (message.durationMinutes != null && message.durationMinutes > 0) {
+                            DurationIndicator(durationMinutes = message.durationMinutes)
+                        }
 
                         // ── Metadata: edited + timestamp ──
                         MessageMetadataRow(
@@ -577,4 +583,43 @@ private fun ReplyReferencePreview(
 private fun formatTimestamp(timestamp: Long): String {
     val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
     return sdf.format(Date(timestamp))
+}
+
+// ════════════════════════════════════════════════════════════════
+// Duration Indicator
+// ════════════════════════════════════════════════════════════════
+
+@Composable
+private fun DurationIndicator(durationMinutes: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Schedule,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(12.dp)
+                )
+                Text(
+                    text = formatDuration(durationMinutes),
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
 }
