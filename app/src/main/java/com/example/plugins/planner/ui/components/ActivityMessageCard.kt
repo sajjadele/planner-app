@@ -193,14 +193,6 @@ private fun MessageContent(
         }
 
         is ActivityMessageDisplayContent.MultiMediaContent -> {
-            // Text first (if exists)
-            if (!displayContent.text.isNullOrBlank()) {
-                MessageText(text = displayContent.text)
-                if (displayContent.images.isNotEmpty() || displayContent.files.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                }
-            }
-
             // Images gallery (compact thumbnails)
             if (displayContent.images.isNotEmpty()) {
                 ImageGallery(
@@ -218,6 +210,14 @@ private fun MessageContent(
                     files = displayContent.files,
                     onFileClick = { file -> onAttachmentClick?.invoke(file) }
                 )
+            }
+
+            // Text (after attachments)
+            if (!displayContent.text.isNullOrBlank()) {
+                if (displayContent.images.isNotEmpty() || displayContent.files.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+                MessageText(text = displayContent.text)
             }
         }
 
