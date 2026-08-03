@@ -91,14 +91,14 @@ internal fun hitTestVisible(
     }
     if (bestId != null) return VisibleHit.Task(bestId)
 
-    // Progressive disclosure chrome: "N more" - Fixed bottom-left position
+    // Progressive disclosure chrome: "N more" — positioned below outermost orbit ring
     if (hiddenHintMeasured != null && model.hiddenCount > 0 && expandedClusterId == null) {
-        val horizontalPadding = 24f * density
-        val bottomPadding = 40f * density
+        val outermostRing = model.orbitBands.lastOrNull()?.radius ?: model.viewportRadius * 0.85f
+        val chipGap = 20f * density
         val chipWidth = hiddenHintMeasured.size.width + 32f * density
         val chipHeight = hiddenHintMeasured.size.height + 16f * density
-        val chipX = horizontalPadding
-        val chipY = (2f * model.viewportRadius * scale) - bottomPadding - chipHeight
+        val chipY = cy + outermostRing * scale + chipGap
+        val chipX = cx - chipWidth / 2f
 
         val left = chipX
         val right = chipX + chipWidth
