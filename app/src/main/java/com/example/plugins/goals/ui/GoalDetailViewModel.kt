@@ -332,10 +332,12 @@ class GoalDetailViewModel(
         }
 
         return combine(taskInputs, signalInputs) { tasks, signals ->
+            tasks to signals
+        }.debounce(150).map { (tasks, signals) ->
             val (g, ts, level) = tasks
             val (progress, rescheduleCounts, meaningfulInteractions) = signals
 
-            if (g == null) return@combine null
+            if (g == null) return@map null
 
             val nowMillis = System.currentTimeMillis()
             val activeTasks = ts.filter { !it.isCompleted }
