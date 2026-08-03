@@ -291,12 +291,14 @@ private fun DrawScope.drawShowMoreChip(
     if (hiddenHintMeasured == null || expandedClusterId != null) return
     if (model.hiddenCount <= 0) return
 
-    val horizontalPadding = 24.dp.toPx()
-    val bottomPadding = 40.dp.toPx()
+    val scale = size.minDimension / (model.viewportRadius * 2f)
+    // Position below outermost orbit ring
+    val outermostRing = model.orbitBands.lastOrNull()?.radius ?: model.viewportRadius * 0.85f
+    val chipGap = 20.dp.toPx()
+    val chipY = center.y + outermostRing * scale + chipGap
     val chipWidth = hiddenHintMeasured.size.width + 32.dp.toPx()
     val chipHeight = hiddenHintMeasured.size.height + 16.dp.toPx()
-    val chipX = horizontalPadding
-    val chipY = size.height - bottomPadding - chipHeight
+    val chipX = center.x - chipWidth / 2f
 
     drawRoundRect(
         color = primary.copy(alpha = 0.12f * nodeEntrance),
