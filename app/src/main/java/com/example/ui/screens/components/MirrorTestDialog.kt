@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.domain.mirror.MirrorInsight
+import com.example.ui.components.VisionText
 import com.example.ui.theme.*
 
 @Composable
@@ -45,11 +46,11 @@ fun MirrorTestDialog(
                     fontWeight = FontWeight.Bold,
                     color = if (LocalIsDarkTheme.current) DarkTextPrimary else TextPrimary
                 )
-                Text(
+                VisionText(
                     text = "ابزار توسعه‌دهنده — فقط در نسخه DEBUG",
                     fontSize = 11.sp,
                     color = if (LocalIsDarkTheme.current) DarkTextTertiary else TextTertiary,
-                    modifier = Modifier.padding(top = 2.dp)
+                    modifier = Modifier.padding(top = 2.dp).fillMaxWidth()
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -70,7 +71,7 @@ fun MirrorTestDialog(
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
                     ) {
-                        Text(label, color = Color.White, fontWeight = FontWeight.Medium)
+                        VisionText(label, color = Color.White, fontWeight = FontWeight.Medium)
                     }
                 }
 
@@ -82,16 +83,17 @@ fun MirrorTestDialog(
                         .fillMaxWidth()
                         .padding(vertical = 4.dp)
                 ) {
-                    Text("پاکسازی داده‌های تست Mirror", color = Color.White, fontWeight = FontWeight.Medium)
+                    VisionText("پاکسازی داده‌های تست Mirror", color = Color.White, fontWeight = FontWeight.Medium)
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 status?.let {
-                    Text(
+                    VisionText(
                         text = it,
                         fontSize = 11.sp,
-                        color = if (LocalIsDarkTheme.current) DarkTextTertiary else TextTertiary
+                        color = if (LocalIsDarkTheme.current) DarkTextTertiary else TextTertiary,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
 
@@ -104,32 +106,36 @@ fun MirrorTestDialog(
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             scenario?.let {
-                                Text(
+                                VisionText(
                                     text = "Scenario: $it",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                             }
-                            Text(
+                            VisionText(
                                 text = "Mirror detected (${result.size}):",
                                 fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                                modifier = Modifier.fillMaxWidth()
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             result.forEach { insight: MirrorInsight ->
-                                Text(
+                                VisionText(
                                     text = "• ${insight.title}",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
-                                Text(
+                                VisionText(
                                     text = insight.message,
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f),
-                                    lineHeight = 16.sp
+                                    lineHeight = 16.sp,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                             }
@@ -145,7 +151,7 @@ fun MirrorTestDialog(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("بستن", color = Color.White, fontWeight = FontWeight.Bold)
+                    VisionText("بستن", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
