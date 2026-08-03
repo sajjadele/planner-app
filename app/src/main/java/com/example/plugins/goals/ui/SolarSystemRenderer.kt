@@ -252,11 +252,28 @@ private fun DrawScope.drawEmptyHint(
     nodeEntrance: Float
 ) {
     if (emptyHintMeasured == null) return
+    val scale = size.minDimension / (model.viewportRadius * 2f)
+    // Position below the outermost orbit ring with comfortable padding
+    val outerRingBottom = center.y + model.viewportRadius * 0.85f * scale
+    val chipGap = 24.dp.toPx()
+    val chipY = outerRingBottom + chipGap
+    val chipW = emptyHintMeasured.size.width + 32.dp.toPx()
+    val chipH = emptyHintMeasured.size.height + 16.dp.toPx()
+    val chipX = center.x - chipW / 2f
+
+    // Subtle background chip
+    drawRoundRect(
+        color = Color(0xFF2A2A2E).copy(alpha = 0.7f * nodeEntrance),
+        topLeft = Offset(chipX, chipY),
+        size = Size(chipW, chipH),
+        cornerRadius = CornerRadius(20.dp.toPx(), 20.dp.toPx())
+    )
+    // Text
     drawText(
         textLayoutResult = emptyHintMeasured,
         topLeft = Offset(
-            center.x - emptyHintMeasured.size.width / 2f,
-            center.y + model.viewportRadius * 0.72f * (size.minDimension / (model.viewportRadius * 2f))
+            chipX + 16.dp.toPx(),
+            chipY + chipH / 2f - emptyHintMeasured.size.height / 2f
         ),
         alpha = nodeEntrance
     )

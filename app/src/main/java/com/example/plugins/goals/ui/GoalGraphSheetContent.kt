@@ -129,14 +129,14 @@ fun GoalGraphSheetContent(
         textMeasurer.measure(
             text = "${RTL}${goalTitle}",
             style = TextStyle(
-                fontSize = 13.sp,
-                color = Color.White,
+                fontSize = 11.sp,
+                color = Color.White.copy(alpha = 0.85f),
                 textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Medium
             ),
             overflow = TextOverflow.Ellipsis,
             maxLines = 1,
-            constraints = Constraints(maxWidth = (200f * density.density).roundToInt())
+            constraints = Constraints(maxWidth = (150f * density.density).roundToInt())
         )
     }
     val clusterCountMap = remember(visibleGraph) {
@@ -179,9 +179,10 @@ fun GoalGraphSheetContent(
         textMeasurer.measure(
             text = "${RTL}تسک فعالی نیست",
             style = TextStyle(
-                fontSize = 12.sp,
-                color = onSurfaceVariant,
-                textAlign = TextAlign.Center
+                fontSize = 13.sp,
+                color = Color(0xFFB0B0B0),
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Medium
             )
         )
     }
