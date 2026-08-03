@@ -9,20 +9,14 @@ import androidx.compose.runtime.mutableFloatStateOf
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -33,17 +27,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import androidx.compose.ui.text.font.FontWeight
 import com.example.core.util.RTL
 import com.example.core.util.toEnglishDigits
-import kotlin.math.sin
-import kotlin.math.roundToInt
-import com.example.domain.graph.GraphGeometry
 import com.example.domain.graph.VisibilityLevel
 import com.example.domain.graph.VisibilityResolver
-import com.example.domain.graph.VisibleCluster
 import com.example.domain.graph.VisibleGraphModel
-import com.example.domain.graph.VisibleTask
 import com.example.ui.theme.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.Icons
@@ -52,12 +42,13 @@ import androidx.compose.material.icons.filled.Info
 /**
  * Bottom-sheet body rendering the Behavioral Solar System for a single goal.
  *
- * Phase 2B: pure rendering of [VisibleGraphModel]. Visibility decisions live in
- * domain.graph.VisibilityResolver. Phase 2C.1: the Sun is Goal **identity only**
- * (name + decorative presence) — no progress, health, or attention on the sun.
+ * Entry point only — rendering delegated to [SolarSystemRenderer],
+ * hit-testing to [SolarSystemHitTest], cluster layout to [ClusterLayoutCalculator].
  *
- * Phase 2C.4: progressive disclosure via "N more" chrome; cluster expand/collapse;
- * selection is ephemeral (cleared when preview dismisses).
+ * Phase 2B: pure rendering of [VisibleGraphModel]. Visibility decisions live in
+ * domain.graph.VisibilityResolver.
+ *
+ * Phase 4: extracted renderer/hit-test/cluster-layout for separation of concerns.
  *
  * [expandedClusterId] is owned by the ViewModel (affects visible content).
  * [selectedId] is transient Compose UI state only.
@@ -85,6 +76,7 @@ fun GoalGraphSheetContent(
         if (autoShowEducation) showLegend = true
     }
 
+    // ── Entrance animations ──
     val sunEntrance = remember { Animatable(0f) }
     val ringEntrance = remember { Animatable(0f) }
     val nodeEntrance = remember { Animatable(0f) }
@@ -107,7 +99,7 @@ fun GoalGraphSheetContent(
         expandProgress.animateTo(target, tween(320, easing = FastOutSlowInEasing))
     }
 
-    // Idle motion only when a boulder is visible (avoids continuous Canvas invalidation).
+    // ── Idle motion (boulder wobble) ──
     val needsIdleMotion = remember(visibleGraph) {
         visibleGraph.tasks.any { it.isBoulder }
     }
@@ -127,10 +119,12 @@ fun GoalGraphSheetContent(
     }
     val t = if (entranceDone && needsIdleMotion) clock else 0f
 
+    // ── Theme colors ──
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     val primary = MaterialTheme.colorScheme.primary
 
+    // ── Text measurements ──
     val titleMeasured = remember(goalTitle) {
         textMeasurer.measure(
             text = "${RTL}${goalTitle}",
@@ -158,8 +152,8 @@ fun GoalGraphSheetContent(
             )
         }
     }
-    // Progressive disclosure chrome only when a deeper level is still available.
-    // Progressive disclosure chrome only when a deeper level is still available.
+
+    // ── Progressive disclosure chrome ──
     val canRevealMore = remember(visibleGraph) {
         when (visibleGraph.level) {
             VisibilityLevel.OVERVIEW -> visibleGraph.hiddenCount > 0
@@ -193,6 +187,7 @@ fun GoalGraphSheetContent(
     }
     val isEmptyGraph = visibleGraph.tasks.isEmpty() && visibleGraph.clusters.isEmpty()
 
+    // ── Layout ──
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -244,31 +239,11 @@ fun GoalGraphSheetContent(
                 title = { Text("راهنمای منظومه رفتاری") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        LegendRow(
-                            glyph = "☀",
-                            title = "هدف",
-                            body = "مرکز منظومه و هویت هدف است؛ پیشرفت و توجه روی سیارهها نشان داده میشوند."
-                        )
-                        LegendRow(
-                            glyph = "🔥",
-                            title = "توجه بالا",
-                            body = "تسکهایی که نیاز به توجه بیشتری دارند نزدیکتر به هدف قرار میگیرند."
-                        )
-                        LegendRow(
-                            glyph = "⏰",
-                            title = "موعد گذشته",
-                            body = "تسکهایی که مهلت آنها گذشته و هنوز انجام نشدهاند با حلقه قرمز مشخص میشوند."
-                        )
-                        LegendRow(
-                            glyph = "●",
-                            title = "تسک فعال",
-                            body = "هر نقطه نشاندهنده یک کار این هدف است."
-                        )
-                        LegendRow(
-                            glyph = "○",
-                            title = "خوشه توجه",
-                            body = "وقتی تعداد تسکها زیاد است، تسکهای مشابه در خوشههای توجه گروهبندی میشوند."
-                        )
+                        LegendRow(glyph = "☀", title = "هدف", body = "مرکز منظومه و هویت هدف است؛ پیشرفت و توجه روی سیارهها نشان داده میشوند.")
+                        LegendRow(glyph = "🔥", title = "توجه بالا", body = "تسکهایی که نیاز به توجه بیشتری دارند نزدیکتر به هدف قرار میگیرند.")
+                        LegendRow(glyph = "⏰", title = "موعد گذشته", body = "تسکهایی که مهلت آنها گذشته و هنوز انجام نشدهاند با حلقه قرمز مشخص میشوند.")
+                        LegendRow(glyph = "●", title = "تسک فعال", body = "هر نقطه نشاندهنده یک کار این هدف است.")
+                        LegendRow(glyph = "○", title = "خوشه توجه", body = "وقتی تعداد تسکها زیاد است، تسکهای مشابه در خوشههای توجه گروهبندی میشوند.")
                     }
                 }
             )
@@ -337,442 +312,7 @@ fun GoalGraphSheetContent(
     }
 }
 
-private fun toCanvas(model: VisibleGraphModel, scale: Float, x: Float, y: Float): Offset {
-    val cx = model.viewportRadius * scale
-    val cy = model.viewportRadius * scale
-    return Offset(cx + (x - model.centerX) * scale, cy + (y - model.centerY) * scale)
-}
-
-private fun taskPosition(model: VisibleGraphModel, task: VisibleTask): Pair<Float, Float> =
-    GraphGeometry.project(model.centerX, model.centerY, task.radius, task.angle)
-
-private fun clusterPosition(model: VisibleGraphModel, cluster: VisibleCluster): Pair<Float, Float> =
-    GraphGeometry.project(model.centerX, model.centerY, cluster.radius, cluster.angle)
-
-private const val SAT_SIZE = 16f
-private const val SAT_SIZE_MUL = 1.5f
-/** Fixed design-space sun radius (identity object — not progress-scaled). */
-private const val SUN_SIZE = 40f
-/** Decorative pulse amplitude: ~98%–102% of fixed sun size (not semantic). */
-private const val SUN_PULSE_AMP = 0.02f
-/** Soft identity halo scale relative to sun body (not progress-driven). */
-private const val SUN_HALO_SCALE = 1.35f
-
-private fun Color.lighten(amount: Float): Color =
-    copy(red = red + (1f - red) * amount, green = green + (1f - green) * amount, blue = blue + (1f - blue) * amount)
-
-private fun DrawScope.drawVisibleSolarSystem(
-    model: VisibleGraphModel,
-    scale: Float,
-    time: Float,
-    sunEntrance: Float,
-    ringEntrance: Float,
-    nodeEntrance: Float,
-    expandProgress: Float,
-    selectedId: Int?,
-    expandedClusterId: Int?,
-    titleMeasured: androidx.compose.ui.text.TextLayoutResult,
-    clusterCountMap: Map<Int, androidx.compose.ui.text.TextLayoutResult>,
-    hiddenHintMeasured: androidx.compose.ui.text.TextLayoutResult?,
-    emptyHintMeasured: androidx.compose.ui.text.TextLayoutResult?,
-    onSurface: Color,
-    onSurfaceVariant: Color,
-    primary: Color
-) {
-    val center = toCanvas(model, scale, model.centerX, model.centerY)
-    val sunR = SUN_SIZE * scale
-
-    // Orbit bands: faint astronomical guides only.
-    // Attention is communicated solely by planet distance from the sun — not by ring style.
-    val ringColor = onSurfaceVariant
-    val ringStroke = Stroke(width = 1.0f.dp.toPx())
-    model.orbitBands.forEachIndexed { index, band ->
-        val r = band.radius * scale
-        // Equal visual language; slight fade with distance for depth, never attention color
-        val alpha = when (index) {
-            0 -> 0.08f
-            1 -> 0.06f
-            2 -> 0.05f
-            else -> 0.04f
-        }
-        drawCircle(
-            color = ringColor.copy(alpha = alpha * ringEntrance),
-            radius = r,
-            center = center,
-            style = ringStroke
-        )
-    }
-
-    // ── Sun: Goal identity only (Phase 2C.1) ──
-    // Fixed size + subtle decorative pulse. No progress, health, or attention.
-    // Color: AccentGold fallback (GoalEntity has no user-selected color field yet).
-    val pulse = 1f + SUN_PULSE_AMP * sin(time * 2 * Math.PI.toFloat())
-    val sunBodyR = sunR * pulse
-    val haloRadius = sunBodyR * SUN_HALO_SCALE
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(
-                AccentGold.copy(alpha = 0.35f * sunEntrance),
-                AccentGold.copy(alpha = 0.12f * sunEntrance),
-                AccentGold.copy(alpha = 0.0f)
-            ),
-            center = center,
-            radius = haloRadius
-        ),
-        radius = haloRadius,
-        center = center
-    )
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(
-                Color(0xFFFFE08A).copy(alpha = sunEntrance),
-                AccentGold.copy(alpha = sunEntrance),
-                AccentGold.copy(alpha = 0.85f * sunEntrance)
-            ),
-            center = center,
-            radius = sunBodyR
-        ),
-        radius = sunBodyR,
-        center = center
-    )
-    drawCircle(
-        color = Color.White.copy(alpha = 0.18f * sunEntrance),
-        radius = sunBodyR * 0.42f,
-        center = center
-    )
-
-    val titleGap = 32.dp.toPx()
-    val titleY = center.y - sunBodyR - titleGap - titleMeasured.size.height
-    drawText(
-        textLayoutResult = titleMeasured,
-        topLeft = Offset(center.x - titleMeasured.size.width / 2f, titleY),
-        alpha = sunEntrance
-    )
-
-    // Clusters (Insight level) when not expanded
-    if (model.clusters.isNotEmpty() && expandedClusterId == null) {
-        model.clusters.forEach { cluster ->
-            drawVisibleCluster(cluster, model, scale, nodeEntrance, onSurfaceVariant, clusterCountMap[cluster.clusterId])
-        }
-    } else if (model.clusters.isNotEmpty() && expandedClusterId != null) {
-        val expanded = model.clusters.firstOrNull { it.clusterId == expandedClusterId }
-        model.clusters.forEach { cluster ->
-            if (cluster.clusterId != expandedClusterId) {
-                drawVisibleCluster(cluster, model, scale, nodeEntrance * 0.35f, onSurfaceVariant, clusterCountMap[cluster.clusterId])
-            }
-        }
-        // Expanded cluster members: look up from individual tasks by member id
-        // Members may not be in model.tasks (they were clustered). Draw placeholders at band radius.
-        val memberIds = expanded?.memberIds ?: emptyList()
-        val shown = model.tasks.filter { it.taskId in memberIds }
-        if (shown.isNotEmpty()) {
-            shown.forEach { task ->
-                drawVisibleSatellite(
-                    task = task, model = model, scale = scale, time = time,
-                    entrance = nodeEntrance * expandProgress, selectedId = selectedId
-                )
-            }
-        } else if (expanded != null) {
-            // Members not in visible individual set — place along cluster band by attention order
-            expanded.memberIds.forEachIndexed { i, taskId ->
-                val n = expanded.memberIds.size
-                val angle = if (n == 1) expanded.angle
-                else (i.toFloat() / n) * GraphGeometry.TWO_PI + ((taskId * 92821) % 1000) / 1000f * 0.25f
-                val placeholder = VisibleTask(
-                    taskId = taskId,
-                    attentionScore = expanded.band.range.start,
-                    radius = expanded.radius,
-                    angle = angle,
-                    reasons = emptyList(),
-                    isBoulder = false,
-                    isOverdue = false,
-                    isNearDeadline = false,
-                    priority = null,
-                    title = "task-$taskId"
-                )
-                drawVisibleSatellite(
-                    task = placeholder, model = model, scale = scale, time = time,
-                    entrance = nodeEntrance * expandProgress, selectedId = selectedId
-                )
-            }
-        }
-    }
-
-    // Individual visible tasks (Overview / Expanded / Insight top tasks)
-    if (expandedClusterId == null) {
-        model.tasks.forEach { task ->
-            drawVisibleSatellite(
-                task = task, model = model, scale = scale, time = time,
-                entrance = nodeEntrance, selectedId = selectedId
-            )
-        }
-    }
-
-    // Empty graph guidance (sun remains identity only)
-    if (emptyHintMeasured != null) {
-        drawText(
-            textLayoutResult = emptyHintMeasured,
-            topLeft = Offset(
-                center.x - emptyHintMeasured.size.width / 2f,
-                center.y + model.viewportRadius * 0.72f * scale
-            ),
-            alpha = nodeEntrance
-        )
-    }
-
-    // Show-more affordance: fixed bottom-left chip (outside solar system area)
-    if (hiddenHintMeasured != null && expandedClusterId == null) {
-        val horizontalPadding = 24.dp.toPx()
-        val bottomPadding = 40.dp.toPx()
-        val chipWidth = hiddenHintMeasured.size.width + 32.dp.toPx()
-        val chipHeight = hiddenHintMeasured.size.height + 16.dp.toPx()
-        // Fixed position: bottom-left corner, well outside orbit rings
-        val chipX = horizontalPadding
-        val chipY = size.height - bottomPadding - chipHeight
-        
-        // Background: primary blue with low opacity
-        drawRoundRect(
-            color = primary.copy(alpha = 0.12f * nodeEntrance),
-            topLeft = Offset(chipX, chipY),
-            size = Size(chipWidth, chipHeight),
-            cornerRadius = CornerRadius(18.dp.toPx(), 18.dp.toPx())
-        )
-        
-        // Text
-        drawText(
-            textLayoutResult = hiddenHintMeasured,
-            topLeft = Offset(
-                chipX + 16.dp.toPx(),
-                chipY + chipHeight / 2f - hiddenHintMeasured.size.height / 2f
-            ),
-            alpha = nodeEntrance
-        )
-    }
-}
-
-private fun DrawScope.drawVisibleSatellite(
-    task: VisibleTask,
-    model: VisibleGraphModel,
-    scale: Float,
-    time: Float,
-    entrance: Float,
-    selectedId: Int?
-) {
-    val (px, py) = taskPosition(model, task)
-    val wobble = if (task.isBoulder) {
-        val phase = (task.taskId * 92821 % 1000) / 1000f * 2 * Math.PI.toFloat()
-        2.dp.toPx() * sin(time * 2 * Math.PI.toFloat() * 0.5f + phase)
-    } else 0f
-    val base = toCanvas(model, scale, px, py)
-    val pos = base + Offset(wobble, wobble * 0.6f)
-
-    // Neutral planet color - attention is encoded by orbit position only
-    // Categorical states only: boulder, overdue, near-deadline, selected
-    val isSelected = task.taskId == selectedId
-    val baseColor = when {
-        task.isOverdue -> Color(0xFFDC2626)
-        task.isBoulder -> AccentRed
-        task.isNearDeadline -> Color(0xFFF59E0B)
-        else -> AccentPurple // neutral planet color
-    }
-
-    val baseAlpha = entrance
-    val visualR = SAT_SIZE * scale * SAT_SIZE_MUL
-    val r = visualR // uniform size for all planets
-
-    // Subtle elevation shadow (not attention-based glow)
-    val shadowAlpha = 0.12f * entrance
-    drawCircle(
-        color = Color.Black.copy(alpha = shadowAlpha),
-        radius = r * 1.15f,
-        center = pos + Offset(x = 0f, y = 1.dp.toPx())
-    )
-
-    // Overdue: small badge indicator only (not full planet color)
-    if (task.isOverdue && !baseColor.equals(Color(0xFFDC2626))) {
-        val overdueDot = Color(0xFFDC2626).copy(alpha = 0.6f * entrance)
-        drawCircle(color = overdueDot, radius = r * 0.35f, center = pos + Offset(r * 0.7f, -r * 0.7f))
-    }
-
-    // Boulder: subtle texture indicator (inner ring) - not aggressive glow
-    if (task.isBoulder) {
-        drawCircle(
-            color = AccentRed.copy(alpha = 0.18f * entrance),
-            radius = r * 0.85f,
-            center = pos,
-            style = Stroke(width = 1.5.dp.toPx())
-        )
-    }
-
-    // Near deadline: thin accent ring
-    if (task.isNearDeadline) {
-        val amber = Color(0xFFF59E0B)
-        drawCircle(
-            color = amber.copy(alpha = 0.35f * entrance),
-            radius = r * 1.15f,
-            center = pos,
-            style = Stroke(width = 1.dp.toPx())
-        )
-    }
-
-    // Main planet body - uniform size, neutral color for normal tasks
-    val fillAlpha = baseAlpha
-    val core = baseColor.lighten(0.25f).copy(alpha = fillAlpha)
-    val edge = baseColor.copy(alpha = fillAlpha)
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(core, baseColor.copy(alpha = fillAlpha), edge),
-            center = pos,
-            radius = r
-        ),
-        radius = if (isSelected) r * 1.2f else r,
-        center = pos
-    )
-
-    // Selection ring only — dialog is the primary insight surface (no canvas title label)
-    if (isSelected) {
-        drawCircle(
-            color = AccentPurple,
-            radius = r * 1.2f,
-            center = pos,
-            style = Stroke(width = 2.dp.toPx())
-        )
-    }
-}
-
-private fun DrawScope.drawVisibleCluster(
-    cluster: VisibleCluster,
-    model: VisibleGraphModel,
-    scale: Float,
-    alpha: Float,
-    onSurfaceVariant: Color,
-    countMeasured: androidx.compose.ui.text.TextLayoutResult?
-) {
-    val (px, py) = clusterPosition(model, cluster)
-    val pos = toCanvas(model, scale, px, py)
-    // Neutral cluster color - attention is encoded by orbit position, not color
-    val color = AccentPurple
-    val visualSize = (20f + minOf(cluster.count, 20) * 0.7f).coerceAtMost(34f)
-    val r = visualSize * scale
-    drawCircle(color = color.copy(alpha = 0.12f * alpha), radius = r * 1.5f, center = pos)
-    drawCircle(color = color.copy(alpha = alpha), radius = r, center = pos)
-    drawCircle(color = Color.White.copy(alpha = 0.10f * alpha), radius = r * 0.6f, center = pos)
-    val measured = countMeasured ?: return
-    drawText(
-        textLayoutResult = measured,
-        topLeft = Offset(pos.x - measured.size.width / 2f, pos.y - measured.size.height / 2f),
-        alpha = alpha
-    )
-}
-
-private sealed class VisibleHit {
-    data class Cluster(val id: Int) : VisibleHit()
-    data class Task(val id: Int) : VisibleHit()
-    data object ShowMore : VisibleHit()
-    data object Sun : VisibleHit()
-    data object None : VisibleHit()
-}
-
-private fun hitTestVisible(
-    model: VisibleGraphModel,
-    px: Float,
-    py: Float,
-    expandedClusterId: Int?,
-    scale: Float,
-    hiddenHintMeasured: androidx.compose.ui.text.TextLayoutResult?,
-    density: Float
-): VisibleHit {
-    val cx = model.viewportRadius * scale
-    val cy = model.viewportRadius * scale
-    val tolerance = 12f * scale
-    val sunR = SUN_SIZE * scale
-
-    // Sun hit
-    if (GraphGeometry.distance(px, py, cx, cy) <= sunR + tolerance) {
-        return VisibleHit.Sun
-    }
-
-    // Clusters: expand when collapsed; re-tap expanded cluster collapses (toggle in host)
-    if (model.clusters.isNotEmpty()) {
-        model.clusters.forEach { cluster ->
-            val (x, y) = clusterPosition(model, cluster)
-            val nx = cx + (x - model.centerX) * scale
-            val ny = cy + (y - model.centerY) * scale
-            val visualSize = (20f + minOf(cluster.count, 20) * 0.7f).coerceAtMost(34f)
-            val hitR = if (cluster.clusterId == expandedClusterId) {
-                visualSize * scale * 1.5f + tolerance
-            } else {
-                visualSize * scale + tolerance
-            }
-            if (GraphGeometry.distance(px, py, nx, ny) <= hitR) {
-                return VisibleHit.Cluster(cluster.clusterId)
-            }
-        }
-    }
-
-    val tasksToHit = if (expandedClusterId != null) {
-        val expanded = model.clusters.firstOrNull { it.clusterId == expandedClusterId }
-        val memberIds = expanded?.memberIds?.toSet() ?: emptySet()
-        model.tasks.filter { it.taskId in memberIds }.ifEmpty {
-            expanded?.memberIds?.mapIndexed { idx, id ->
-                val n = expanded.memberIds.size
-                val angle = if (n == 1) expanded.angle
-                else (idx.toFloat() / n) * GraphGeometry.TWO_PI +
-                    ((id * 92821) % 1000) / 1000f * 0.25f
-                VisibleTask(
-                    taskId = id,
-                    attentionScore = 0f,
-                    radius = expanded.radius,
-                    angle = angle,
-                    reasons = emptyList(),
-                    isBoulder = false,
-                    isOverdue = false,
-                    isNearDeadline = false,
-                    priority = null,
-                    title = ""
-                )
-            } ?: emptyList()
-        }
-    } else {
-        model.tasks
-    }
-
-    var bestId: Int? = null
-    var bestDist = Float.MAX_VALUE
-    val visualR = SAT_SIZE * scale * SAT_SIZE_MUL
-    tasksToHit.forEach { task ->
-        val (x, y) = taskPosition(model, task)
-        val nx = cx + (x - model.centerX) * scale
-        val ny = cy + (y - model.centerY) * scale
-        val d = GraphGeometry.distance(px, py, nx, ny)
-        if (d <= visualR + tolerance && d < bestDist) {
-            bestDist = d
-            bestId = task.taskId
-        }
-    }
-    if (bestId != null) return VisibleHit.Task(bestId)
-
-    // Progressive disclosure chrome: "N more" - Fixed bottom-left position
-    if (hiddenHintMeasured != null && model.hiddenCount > 0 && expandedClusterId == null) {
-        val horizontalPadding = 24f * density
-        val bottomPadding = 40f * density
-        val chipWidth = hiddenHintMeasured.size.width + 32f * density
-        val chipHeight = hiddenHintMeasured.size.height + 16f * density
-        val chipX = horizontalPadding
-        val chipY = (2f * model.viewportRadius * scale) - bottomPadding - chipHeight
-        
-        val left = chipX
-        val right = chipX + chipWidth
-        val top = chipY
-        val bottom = chipY + chipHeight
-        
-        if (px in left..right && py in top..bottom) {
-            return VisibleHit.ShowMore
-        }
-    }
-
-    return VisibleHit.None
-}
+// ── Legend ──
 
 @Composable
 private fun LegendRow(
